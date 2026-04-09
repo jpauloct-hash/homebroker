@@ -1421,6 +1421,60 @@ function fetchNews() {
 }
 
 
+// ── News summary via Claude API ───────────────────────────────────────────────
+function fetchSummary(item, cardEl) {
+  var btn = cardEl.querySelector(".news-expand-btn");
+  var box = cardEl.querySelector(".news-summary-box");
+  if (!btn || !box) return;
+
+  // Toggle: if already expanded, collapse
+  if (box.style.display === "block") {
+    box.style.display = "none";
+    btn.textContent = "Ver resumo";
+    return;
+  }
+
+  // Show loading
+  btn.textContent = "Carregando...";
+  btn.disabled = true;
+  box.style.display = "block";
+  box.innerHTML = '<div class="spin" style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;vertical-align:middle;margin-right:6px"></div> Resumindo noticia...';
+
+  var prompt = "Resuma em 3 a 5 linhas, em portugues, a seguinte noticia financeira. Destaque os pontos mais importantes para um investidor. Titulo: " + item.title + ". Fonte: " + item.source + ". URL: " + (item.url || "");
+
+  fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 300,
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      messages: [{ role: "user", content: prompt }]
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    var text = (d.content || []).map(function(b) {
+      return b.type === "text" ? b.text : "";
+    }).join("").trim();
+
+    if (!text) text = "Nao foi possivel gerar o resumo.";
+
+    box.innerHTML =
+      '<div style="font-size:11px;color:var(--tx2);line-height:1.7;margin-bottom:10px">' + text + '</div>' +
+      (item.url ? '<a href="' + item.url + '" target="_blank" style="font-size:10px;color:var(--bl);font-weight:700">Ler noticia completa &rarr;</a>' : '');
+
+    btn.textContent = "Fechar resumo";
+    btn.disabled = false;
+  })
+  .catch(function() {
+    box.innerHTML = '<div style="color:var(--r);font-size:11px">Erro ao carregar resumo.</div>' +
+      (item.url ? '<br><a href="' + item.url + '" target="_blank" style="font-size:10px;color:var(--bl)">Abrir noticia &rarr;</a>' : '');
+    btn.textContent = "Ver resumo";
+    btn.disabled = false;
+  });
+}
+
 function renderNewsTab() {
   var hdr  = document.getElementById("news-hdr");
   var list = document.getElementById("news-list");
@@ -1441,11 +1495,9 @@ function renderNewsTab() {
     var e = document.createElement("div");
     e.className = "ti";
     var tc = item.type === "macro" ? "var(--a)" : "var(--bl)";
-    e.style.borderLeft = "2px solid " + tc;
-    e.style.flexDirection = "column";
-    e.style.alignItems = "flex-start";
-    e.style.cursor = "pointer";
+    e.style.cssText = "border-left:2px solid "+tc+";flex-direction:column;align-items:flex-start;cursor:default;margin-bottom:8px;";
 
+    // Top row: badge + time
     var top = document.createElement("div");
     top.style.cssText = "display:flex;justify-content:space-between;width:100%;margin-bottom:5px";
     var badge = document.createElement("span");
@@ -1457,19 +1509,30 @@ function renderNewsTab() {
     time.textContent = item.time || "";
     top.appendChild(badge); top.appendChild(time);
 
+    // Title
     var title = document.createElement("div");
-    title.style.cssText = "font-size:12px;color:var(--tx);font-weight:600;line-height:1.5;margin-bottom:3px";
+    title.style.cssText = "font-size:12px;color:var(--tx);font-weight:600;line-height:1.5;margin-bottom:6px";
     title.textContent = item.title || "";
 
-    var src = document.createElement("div");
-    src.style.cssText = "font-size:10px;color:var(--tx3)";
-    src.textContent = item.source || "";
+    // Expand button
+    var btn = document.createElement("button");
+    btn.className = "news-expand-btn";
+    btn.style.cssText = "background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);border-radius:5px;color:var(--bl);font-size:10px;font-weight:700;padding:3px 10px;cursor:pointer;margin-bottom:6px;";
+    btn.textContent = "Ver resumo";
 
-    e.appendChild(top); e.appendChild(title); e.appendChild(src);
+    // Summary box (hidden by default)
+    var box = document.createElement("div");
+    box.className = "news-summary-box";
+    box.style.cssText = "display:none;background:var(--bg);border-radius:6px;padding:10px;margin-top:4px;width:100%;border:1px solid var(--bd2)";
 
-    if (item.url) {
-      (function(url){ e.onclick = function(){ window.open(url,"_blank"); }; })(item.url);
-    }
+    e.appendChild(top);
+    e.appendChild(title);
+    e.appendChild(btn);
+    e.appendChild(box);
+
+    // Wire expand button
+    (function(it, card){ btn.onclick = function(){ fetchSummary(it, card); }; })(item, e);
+
     list.appendChild(e);
   });
 }
