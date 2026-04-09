@@ -1821,32 +1821,67 @@ function buildTapePicker() {
   var countEl = document.getElementById("tape-count");
   if (!picker) return;
   picker.innerHTML = "";
-  ALL_TAPE_TICKERS.forEach(function(t) {
-    var isSelected = TAPE_TICKERS.indexOf(t) >= 0;
-    var label = document.createElement("label");
-    label.style.cssText = "display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid " + (isSelected ? "#1e4a80" : "var(--bd)") + ";background:" + (isSelected ? "#0d2040" : "transparent") + ";color:" + (isSelected ? "var(--bl)" : "var(--tx3)") + ";transition:all .15s;";
-    var cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.className = "tape-check";
-    cb.value = t;
-    cb.checked = isSelected;
-    cb.style.display = "none";
-    cb.onchange = function() {
-      var checked = picker.querySelectorAll(".tape-check:checked").length;
-      if (cb.checked && checked > 20) { cb.checked = false; notif("Maximo 20 tickers","err"); return; }
-      label.style.border = cb.checked ? "1px solid #1e4a80" : "1px solid var(--bd)";
-      label.style.background = cb.checked ? "#0d2040" : "transparent";
-      label.style.color = cb.checked ? "var(--bl)" : "var(--tx3)";
-      if (countEl) countEl.textContent = picker.querySelectorAll(".tape-check:checked").length;
-    };
-    var name = ALL_TAPE_NAMES[t] ? t : t;
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(t));
-    label.onclick = function(){ cb.checked = !cb.checked; cb.onchange(); };
-    picker.appendChild(label);
+
+  var segments = [
+    { label: "ACOES IBOVESPA", tickers: [
+      "PETR4","PETR3","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3",
+      "B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","ELET3","ELET6",
+      "HAPV3","TOTS3","CPLE6","ENEV3","CSAN3","LREN3","MGLU3","BEEF3","BRFS3","CYRE3",
+      "FLRY3","GGBR4","GOAU4","HYPE3","JBSS3","KLBN11","MRVE3","MULT3","RAIL3","SBSP3",
+      "TAEE11","TIMS3","TRPL4","USIM5","YDUQ3","NTCO3","POMO4"
+    ]},
+    { label: "ETFs", tickers: [
+      "BOVA11","SMAL11","IVVB11","DOLA11","GOLD11","HASH11","PIBB11","SPXI11","BBSD11","EURP11"
+    ]},
+    { label: "BDRs", tickers: [
+      "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34"
+    ]}
+  ];
+
+  var updateCount = function() {
+    var n = picker.querySelectorAll("input[type=checkbox]:checked").length;
+    if (countEl) countEl.textContent = n;
+  };
+
+  segments.forEach(function(seg) {
+    // Section header
+    var hdr = document.createElement("div");
+    hdr.style.cssText = "font-size:9px;font-weight:700;color:var(--a);letter-spacing:2px;margin:10px 0 6px;width:100%";
+    hdr.textContent = seg.label;
+    picker.appendChild(hdr);
+
+    // Ticker chips
+    seg.tickers.forEach(function(t) {
+      var isOn = TAPE_TICKERS.indexOf(t) >= 0;
+
+      var chip = document.createElement("div");
+      chip.style.cssText = "display:inline-flex;align-items:center;padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;margin:2px;transition:all .15s;border:1px solid " + (isOn ? "#1e4a80" : "var(--bd)") + ";background:" + (isOn ? "#0d2040" : "transparent") + ";color:" + (isOn ? "var(--bl)" : "var(--tx3)") + ";";
+      chip.textContent = t;
+
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = t;
+      cb.checked = isOn;
+      cb.style.display = "none";
+      chip.appendChild(cb);
+
+      chip.onclick = function() {
+        var total = picker.querySelectorAll("input[type=checkbox]:checked").length;
+        if (!cb.checked && total >= 20) { notif("Maximo 20 tickers","err"); return; }
+        cb.checked = !cb.checked;
+        chip.style.border = cb.checked ? "1px solid #1e4a80" : "1px solid var(--bd)";
+        chip.style.background = cb.checked ? "#0d2040" : "transparent";
+        chip.style.color = cb.checked ? "var(--bl)" : "var(--tx3)";
+        updateCount();
+      };
+
+      picker.appendChild(chip);
+    });
   });
-  if (countEl) countEl.textContent = TAPE_TICKERS.length;
+
+  updateCount();
 }
+
 
 function initApp() {
   $("ts").style.display="none"; $("ma").style.display="flex";
@@ -1888,15 +1923,17 @@ function initApp() {
   $("sht").onclick=function(e){ if(e.target===$("sht")) $("sht").classList.remove("on"); };
 
   $("tape-save").onclick = function() {
+    var picker = document.getElementById("tape-picker");
+    if (!picker) return;
     var selected = [];
-    var checks = document.querySelectorAll(".tape-check:checked");
+    var checks = picker.querySelectorAll("input[type=checkbox]:checked");
     for (var i=0; i<checks.length; i++) selected.push(checks[i].value);
     if (!selected.length) { notif("Selecione ao menos 1 ticker","err"); return; }
     TAPE_TICKERS = selected;
     localStorage.setItem("hb_tape_v1", JSON.stringify(selected));
     $("sht").classList.remove("on");
     renderTickers();
-    notif("Tape atualizado: " + selected.length + " tickers!");
+    notif("Tape: " + selected.length + " tickers salvos!");
   };
 
   $("s-save").onclick=function() {
