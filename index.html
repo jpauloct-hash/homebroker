@@ -1521,25 +1521,28 @@ function renderNewsTab() {
     return;
   }
 
-
+  var savedAutoExpand = autoExpandId;
+  var savedFocus = focusNewsId;
 
   newsCache.forEach(function(item) {
     var e = document.createElement("div");
     e.className = "ti";
+    e.id = "ni-" + item.id;
     var tc = item.type === "macro" ? "var(--a)" : "var(--bl)";
     e.style.cssText = "border-left:2px solid "+tc+";flex-direction:column;align-items:flex-start;cursor:default;margin-bottom:8px;";
 
-    // Top row: badge + time
+    // Top row
     var top = document.createElement("div");
     top.style.cssText = "display:flex;justify-content:space-between;width:100%;margin-bottom:5px";
     var badge = document.createElement("span");
     badge.className = "bdg";
-    badge.style.cssText = "background:rgba(255,255,255,.06);color:" + tc;
+    badge.style.cssText = "background:rgba(255,255,255,.06);color:"+tc;
     badge.textContent = item.ticker || item.source || "?";
     var time = document.createElement("span");
     time.style.cssText = "font-size:9px;color:var(--tx4)";
     time.textContent = item.time || "";
-    top.appendChild(badge); top.appendChild(time);
+    top.appendChild(badge);
+    top.appendChild(time);
 
     // Title
     var title = document.createElement("div");
@@ -1549,10 +1552,10 @@ function renderNewsTab() {
     // Expand button
     var btn = document.createElement("button");
     btn.className = "news-expand-btn";
-    btn.style.cssText = "background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);border-radius:5px;color:var(--bl);font-size:10px;font-weight:700;padding:3px 10px;cursor:pointer;margin-bottom:6px;";
+    btn.style.cssText = "background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);border-radius:5px;color:var(--bl);font-size:10px;font-weight:700;padding:3px 10px;cursor:pointer;margin-bottom:4px;font-family:inherit";
     btn.textContent = "Ver resumo";
 
-    // Summary box (hidden by default)
+    // Summary box
     var box = document.createElement("div");
     box.className = "news-summary-box";
     box.style.cssText = "display:none;background:var(--bg);border-radius:6px;padding:10px;margin-top:4px;width:100%;border:1px solid var(--bd2)";
@@ -1562,16 +1565,32 @@ function renderNewsTab() {
     e.appendChild(btn);
     e.appendChild(box);
 
-    // Wire expand button
-    (function(it, card){ btn.onclick = function(){ fetchSummary(it, card); }; })(item, e);
-    list.appendChild(e);
+    (function(it, card, b){ 
+      b.onclick = function(){ fetchSummary(it, card); }; 
+    })(item, e, btn);
 
-    // Auto-expand if coming from tape
-    if (autoExpandId && item.id === autoExpandId) {
-      (function(it, card){ setTimeout(function(){ showSummaryInCard(card, it); }, 100); })(item, e);
-      autoExpandId = null;
-    }
+    list.appendChild(e);
   });
+
+  // Scroll to focused item
+  if (savedFocus || savedAutoExpand) {
+    var targetId = savedAutoExpand || savedFocus;
+    focusNewsId = null;
+    autoExpandId = null;
+    setTimeout(function() {
+      var el = document.getElementById("ni-" + targetId);
+      if (!el) return;
+      el.scrollIntoView({behavior:"smooth", block:"start"});
+      // Auto-expand summary if coming from tape
+      if (savedAutoExpand) {
+        var targetItem = null;
+        for (var i = 0; i < newsCache.length; i++) {
+          if (newsCache[i].id === savedAutoExpand) { targetItem = newsCache[i]; break; }
+        }
+        if (targetItem) showSummaryInCard(el, targetItem);
+      }
+    }, 150);
+  }
 }
 
 
