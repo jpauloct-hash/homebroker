@@ -152,7 +152,10 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
   <div id="pregao-bar">
     <span id="pregao-sts" class="pregao-closed">&#9679; PREGAO FECHADO</span>
-    <span id="pregao-cd"></span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="pregao-cd"></span>
+      <button id="force-refresh" title="Atualizar cotações" style="background:transparent;border:none;color:var(--tx4);font-size:11px;padding:2px 4px;line-height:1;opacity:0.6;" onclick="fetchQ()">&#8635;</button>
+    </div>
   </div>
 
   <div id="goalbar">
