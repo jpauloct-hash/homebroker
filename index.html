@@ -1346,42 +1346,81 @@ function fetchNews() {
   if (now - newsLastFetch < NEWS_REFRESH) return;
   newsLastFetch = now;
 
-  var tickers = TICKERS.join(", ");
-  var prompt = [
-    "Busque as ultimas noticias financeiras do mercado brasileiro sobre: " + tickers,
-    "Ibovespa, B3, Banco Central, Selic, politica monetaria, Ministerio da Fazenda.",
-    "Retorne APENAS JSON valido neste formato exato, sem texto antes ou depois:",
-    '{"news":[{"id":1,"title":"titulo","source":"fonte","type":"macro","ticker":"","time":"ha X min","url":"https://exemplo.com"}]}',
-    "Regras: 20 noticias, apenas portugues, type=macro para BC/Selic/Fazenda, type=company para empresas."
-  ].join(" ");
+  // RSS feeds via allorigins CORS proxy (no API key needed)
+  var feeds = [
+    {url:"https://www.infomoney.com.br/feed/", label:"InfoMoney", type:"company"},
+    {url:"https://valoreconomico.globo.com/rss/financas/", label:"Valor", type:"company"},
+    {url:"https://agenciabrasil.ebc.com.br/rss/economia/feed.xml", label:"Ag.Brasil", type:"macro"},
+    {url:"https://www.bcb.gov.br/api/feed/pt-br/noticias", label:"BC", type:"macro"},
+    {url:"https://www.cvm.gov.br/noticias/rss.html", label:"CVM", type:"macro"}
+  ];
 
-  fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      tools: [{type: "web_search_20250305", name: "web_search"}],
-      messages: [{role: "user", content: prompt}]
-    })
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(d) {
-    var text = d.content.map(function(b) { return b.type === "text" ? b.text : ""; }).join("");
-    var start = text.indexOf('{"news":');
-    if (start === -1) return;
-    var end = text.lastIndexOf("}") + 1;
-    if (end <= start) return;
-    try {
-      var parsed = JSON.parse(text.slice(start, end));
-      if (!parsed.news || !parsed.news.length) return;
-      newsCache = parsed.news;
-      renderNewsTab();
-      buildNewsTape();
-    } catch(e) {}
-  })
-  .catch(function() {});
+  var PROXY = "https://api.allorigins.win/get?url=";
+  var allNews = [];
+  var completed = 0;
+
+  function done() {
+    completed++;
+    if (completed < feeds.length) return;
+    // Sort by date desc, deduplicate
+    allNews.sort(function(a,b){ return b.ts - a.ts; });
+    var seen = {};
+    newsCache = allNews.filter(function(n) {
+      if (seen[n.title]) return false;
+      seen[n.title] = true;
+      return true;
+    }).slice(0, 30);
+    // Assign IDs
+    newsCache.forEach(function(n, i){ n.id = i+1; });
+    renderNewsTab();
+    buildNewsTape();
+  }
+
+  feeds.forEach(function(feed) {
+    fetch(PROXY + encodeURIComponent(feed.url))
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        var xml = data.contents || "";
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(xml, "text/xml");
+        var items = doc.querySelectorAll("item");
+        items.forEach(function(item, idx) {
+          if (idx >= 8) return; // max 8 per feed
+          var title = (item.querySelector("title")||{textContent:""}).textContent.trim();
+          var link  = (item.querySelector("link")||{textContent:""}).textContent.trim() ||
+                      (item.querySelector("guid")||{textContent:""}).textContent.trim();
+          var pubDate = (item.querySelector("pubDate")||{textContent:""}).textContent.trim();
+          if (!title || title.length < 5) return;
+
+          // Filter: only Portuguese/Brazil relevant
+          var lower = title.toLowerCase();
+          var relevant = lower.match(/bolsa|ibovespa|selic|bc|real|juros|cvm|acoes|acao|mercado|brasil|b3|petrobras|vale|itau|bradesco|ambev|weg|embraer|dividendo|resultado|lucro|prejuizo|receita|banco|economia|inflacao|cambio|dolar|credito/);
+          if (!relevant) return;
+
+          // Detect ticker
+          var ticker = "";
+          TICKERS.forEach(function(t) {
+            if (title.toUpperCase().indexOf(t) >= 0) ticker = t;
+          });
+
+          // Time ago
+          var ts = pubDate ? new Date(pubDate).getTime() : Date.now();
+          var mins = Math.floor((Date.now() - ts) / 60000);
+          var timeStr = mins < 60 ? "ha " + mins + "min" :
+                        mins < 1440 ? "ha " + Math.floor(mins/60) + "h" :
+                        "ha " + Math.floor(mins/1440) + "d";
+
+          allNews.push({
+            title: title, source: feed.label, type: feed.type,
+            ticker: ticker, time: timeStr, url: link, ts: ts
+          });
+        });
+        done();
+      })
+      .catch(function(){ done(); });
+  });
 }
+
 
 function renderNewsTab() {
   var loading = $("news-loading");
