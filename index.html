@@ -1430,32 +1430,49 @@ function fetchNews() {
 
 function renderNewsTab() {
   var panel = document.getElementById("news-panel");
-  if (!panel) { return; }
-
-  var count = newsCache.length;
-  var inner = '<div style="padding:20px">' +
-    '<div style="color:#f59e0b;font-size:13px;font-weight:700;margin-bottom:12px">' +
-      count + ' noticias carregadas' +
-    '</div>';
-
-  for (var i = 0; i < Math.min(count, 20); i++) {
-    var n = newsCache[i];
-    var tc = n.type === "macro" ? "#f59e0b" : "#60a5fa";
-    var tg = n.ticker || n.source || "";
-    var ti = (n.title || "").replace(/</g,"&lt;");
-    var tm = n.time || "";
-    inner +=
-      '<div style="background:#0c1220;border:1px solid #0f1e30;border-radius:8px;padding:12px;margin-bottom:8px;">' +
-        '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
-          '<span style="color:' + tc + ';font-size:9px;font-weight:700">[' + tg + ']</span>' +
-          '<span style="color:#1a3050;font-size:9px">' + tm + '</span>' +
-        '</div>' +
-        '<div style="color:#dde8f5;font-size:12px;line-height:1.5">' + ti + '</div>' +
-      '</div>';
+  if (!panel) {
+    alert("news-panel not found!");
+    return;
   }
+  var n = newsCache.length;
+  panel.style.background = "#0c1220";
+  panel.style.overflowY = "auto";
+  panel.style.padding = "20px";
+  
+  // Clear old content
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
 
-  inner += '</div>';
-  panel.innerHTML = '<div style="position:absolute;inset:0;overflow-y:auto">' + inner + '</div>';
+  // Header
+  var hdr = document.createElement("p");
+  hdr.style.color = "#f59e0b";
+  hdr.style.fontSize = "14px";
+  hdr.style.fontWeight = "700";
+  hdr.style.marginBottom = "16px";
+  hdr.textContent = n + " noticias";
+  panel.appendChild(hdr);
+
+  // Cards
+  for (var i = 0; i < Math.min(n, 20); i++) {
+    var item = newsCache[i];
+    var card = document.createElement("div");
+    card.style.cssText = "background:#0f1e30;border-radius:8px;padding:12px;margin-bottom:10px;";
+
+    var tag = document.createElement("div");
+    tag.style.cssText = "color:#60a5fa;font-size:10px;font-weight:700;margin-bottom:6px";
+    tag.textContent = "[" + (item.ticker || item.source || "?") + "] " + (item.time || "");
+    card.appendChild(tag);
+
+    var title = document.createElement("div");
+    title.style.cssText = "color:#dde8f5;font-size:12px;line-height:1.5";
+    title.textContent = item.title || "(sem titulo)";
+    card.appendChild(title);
+
+    if (item.url) {
+      card.style.cursor = "pointer";
+      (function(url){ card.onclick = function(){ window.open(url,"_blank"); }; })(item.url);
+    }
+    panel.appendChild(card);
+  }
 }
 
 
