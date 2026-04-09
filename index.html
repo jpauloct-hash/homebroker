@@ -1429,66 +1429,64 @@ function fetchNews() {
 
 
 function renderNewsTab() {
-  var sp = document.querySelector("#news-panel .sp");
-  if (!sp) return;
+  var panel = document.getElementById("news-panel");
+  if (!panel) return;
 
   if (!newsCache.length) {
-    sp.innerHTML =
-      '<div style="text-align:center;padding:40px 20px;color:#3a5878;font-size:11px">' +
-      '<div class="spin" style="display:inline-block;width:16px;height:16px;border:2px solid #f59e0b;border-top-color:transparent;border-radius:50%;margin-bottom:12px"></div>' +
-      '<br>Buscando noticias...' +
+    panel.innerHTML =
+      '<div style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#3a5878;font-size:11px;gap:10px">' +
+      '<div class="spin" style="width:18px;height:18px;border:2px solid #f59e0b;border-top-color:transparent;border-radius:50%"></div>' +
+      'Buscando noticias...' +
       '</div>';
     return;
   }
 
-  var html = '<div style="padding:0 0 60px 0">';
-
   var macro   = newsCache.filter(function(n){ return n.type === "macro"; });
   var company = newsCache.filter(function(n){ return n.type === "company"; });
-  var list    = (macro.length + company.length === 0) ? newsCache : null;
+  if (!macro.length && !company.length) {
+    macro = newsCache.slice(0, 10);
+    company = newsCache.slice(10);
+  }
 
-  function section(items, color, title) {
-    if (!items || !items.length) return "";
-    var s = '<div style="font-size:9px;font-weight:700;color:' + color + ';letter-spacing:2px;margin-bottom:8px;margin-top:8px">' + title + '</div>';
-    items.slice(0,20).forEach(function(n) {
+  var html = '<div style="overflow-y:auto;height:100%;padding:14px 14px 60px">';
+
+  function makeSection(items, color, label) {
+    if (!items.length) return "";
+    var s = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:' + color + ';margin-bottom:8px;margin-top:4px">' + label + '</div>';
+    items.slice(0, 20).forEach(function(n) {
       var tc = n.type === "macro" ? "#f59e0b" : "#60a5fa";
-      var tag = (n.ticker || n.source || "").toString();
-      var title2 = (n.title || "").toString().replace(/</g,"&lt;").replace(/>/g,"&gt;");
-      var src = (n.source || "").toString();
-      var time2 = (n.time || "").toString();
-      var nid = n.id || 0;
-      s += '<div class="news-item" id="ni-' + nid + '" data-url="' + (n.url||"").replace(/"/g,"&quot;") + '">' +
+      var tg = String(n.ticker || n.source || "");
+      var ti = String(n.title || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      var sc = String(n.source || "");
+      var tm = String(n.time || "");
+      var id = n.id || 0;
+      var ur = String(n.url || "");
+      s += '<div class="news-item" id="ni-'+id+'" data-url="'+ur+'">' +
         '<div style="display:flex;justify-content:space-between;margin-bottom:5px">' +
-          '<span style="font-size:9px;font-weight:700;color:' + tc + ';background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">' + tag + '</span>' +
-          '<span style="font-size:9px;color:#1a3050">' + time2 + '</span>' +
+          '<span style="font-size:9px;font-weight:700;color:'+tc+';background:rgba(255,255,255,.07);padding:2px 6px;border-radius:4px">'+tg+'</span>' +
+          '<span style="font-size:9px;color:#1a3050">'+tm+'</span>' +
         '</div>' +
-        '<div style="font-size:12px;color:#dde8f5;font-weight:600;line-height:1.5;margin-bottom:4px">' + title2 + '</div>' +
-        '<div style="font-size:10px;color:#3a5878">' + src + '</div>' +
+        '<div style="font-size:12px;color:#dde8f5;font-weight:600;line-height:1.5;margin-bottom:3px">'+ti+'</div>' +
+        '<div style="font-size:10px;color:#3a5878">'+sc+'</div>' +
       '</div>';
     });
     return s;
   }
 
-  if (list) {
-    html += section(list, "#60a5fa", "NOTICIAS");
-  } else {
-    html += section(macro,   "#f59e0b", "MACRO - BC - FAZENDA - CVM");
-    html += section(company, "#60a5fa", "EMPRESAS - IBOVESPA");
-  }
+  html += makeSection(macro,   "#f59e0b", "MACRO - BC - FAZENDA");
+  html += makeSection(company, "#60a5fa", "EMPRESAS - IBOVESPA");
+  html += '</div>';
 
-  html += "</div>";
-  sp.innerHTML = html;
+  panel.innerHTML = html;
 
-  // Wire up onclick for each card
-  var cards = sp.querySelectorAll(".news-item");
-  cards.forEach(function(card) {
-    card.onclick = function() {
-      var url = card.getAttribute("data-url");
-      if (url && url.indexOf("http") === 0) window.open(url, "_blank");
+  // Wire onclick
+  panel.querySelectorAll(".news-item").forEach(function(el) {
+    el.onclick = function() {
+      var url = el.getAttribute("data-url");
+      if (url && url.length > 4) window.open(url, "_blank");
     };
   });
 
-  // Scroll to focused item
   if (focusNewsId) {
     setTimeout(function() {
       var el = document.getElementById("ni-" + focusNewsId);
@@ -1524,14 +1522,13 @@ function buildNewsTape() {
       span.onclick = function() {
         var nid = parseInt(span.dataset.newsId);
         focusNewsId = nid;
-        // Switch to news tab
         document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
         document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("on"); });
         $("news-panel").classList.add("on");
         var newsTab = document.querySelector(".tab[data-t='news']");
         if (newsTab) newsTab.classList.add("on");
         $("pb").style.display = "none";
-        renderNewsTab();
+        setTimeout(function(){ renderNewsTab(); }, 50);
       };
       el.appendChild(span);
     });
