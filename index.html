@@ -1918,7 +1918,7 @@ function initApp() {
 
   $("exec").onclick=execOrder;
 
-  $("cfgb").onclick=function() { $("tdsp").textContent=token.slice(0,8)+"..."+token.slice(-4); $("s-end").value=goal.endDate||""; $("s-tgt").value=goal.target||""; $("sht").classList.add("on"); };
+  $("cfgb").onclick=function() { $("tdsp").textContent=token.slice(0,8)+"..."+token.slice(-4); $("s-end").value=goal.endDate||""; $("s-tgt").value=goal.target||""; buildTapePicker(); $("sht").classList.add("on"); };
   $("csht").onclick=function(){ $("sht").classList.remove("on"); };
   $("sht").onclick=function(e){ if(e.target===$("sht")) $("sht").classList.remove("on"); };
 
