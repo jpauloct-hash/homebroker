@@ -92,6 +92,10 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 #cfm{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:none;align-items:center;justify-content:center;padding:24px;}
 #cfm.on{display:flex;}
 .cfm-box{width:100%;max-width:360px;background:#0d1421;border-radius:14px;padding:24px;border:1px solid var(--r);animation:slideup .2s ease;}
+.news-item{background:var(--bg3);border-radius:9px;padding:13px 14px;margin-bottom:8px;border:1px solid var(--bd);cursor:pointer;transition:background .15s;}
+.news-item:active{background:var(--bd);}
+.news-tape-item{font-size:9px;color:var(--tx2);padding:0 16px;cursor:pointer;white-space:nowrap;letter-spacing:.3px;}
+.news-tape-item .nt-tag{font-weight:700;}
 .ticker-result{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s;}
 .ticker-result:last-child{border-bottom:none;}
 .ticker-result:active{background:var(--bg3);}
@@ -175,6 +179,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
   <div id="tks-wrap"><div id="tks"></div></div>
 
+  <!-- News tape -->
+  <div id="news-tape-wrap" style="overflow:hidden;background:#060b14;border-bottom:1px solid var(--bd);flex-shrink:0;height:24px;display:flex;align-items:center;">
+    <div id="news-tape" style="display:flex;gap:0;width:max-content;white-space:nowrap;will-change:transform;"></div>
+  </div>
+
   <div id="sb">
     <div>
       <div id="ssym" style="font-size:16px;font-weight:700;color:var(--bl);letter-spacing:1px"></div>
@@ -192,6 +201,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <button class="tab" data-t="order">ORDENS</button>
       <button class="tab" data-t="portfolio">CARTEIRA</button>
       <button class="tab" data-t="history">HISTÓRICO</button>
+      <button class="tab" data-t="news">NOTÍCIAS</button>
     </div>
     <div id="pb">
       <span style="font-size:9px;color:var(--tx4);margin-right:4px">PERÍODO</span>
@@ -300,6 +310,26 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <div id="hcnt" style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:12px"></div>
         <div id="hlist"></div>
       </div>
+    <div id="news-panel" class="panel">
+      <div class="sp">
+        <div id="news-loading" style="text-align:center;padding:30px 20px;color:var(--tx4);font-size:11px">
+          <div class="spin" style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;margin-bottom:8px"></div><br>
+          Buscando notícias...
+        </div>
+        <div id="news-macro-sec" style="display:none">
+          <div style="font-size:9px;color:var(--a);letter-spacing:2px;margin-bottom:8px;padding:0 2px">MACRO · BC · FAZENDA · CVM</div>
+          <div id="news-macro-list"></div>
+        </div>
+        <div id="news-co-sec" style="display:none;margin-top:4px">
+          <div style="font-size:9px;color:var(--bl);letter-spacing:2px;margin-bottom:8px;padding:0 2px">EMPRESAS · IBOVESPA</div>
+          <div id="news-co-list"></div>
+        </div>
+        <div id="news-empty" style="display:none;text-align:center;padding:40px 20px;color:var(--tx4);font-size:11px">
+          <div style="font-size:32px;margin-bottom:10px">📰</div>Nenhuma notícia disponível.
+        </div>
+      </div>
+    </div>
+
     </div>
   </div>
 </div>
@@ -1284,6 +1314,216 @@ function updateExecBtn() {
   }
 }
 
+// ── News system ──────────────────────────────────────────────────────────────
+var newsCache = [];
+var newsTapeItems = [];
+var newsTapeX = 0;
+var newsTapeOneW = 0;
+var newsTapeRAF = null;
+var newsTapePaused = false;
+var newsTapeDragging = false;
+var newsTapeDragStartX = 0;
+var newsTapeDragStartTapeX = 0;
+var newsLastFetch = 0;
+var NEWS_REFRESH = 15 * 60 * 1000; // 15 min during pregão
+var focusNewsId = null; // news to scroll to when opening tab
+
+// RSS feeds via Claude proxy (CORS bypass)
+var NEWS_SOURCES = [
+  // Macro
+  {url:"https://www.bcb.gov.br/api/feed/pt-br/noticias", label:"BC", type:"macro"},
+  {url:"https://www.gov.br/fazenda/pt-br/assuntos/noticias/RSS", label:"FAZENDA", type:"macro"},
+  {url:"https://www.cvm.gov.br/noticias/rss.html", label:"CVM", type:"macro"},
+  // Empresas / B3
+  {url:"https://www.infomoney.com.br/feed/", label:"INFOMONEY", type:"company"},
+  {url:"https://valoreconomico.globo.com/rss/mercados/", label:"VALOR", type:"company"}
+];
+
+var TICKER_KEYS = TICKERS.concat(["IBOVESPA","IBOV","B3","BOVESPA"]);
+
+function fetchNews() {
+  var now = Date.now();
+  if (now - newsLastFetch < NEWS_REFRESH) return;
+  newsLastFetch = now;
+
+  var prompt = 'Busque as últimas notícias financeiras do mercado brasileiro relacionadas a estas empresas e tickers: ' +
+    TICKERS.join(", ") + ', Ibovespa, B3, Banco Central, Selic, política monetária, Ministério da Fazenda.
+
+' +
+    'Retorne SOMENTE um JSON válido com este formato, sem texto adicional:
+' +
+    '{"news":[{"id":1,"title":"título da notícia","source":"nome da fonte","type":"macro ou company","ticker":"PETR4 ou vazio","time":"há X minutos/horas","url":"https://..."}]}
+
+' +
+    'Retorne 20 notícias recentes, apenas em português, priorizando as mais recentes. ' +
+    'type deve ser "macro" para BC/Selic/Fazenda/economia e "company" para notícias de empresas específicas.';
+
+  fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-20250514",
+      max_tokens:2000,
+      tools:[{type:"web_search_20250305",name:"web_search"}],
+      messages:[{role:"user",content:prompt}]
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    var text = d.content.map(function(b){ return b.type==="text"?b.text:""; }).join("");
+    var match = text.match(/\{[\s\S]*"news"[\s\S]*\}/);
+    if (!match) return;
+    var parsed = JSON.parse(match[0]);
+    if (!parsed.news || !parsed.news.length) return;
+    newsCache = parsed.news;
+    renderNewsTab();
+    buildNewsTape();
+  })
+  .catch(function(){});
+}
+
+function renderNewsTab() {
+  var loading = $("news-loading");
+  var macroSec = $("news-macro-sec");
+  var coSec = $("news-co-sec");
+  var emptyEl = $("news-empty");
+
+  if (!newsCache.length) {
+    if (loading) loading.style.display = "none";
+    if (emptyEl) emptyEl.style.display = "block";
+    return;
+  }
+
+  if (loading) loading.style.display = "none";
+  if (emptyEl) emptyEl.style.display = "none";
+
+  var macroNews = newsCache.filter(function(n){ return n.type==="macro"; }).slice(0,20);
+  var coNews    = newsCache.filter(function(n){ return n.type==="company"; }).slice(0,20);
+
+  function renderList(items, listId, secId) {
+    var sec = $(secId), list = $(listId);
+    if (!sec || !list) return;
+    if (!items.length) { sec.style.display="none"; return; }
+    sec.style.display = "block";
+    list.innerHTML = "";
+    items.forEach(function(n) {
+      var el = document.createElement("div");
+      el.className = "news-item";
+      el.id = "news-item-"+n.id;
+      var tagColor = n.type==="macro" ? "var(--a)" : "var(--bl)";
+      var tag = n.ticker ? n.ticker : n.source;
+      el.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
+          '<span style="font-size:9px;font-weight:700;color:'+tagColor+';letter-spacing:1px;background:rgba(255,255,255,.05);padding:2px 6px;border-radius:4px">'+tag+'</span>' +
+          '<span style="font-size:9px;color:var(--tx4)">'+n.time+'</span>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--tx);line-height:1.5;font-weight:600;margin-bottom:4px">'+n.title+'</div>' +
+        '<div style="font-size:10px;color:var(--tx3)">'+n.source+' · Toque para abrir</div>';
+      el.onclick = function() {
+        if (n.url && n.url.startsWith("http")) window.open(n.url,"_blank");
+      };
+      // Highlight if focused
+      if (focusNewsId && focusNewsId === n.id) {
+        el.style.border = "1px solid var(--a)";
+        setTimeout(function(){ el.style.border="1px solid var(--bd)"; }, 2000);
+      }
+      list.appendChild(el);
+    });
+  }
+
+  renderList(macroNews, "news-macro-list", "news-macro-sec");
+  renderList(coNews,    "news-co-list",    "news-co-sec");
+
+  // Scroll to focused news if set
+  if (focusNewsId) {
+    setTimeout(function() {
+      var el = $("news-item-"+focusNewsId);
+      if (el) el.scrollIntoView({behavior:"smooth",block:"center"});
+      focusNewsId = null;
+    }, 150);
+  }
+}
+
+function buildNewsTape() {
+  var el = $("news-tape");
+  if (!el || !newsCache.length) return;
+
+  var items = newsCache.slice(0, 10); // 10 in tape
+  newsTapeItems = items;
+  el.innerHTML = "";
+
+  // Build 3x for seamless loop
+  for (var pass=0; pass<3; pass++) {
+    items.forEach(function(n) {
+      var span = document.createElement("span");
+      span.className = "news-tape-item";
+      var tagColor = n.type==="macro" ? "#f59e0b" : "#60a5fa";
+      var tag = n.ticker || n.source;
+      span.innerHTML = '<span class="nt-tag" style="color:'+tagColor+'">['+ tag +']</span> '+n.title+' &nbsp;&nbsp;·&nbsp;&nbsp;';
+      span.dataset.newsId = n.id;
+      span.onclick = function() {
+        var nid = parseInt(span.dataset.newsId);
+        focusNewsId = nid;
+        // Switch to news tab
+        document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
+        document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("on"); });
+        $("news-panel").classList.add("on");
+        var newsTab = document.querySelector(".tab[data-t='news']");
+        if (newsTab) newsTab.classList.add("on");
+        $("pb").style.display = "none";
+        renderNewsTab();
+      };
+      el.appendChild(span);
+    });
+  }
+
+  // Init tape scroll
+  setTimeout(function() {
+    var children = el.querySelectorAll(".news-tape-item");
+    var oneSet = Math.floor(children.length / 3);
+    newsTapeOneW = 0;
+    for (var i=0; i<oneSet; i++) newsTapeOneW += children[i].offsetWidth;
+    newsTapeX = -newsTapeOneW;
+    el.style.transform = "translateX("+newsTapeX+"px)";
+    cancelAnimationFrame(newsTapeRAF);
+    newsTapeLoop();
+  }, 200);
+}
+
+function newsTapeLoop() {
+  if (!newsTapePaused) {
+    newsTapeX -= 0.8;
+    var el = $("news-tape");
+    if (el) {
+      if (newsTapeX < -(newsTapeOneW*2)) newsTapeX += newsTapeOneW;
+      if (newsTapeX > 0) newsTapeX -= newsTapeOneW;
+      el.style.transform = "translateX("+newsTapeX+"px)";
+    }
+  }
+  newsTapeRAF = requestAnimationFrame(newsTapeLoop);
+}
+
+function initNewsTape() {
+  var wrap = $("news-tape-wrap");
+  if (!wrap) return;
+  wrap.addEventListener("touchstart", function(e) {
+    newsTapePaused = true;
+    newsTapeDragging = true;
+    newsTapeDragStartX = e.touches[0].clientX;
+    newsTapeDragStartTapeX = newsTapeX;
+  }, {passive:true});
+  wrap.addEventListener("touchmove", function(e) {
+    if (!newsTapeDragging) return;
+    newsTapeX = newsTapeDragStartTapeX + (e.touches[0].clientX - newsTapeDragStartX);
+    var el = $("news-tape");
+    if (el) el.style.transform = "translateX("+newsTapeX+"px)";
+  }, {passive:true});
+  wrap.addEventListener("touchend", function() {
+    newsTapeDragging = false;
+    newsTapePaused = false;
+  }, {passive:true});
+}
+
 // ── Ticker quick search ───────────────────────────────────────────────────────
 function initTickerSearch() {
   var input = $("ticker-search");
@@ -1427,6 +1667,11 @@ function initApp() {
 
   updateExecBtn(); updatePregaoBar(); render(); loadTV(); startRefresh();
   initTickerSearch();
+  initNewsTape();
+  // Fetch news after a short delay to not block startup
+  setTimeout(function(){ fetchNews(); }, 4000);
+  // Refresh news every 15 min
+  setInterval(function(){ fetchNews(); }, 15*60*1000);
 }
 
 $("tbtn").onclick=function() {
