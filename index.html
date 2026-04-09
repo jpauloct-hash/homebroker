@@ -1429,70 +1429,64 @@ function fetchNews() {
 
 
 function renderNewsTab() {
-  var loading = $("news-loading");
-  var macroSec = $("news-macro-sec");
-  var coSec = $("news-co-sec");
-  var emptyEl = $("news-empty");
+  var panel = $("news-panel");
+  if (!panel) return;
+
+  var sp = panel.querySelector(".sp");
+  if (!sp) return;
+
+  // Clear and rebuild entire content
+  sp.innerHTML = "";
 
   if (!newsCache.length) {
-    if (loading) loading.style.display = "block";
-    if (emptyEl) emptyEl.style.display = "none";
+    sp.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--tx4);font-size:11px"><div style="font-size:32px;margin-bottom:10px">&#128240;</div>Nenhuma noticia disponivel.<br><span style="font-size:10px">As noticias aparecem 4 segundos apos carregar o app.</span></div>';
     return;
   }
-  if (loading) loading.style.display = "none";
-  if (emptyEl) emptyEl.style.display = "none";
-  // Make sure sections are reset
-  var macroSec2 = $("news-macro-sec");
-  var coSec2 = $("news-co-sec");
-  if (macroSec2) macroSec2.style.display = "none";
-  if (coSec2) coSec2.style.display = "none";
 
-  var macroNews = newsCache.filter(function(n){ return n.type==="macro"; }).slice(0,20);
-  var coNews    = newsCache.filter(function(n){ return n.type==="company"; }).slice(0,20);
+  var macro   = newsCache.filter(function(n){ return n.type === "macro"; });
+  var company = newsCache.filter(function(n){ return n.type === "company"; });
 
-  function renderList(items, listId, secId) {
-    var sec = $(secId), list = $(listId);
-    if (!sec || !list) return;
-    if (!items.length) { sec.style.display="none"; return; }
-    sec.style.display = "block";
-    list.innerHTML = "";
-    items.forEach(function(n) {
-      var el = document.createElement("div");
-      el.className = "news-item";
-      el.id = "news-item-"+n.id;
-      var tagColor = n.type==="macro" ? "var(--a)" : "var(--bl)";
+  function makeCards(items, headerColor, headerText) {
+    if (!items.length) return "";
+    var html = '<div style="font-size:9px;font-weight:700;color:' + headerColor + ';letter-spacing:2px;margin-bottom:8px;padding:0 2px">' + headerText + '</div>';
+    items.slice(0,20).forEach(function(n) {
+      var tagColor = n.type === "macro" ? "#f59e0b" : "#60a5fa";
       var tag = n.ticker ? n.ticker : n.source;
-      el.innerHTML =
+      var nid = n.id || 0;
+      html += '<div class="news-item" id="news-item-' + nid + '" onclick="openNewsUrl('' + (n.url||"").replace(/'/g,"%27") + '')">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
-          '<span style="font-size:9px;font-weight:700;color:'+tagColor+';letter-spacing:1px;background:rgba(255,255,255,.05);padding:2px 6px;border-radius:4px">'+tag+'</span>' +
-          '<span style="font-size:9px;color:var(--tx4)">'+n.time+'</span>' +
+          '<span style="font-size:9px;font-weight:700;color:' + tagColor + ';background:rgba(255,255,255,.06);padding:2px 7px;border-radius:4px">' + tag + '</span>' +
+          '<span style="font-size:9px;color:var(--tx4)">' + n.time + '</span>' +
         '</div>' +
-        '<div style="font-size:12px;color:var(--tx);line-height:1.5;font-weight:600;margin-bottom:4px">'+n.title+'</div>' +
-        '<div style="font-size:10px;color:var(--tx3)">'+n.source+' - Toque para abrir</div>';
-      el.onclick = function() {
-        if (n.url && n.url.startsWith("http")) window.open(n.url,"_blank");
-      };
-      // Highlight if focused
-      if (focusNewsId && focusNewsId === n.id) {
-        el.style.border = "1px solid var(--a)";
-        setTimeout(function(){ el.style.border="1px solid var(--bd)"; }, 2000);
-      }
-      list.appendChild(el);
+        '<div style="font-size:12px;color:var(--tx);line-height:1.5;font-weight:600;margin-bottom:4px">' + n.title + '</div>' +
+        '<div style="font-size:10px;color:var(--tx3)">' + n.source + '</div>' +
+      '</div>';
     });
+    return html;
   }
 
-  renderList(macroNews, "news-macro-list", "news-macro-sec");
-  renderList(coNews,    "news-co-list",    "news-co-sec");
+  var html = "";
+  if (macro.length)   html += makeCards(macro,   "#f59e0b", "MACRO - BC - FAZENDA - CVM");
+  if (company.length) html += makeCards(company, "#60a5fa", "EMPRESAS - IBOVESPA");
+  if (!html) {
+    html = '<div style="text-align:center;padding:30px;color:var(--tx4);font-size:11px">Nenhuma noticia relevante encontrada.</div>';
+  }
+  sp.innerHTML = '<div style="padding-bottom:60px">' + html + '</div>';
 
-  // Scroll to focused news if set
+  // Scroll to focused news
   if (focusNewsId) {
     setTimeout(function() {
-      var el = $("news-item-"+focusNewsId);
-      if (el) el.scrollIntoView({behavior:"smooth",block:"center"});
+      var el = $("news-item-" + focusNewsId);
+      if (el) el.scrollIntoView({behavior:"smooth", block:"center"});
       focusNewsId = null;
     }, 150);
   }
 }
+
+function openNewsUrl(url) {
+  if (url && url.indexOf("http") === 0) window.open(url, "_blank");
+}
+
 
 function buildNewsTape() {
   var el = $("news-tape");
