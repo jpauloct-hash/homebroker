@@ -312,25 +312,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       </div>
     <div id="news-panel" class="panel">
       <div class="sp">
-        <div id="news-loading" style="text-align:center;padding:30px 20px;color:var(--tx4);font-size:11px;display:none">
-          <div class="spin" style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;margin-bottom:8px"></div><br>
-          Buscando notícias...
-        </div>
-        <div id="news-macro-sec" style="display:none">
-          <div style="font-size:9px;color:var(--a);letter-spacing:2px;margin-bottom:8px;padding:0 2px">MACRO · BC · FAZENDA · CVM</div>
-          <div id="news-macro-list"></div>
-        </div>
-        <div id="news-co-sec" style="display:none;margin-top:4px">
-          <div style="font-size:9px;color:var(--bl);letter-spacing:2px;margin-bottom:8px;padding:0 2px">EMPRESAS · IBOVESPA</div>
-          <div id="news-co-list"></div>
-        </div>
-        <div id="news-empty" style="display:none;text-align:center;padding:40px 20px;color:var(--tx4);font-size:11px">
-          <div style="font-size:32px;margin-bottom:10px">📰</div>Nenhuma notícia disponível.
-        </div>
+        <div id="news-hdr" style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:12px"></div>
+        <div id="news-list"></div>
       </div>
     </div>
 
-    </div>
   </div>
 </div>
 
@@ -1429,50 +1415,54 @@ function fetchNews() {
 
 
 function renderNewsTab() {
-  notif("NEWS: " + newsCache.length + " itens | panel=" + (document.getElementById("news-panel") ? "OK" : "NULL"));
-  var panel = document.getElementById("news-panel");
-  if (!panel) {
+  var hdr  = document.getElementById("news-hdr");
+  var list = document.getElementById("news-list");
+  if (!list) return;
+
+  var n = newsCache.length;
+  if (hdr) hdr.textContent = n + " NOTICIAS";
+  list.innerHTML = "";
+
+  if (!n) {
+    list.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:10px">&#128240;</div>Buscando noticias...</div>';
     return;
   }
-  var n = newsCache.length;
-  panel.style.background = "#0c1220";
-  panel.style.overflowY = "auto";
-  panel.style.padding = "20px";
-  
-  // Clear old content
-  while (panel.firstChild) panel.removeChild(panel.firstChild);
 
-  // Header
-  var hdr = document.createElement("p");
-  hdr.style.color = "#f59e0b";
-  hdr.style.fontSize = "14px";
-  hdr.style.fontWeight = "700";
-  hdr.style.marginBottom = "16px";
-  hdr.textContent = n + " noticias";
-  panel.appendChild(hdr);
+  newsCache.forEach(function(item) {
+    var e = document.createElement("div");
+    e.className = "ti";
+    var tc = item.type === "macro" ? "var(--a)" : "var(--bl)";
+    e.style.borderLeft = "2px solid " + tc;
+    e.style.flexDirection = "column";
+    e.style.alignItems = "flex-start";
+    e.style.cursor = "pointer";
 
-  // Cards
-  for (var i = 0; i < Math.min(n, 20); i++) {
-    var item = newsCache[i];
-    var card = document.createElement("div");
-    card.style.cssText = "background:#0f1e30;border-radius:8px;padding:12px;margin-bottom:10px;";
-
-    var tag = document.createElement("div");
-    tag.style.cssText = "color:#60a5fa;font-size:10px;font-weight:700;margin-bottom:6px";
-    tag.textContent = "[" + (item.ticker || item.source || "?") + "] " + (item.time || "");
-    card.appendChild(tag);
+    var top = document.createElement("div");
+    top.style.cssText = "display:flex;justify-content:space-between;width:100%;margin-bottom:5px";
+    var badge = document.createElement("span");
+    badge.className = "bdg";
+    badge.style.cssText = "background:rgba(255,255,255,.06);color:" + tc;
+    badge.textContent = item.ticker || item.source || "?";
+    var time = document.createElement("span");
+    time.style.cssText = "font-size:9px;color:var(--tx4)";
+    time.textContent = item.time || "";
+    top.appendChild(badge); top.appendChild(time);
 
     var title = document.createElement("div");
-    title.style.cssText = "color:#dde8f5;font-size:12px;line-height:1.5";
-    title.textContent = item.title || "(sem titulo)";
-    card.appendChild(title);
+    title.style.cssText = "font-size:12px;color:var(--tx);font-weight:600;line-height:1.5;margin-bottom:3px";
+    title.textContent = item.title || "";
+
+    var src = document.createElement("div");
+    src.style.cssText = "font-size:10px;color:var(--tx3)";
+    src.textContent = item.source || "";
+
+    e.appendChild(top); e.appendChild(title); e.appendChild(src);
 
     if (item.url) {
-      card.style.cursor = "pointer";
-      (function(url){ card.onclick = function(){ window.open(url,"_blank"); }; })(item.url);
+      (function(url){ e.onclick = function(){ window.open(url,"_blank"); }; })(item.url);
     }
-    panel.appendChild(card);
-  }
+    list.appendChild(e);
+  });
 }
 
 
