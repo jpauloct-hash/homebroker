@@ -92,6 +92,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 #cfm{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:none;align-items:center;justify-content:center;padding:24px;}
 #cfm.on{display:flex;}
 .cfm-box{width:100%;max-width:360px;background:#0d1421;border-radius:14px;padding:24px;border:1px solid var(--r);animation:slideup .2s ease;}
+.ticker-result{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s;}
+.ticker-result:last-child{border-bottom:none;}
+.ticker-result:active{background:var(--bg3);}
 #nf{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:999;padding:9px 18px;border-radius:8px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none;pointer-events:none;}
 #nf.on{display:block;animation:fadein .2s ease;}
 /* Pregão status */
@@ -205,6 +208,14 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
     <div id="order-panel" class="panel">
       <div class="sp">
+        <!-- Quick ticker search -->
+        <div style="position:relative;margin-bottom:12px;">
+          <input type="text" id="ticker-search" placeholder="Buscar ticker... ex: PETR4"
+            autocomplete="off" autocapitalize="characters"
+            style="width:100%;padding:10px 14px 10px 36px;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:13px;outline:none;font-family:inherit;letter-spacing:1px;">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--tx3);">&#128269;</span>
+          <div id="ticker-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--bd2);border-radius:8px;margin-top:3px;z-index:50;overflow:hidden;"></div>
+        </div>
         <div class="bs">
           <button class="bsb" id="bbuy" style="background:var(--g);color:#fff;box-shadow:0 0 20px rgba(0,200,150,.35)">&#9650; COMPRAR</button>
           <button class="bsb" id="bsel" style="background:var(--bg3);color:var(--tx3)">&#9660; VENDER</button>
@@ -1228,6 +1239,70 @@ function updateExecBtn() {
   }
 }
 
+// ── Ticker quick search ───────────────────────────────────────────────────────
+function initTickerSearch() {
+  var input = $("ticker-search");
+  var results = $("ticker-results");
+  if (!input) return;
+
+  input.addEventListener("input", function() {
+    var q = input.value.trim().toUpperCase();
+    results.innerHTML = "";
+    if (q.length < 1) { results.style.display="none"; return; }
+
+    var matches = DISPLAY_TICKERS.filter(function(t) {
+      return t.indexOf(q) === 0 || NAMES[t].toUpperCase().indexOf(q) >= 0;
+    }).slice(0, 6);
+
+    if (!matches.length) { results.style.display="none"; return; }
+
+    matches.forEach(function(t) {
+      var p = prices[t] || 0;
+      var c = pct[t] || 0;
+      var el = document.createElement("div");
+      el.className = "ticker-result";
+      el.innerHTML =
+        '<div>' +
+          '<span style="color:var(--bl);font-weight:700;font-size:13px;letter-spacing:1px">' + t + '</span>' +
+          '<span style="color:var(--tx4);font-size:10px;margin-left:8px">' + NAMES[t] + '</span>' +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div style="font-weight:700;font-size:12px;color:' + (p>0?(c>=0?"var(--g)":"var(--r)"):"var(--tx3)") + '">' + (p>0?fr(p):"--") + '</div>' +
+          (p>0?'<div style="font-size:9px;color:' + (c>=0?"var(--g)":"var(--r)") + '">' + (c>=0?"+":"") + c.toFixed(2) + '%</div>':'') +
+        '</div>';
+      el.onclick = function() {
+        sel = t;
+        input.value = "";
+        results.style.display = "none";
+        render();
+        loadTV();
+        // Switch to order tab if not already there
+        document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
+        document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("on"); });
+        $("order-panel").classList.add("on");
+        document.querySelector(".tab[data-t='order']").classList.add("on");
+        $("pb").style.display = "none";
+      };
+      results.appendChild(el);
+    });
+    results.style.display = "block";
+  });
+
+  // Close results when tapping outside
+  document.addEventListener("touchstart", function(e) {
+    if (!input.contains(e.target) && !results.contains(e.target)) {
+      results.style.display = "none";
+    }
+  }, {passive:true});
+
+  // Auto uppercase
+  input.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && results.children.length > 0) {
+      results.children[0].click();
+    }
+  });
+}
+
 function initApp() {
   $("ts").style.display="none"; $("ma").style.display="flex";
 
@@ -1306,6 +1381,7 @@ function initApp() {
   $("logb").onclick=function() { localStorage.removeItem(LS_TOKEN); location.reload(); };
 
   updateExecBtn(); updatePregaoBar(); render(); loadTV(); startRefresh();
+  initTickerSearch();
 }
 
 $("tbtn").onclick=function() {
