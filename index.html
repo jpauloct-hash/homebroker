@@ -1421,13 +1421,13 @@ function fetchNews() {
 }
 
 
-// ── News summary via Claude API ───────────────────────────────────────────────
+// ── News summary: fetch article via proxy and extract text ────────────────────
 function fetchSummary(item, cardEl) {
   var btn = cardEl.querySelector(".news-expand-btn");
   var box = cardEl.querySelector(".news-summary-box");
   if (!btn || !box) return;
 
-  // Toggle: if already expanded, collapse
+  // Toggle collapse
   if (box.style.display === "block") {
     box.style.display = "none";
     btn.textContent = "Ver resumo";
@@ -1438,41 +1438,64 @@ function fetchSummary(item, cardEl) {
   btn.textContent = "Carregando...";
   btn.disabled = true;
   box.style.display = "block";
-  box.innerHTML = '<div class="spin" style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;vertical-align:middle;margin-right:6px"></div> Resumindo noticia...';
+  box.innerHTML = '<div style="color:var(--tx3);font-size:11px"><span class="spin" style="display:inline-block;width:9px;height:9px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;vertical-align:middle;margin-right:6px"></span>Carregando conteudo...</div>';
 
-  var prompt = "Resuma em 3 a 5 linhas, em portugues, a seguinte noticia financeira. Destaque os pontos mais importantes para um investidor. Titulo: " + item.title + ". Fonte: " + item.source + ". URL: " + (item.url || "");
-
-  fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 300,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: [{ role: "user", content: prompt }]
-    })
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(d) {
-    var text = (d.content || []).map(function(b) {
-      return b.type === "text" ? b.text : "";
-    }).join("").trim();
-
-    if (!text) text = "Nao foi possivel gerar o resumo.";
-
+  function showResult(text) {
     box.innerHTML =
-      '<div style="font-size:11px;color:var(--tx2);line-height:1.7;margin-bottom:10px">' + text + '</div>' +
-      (item.url ? '<a href="' + item.url + '" target="_blank" style="font-size:10px;color:var(--bl);font-weight:700">Ler noticia completa &rarr;</a>' : '');
+      '<div style="font-size:11px;color:var(--tx2);line-height:1.8;margin-bottom:10px">' +
+        text.replace(/</g,"&lt;").replace(/>/g,"&gt;") +
+      '</div>' +
+      (item.url ? '<a href="' + item.url + '" target="_blank" style="font-size:10px;color:var(--bl);font-weight:700;text-decoration:none">Ler noticia completa &rarr;</a>' : '');
+    btn.textContent = "Fechar";
+    btn.disabled = false;
+  }
 
-    btn.textContent = "Fechar resumo";
-    btn.disabled = false;
-  })
-  .catch(function() {
-    box.innerHTML = '<div style="color:var(--r);font-size:11px">Erro ao carregar resumo.</div>' +
-      (item.url ? '<br><a href="' + item.url + '" target="_blank" style="font-size:10px;color:var(--bl)">Abrir noticia &rarr;</a>' : '');
-    btn.textContent = "Ver resumo";
-    btn.disabled = false;
-  });
+  function showFallback() {
+    // No proxy worked - show title + source as summary
+    var text = item.title + "
+
+Fonte: " + item.source + (item.time ? " - " + item.time : "");
+    showResult(text);
+  }
+
+  if (!item.url) { showFallback(); return; }
+
+  // Try to fetch article via allorigins CORS proxy and extract paragraphs
+  var proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(item.url);
+  fetch(proxy)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var html = data.contents || "";
+      if (!html) { showFallback(); return; }
+
+      // Parse HTML and extract text from <p> tags
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, "text/html");
+
+      // Remove scripts, styles, nav, header, footer
+      ["script","style","nav","header","footer","aside","figure","figcaption"].forEach(function(tag) {
+        var els = doc.querySelectorAll(tag);
+        els.forEach(function(el){ el.remove(); });
+      });
+
+      // Get paragraphs
+      var paras = doc.querySelectorAll("p");
+      var texts = [];
+      paras.forEach(function(p) {
+        var t = p.textContent.trim();
+        if (t.length > 60) texts.push(t); // filter short/nav text
+      });
+
+      if (texts.length === 0) { showFallback(); return; }
+
+      // Take first 4 meaningful paragraphs
+      var summary = texts.slice(0, 4).join("
+
+");
+      if (summary.length > 800) summary = summary.slice(0, 800) + "...";
+      showResult(summary);
+    })
+    .catch(function() { showFallback(); });
 }
 
 function renderNewsTab() {
