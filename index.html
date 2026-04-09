@@ -1430,70 +1430,32 @@ function fetchNews() {
 
 function renderNewsTab() {
   var panel = document.getElementById("news-panel");
-  if (!panel) return;
+  if (!panel) { return; }
 
-  if (!newsCache.length) {
-    panel.innerHTML =
-      '<div style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#3a5878;font-size:11px;gap:10px">' +
-      '<div class="spin" style="width:18px;height:18px;border:2px solid #f59e0b;border-top-color:transparent;border-radius:50%"></div>' +
-      'Buscando noticias...' +
-      '</div>';
-    return;
-  }
+  var count = newsCache.length;
+  var inner = '<div style="padding:20px">' +
+    '<div style="color:#f59e0b;font-size:13px;font-weight:700;margin-bottom:12px">' +
+      count + ' noticias carregadas' +
+    '</div>';
 
-  var macro   = newsCache.filter(function(n){ return n.type === "macro"; });
-  var company = newsCache.filter(function(n){ return n.type === "company"; });
-  if (!macro.length && !company.length) {
-    macro = newsCache.slice(0, 10);
-    company = newsCache.slice(10);
-  }
-
-  var html = '<div style="overflow-y:auto;height:100%;padding:14px 14px 60px">';
-
-  function makeSection(items, color, label) {
-    if (!items.length) return "";
-    var s = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:' + color + ';margin-bottom:8px;margin-top:4px">' + label + '</div>';
-    items.slice(0, 20).forEach(function(n) {
-      var tc = n.type === "macro" ? "#f59e0b" : "#60a5fa";
-      var tg = String(n.ticker || n.source || "");
-      var ti = String(n.title || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-      var sc = String(n.source || "");
-      var tm = String(n.time || "");
-      var id = n.id || 0;
-      var ur = String(n.url || "");
-      s += '<div class="news-item" id="ni-'+id+'" data-url="'+ur+'">' +
-        '<div style="display:flex;justify-content:space-between;margin-bottom:5px">' +
-          '<span style="font-size:9px;font-weight:700;color:'+tc+';background:rgba(255,255,255,.07);padding:2px 6px;border-radius:4px">'+tg+'</span>' +
-          '<span style="font-size:9px;color:#1a3050">'+tm+'</span>' +
+  for (var i = 0; i < Math.min(count, 20); i++) {
+    var n = newsCache[i];
+    var tc = n.type === "macro" ? "#f59e0b" : "#60a5fa";
+    var tg = n.ticker || n.source || "";
+    var ti = (n.title || "").replace(/</g,"&lt;");
+    var tm = n.time || "";
+    inner +=
+      '<div style="background:#0c1220;border:1px solid #0f1e30;border-radius:8px;padding:12px;margin-bottom:8px;">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
+          '<span style="color:' + tc + ';font-size:9px;font-weight:700">[' + tg + ']</span>' +
+          '<span style="color:#1a3050;font-size:9px">' + tm + '</span>' +
         '</div>' +
-        '<div style="font-size:12px;color:#dde8f5;font-weight:600;line-height:1.5;margin-bottom:3px">'+ti+'</div>' +
-        '<div style="font-size:10px;color:#3a5878">'+sc+'</div>' +
+        '<div style="color:#dde8f5;font-size:12px;line-height:1.5">' + ti + '</div>' +
       '</div>';
-    });
-    return s;
   }
 
-  html += makeSection(macro,   "#f59e0b", "MACRO - BC - FAZENDA");
-  html += makeSection(company, "#60a5fa", "EMPRESAS - IBOVESPA");
-  html += '</div>';
-
-  panel.innerHTML = html;
-
-  // Wire onclick
-  panel.querySelectorAll(".news-item").forEach(function(el) {
-    el.onclick = function() {
-      var url = el.getAttribute("data-url");
-      if (url && url.length > 4) window.open(url, "_blank");
-    };
-  });
-
-  if (focusNewsId) {
-    setTimeout(function() {
-      var el = document.getElementById("ni-" + focusNewsId);
-      if (el) el.scrollIntoView({behavior:"smooth", block:"center"});
-      focusNewsId = null;
-    }, 100);
-  }
+  inner += '</div>';
+  panel.innerHTML = '<div style="position:absolute;inset:0;overflow-y:auto">' + inner + '</div>';
 }
 
 
