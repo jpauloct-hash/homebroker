@@ -336,7 +336,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <button id="s-clr" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;background:transparent;color:var(--tx3);font-size:11px;font-weight:600;margin-bottom:16px">Remover meta / prazo</button>
 
     <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:8px">TICKER TAPE</div>
-    <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">Escolha ate 20 tickers para o tape (atual: <span id="tape-count">0</span>)</div>
+    <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">IBOV e USD/BRL sao fixos. Escolha ate 18 adicionais (atual: <span id="tape-count">0</span>)</div>
     <div id="tape-picker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
     <button id="tape-save" style="width:100%;padding:9px;border:none;border-radius:7px;background:#1e4a80;color:#fff;font-size:11px;font-weight:700;margin-bottom:16px">SALVAR TAPE</button>
     <div style="border-top:1px solid var(--bd);padding-top:16px">
@@ -418,16 +418,23 @@ var ALL_TAPE_NAMES = {
 };
 
 // Load tape tickers from localStorage or use defaults
+var PINNED_TICKERS = ["IBOV","USDBRL"];
 function loadTapeTickers() {
   try {
     var saved = JSON.parse(localStorage.getItem("hb_tape_v1") || "null");
-    if (Array.isArray(saved) && saved.length > 0) return saved;
+    if (Array.isArray(saved) && saved.length > 0) {
+      // Always ensure IBOV and USDBRL are first, remove duplicates
+      var filtered = saved.filter(function(t){ return PINNED_TICKERS.indexOf(t) === -1; });
+      return PINNED_TICKERS.concat(filtered);
+    }
   } catch(e) {}
-  return ["IBOV","PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
+  return ["IBOV","USDBRL","PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3"];
 }
 var TAPE_TICKERS = loadTapeTickers();
 var DISPLAY_TICKERS = ["IBOV"].concat(TICKERS);
 var NAMES = {
+  "USDBRL":"Dolar Comercial (USD/BRL)",
+  "IBOV":"Ibovespa Index",
   IBOV:"Ibovespa Index", PETR4:"Petrobras PN", VALE3:"Vale ON", ITUB4:"Itau Unibanco PN",
   BBDC4:"Bradesco PN", BBAS3:"Banco do Brasil ON", ABEV3:"Ambev ON", WEGE3:"WEG ON",
   RENT3:"Localiza ON", PRIO3:"PetroReconcavo ON", BERK34:"Berkshire BDR", B3SA3:"B3 ON",
@@ -435,6 +442,8 @@ var NAMES = {
   EQTL3:"Equatorial ON", DOLA11:"Dolar ETF", RDOR3:"Rede DOr ON", UGPA3:"Ultrapar ON"
 };
 var TVSYM = {
+  "USDBRL":"FX:USDBRL",
+  "IBOV":"BMFBOVESPA:IBOV",
   IBOV:"BMFBOVESPA:IBOV", PETR4:"BMFBOVESPA:PETR4", VALE3:"BMFBOVESPA:VALE3",
   ITUB4:"BMFBOVESPA:ITUB4", BBDC4:"BMFBOVESPA:BBDC4", BBAS3:"BMFBOVESPA:BBAS3",
   ABEV3:"BMFBOVESPA:ABEV3", WEGE3:"BMFBOVESPA:WEGE3", RENT3:"BMFBOVESPA:RENT3",
@@ -568,14 +577,16 @@ function fetchQ() {
   setSts("loading");
   var urlA    = BRAPI+"/quote/"+TICKERS_A.join(",")+"?fundamental=false&token="+token;
   var urlB    = BRAPI+"/quote/"+TICKERS_B.join(",")+"?fundamental=false&token="+token;
-  var urlIbov = BRAPI+"/quote/%5EBVSP?fundamental=false&token="+token;
+  var urlIbov   = BRAPI+"/quote/%5EBVSP?fundamental=false&token="+token;
+  var urlUsdBrl = BRAPI+"/quote/USDBRL=X?fundamental=false&token="+token;
 
   Promise.all([
     fetch(urlA).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
     fetch(urlB).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
-    fetch(urlIbov).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+    fetch(urlIbov).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
+    fetch(urlUsdBrl).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
   ]).then(function(results) {
-    var dA = results[0], dB = results[1], dI = results[2];
+    var dA = results[0], dB = results[1], dI = results[2], dU = results[3];
     if (dA.error) throw new Error(dA.message||"Erro Brapi A");
     if (dB.error) throw new Error(dB.message||"Erro Brapi B");
 
@@ -591,6 +602,12 @@ function fetchQ() {
       prices["IBOV"] = ibov.regularMarketPrice;
       chg["IBOV"]    = ibov.regularMarketChange || 0;
       pct["IBOV"]    = ibov.regularMarketChangePercent || 0;
+    }
+    if (dU && !dU.error && dU.results && dU.results.length) {
+      var usd = dU.results[0];
+      prices["USDBRL"] = usd.regularMarketPrice;
+      chg["USDBRL"]    = usd.regularMarketChange || 0;
+      pct["USDBRL"]    = usd.regularMarketChangePercent || 0;
     }
 
     setSts("ok");
@@ -1867,7 +1884,7 @@ function buildTapePicker() {
 
       chip.onclick = function() {
         var total = picker.querySelectorAll("input[type=checkbox]:checked").length;
-        if (!cb.checked && total >= 20) { notif("Maximo 20 tickers","err"); return; }
+        if (!cb.checked && total >= 18) { notif("Maximo 18 tickers (IBOV e USD/BRL sao fixos)","err"); return; }
         cb.checked = !cb.checked;
         chip.style.border = cb.checked ? "1px solid #1e4a80" : "1px solid var(--bd)";
         chip.style.background = cb.checked ? "#0d2040" : "transparent";
@@ -1929,11 +1946,15 @@ function initApp() {
     var checks = picker.querySelectorAll("input[type=checkbox]:checked");
     for (var i=0; i<checks.length; i++) selected.push(checks[i].value);
     if (!selected.length) { notif("Selecione ao menos 1 ticker","err"); return; }
-    TAPE_TICKERS = selected;
-    localStorage.setItem("hb_tape_v1", JSON.stringify(selected));
+    // Always pin IBOV and USDBRL at start
+    var final = PINNED_TICKERS.concat(selected.filter(function(t){
+      return PINNED_TICKERS.indexOf(t) === -1;
+    }));
+    TAPE_TICKERS = final;
+    localStorage.setItem("hb_tape_v1", JSON.stringify(final));
     $("sht").classList.remove("on");
     renderTickers();
-    notif("Tape: " + selected.length + " tickers salvos!");
+    notif("Tape: " + final.length + " tickers salvos!");
   };
 
   $("s-save").onclick=function() {
