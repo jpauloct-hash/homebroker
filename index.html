@@ -1617,6 +1617,10 @@ function initApp() {
       b.classList.add("on"); $(b.dataset.t+"-panel").classList.add("on");
       $("pb").style.display=b.dataset.t==="chart"?"flex":"none";
       if (b.dataset.t==="portfolio") drawEquityChart();
+      if (b.dataset.t==="news") {
+        renderNewsTab();
+        if (!newsCache.length) { newsLastFetch=0; fetchNews(); }
+      }
     };
   });
 
