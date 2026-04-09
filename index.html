@@ -388,7 +388,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 </div>
 
 <script>
-// ── Ativos: 19 mais líquidos do Ibovespa + IBOV como referência ──────────────
+//  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
 var TICKERS = ["PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
 var DISPLAY_TICKERS = ["IBOV"].concat(TICKERS);
 var NAMES = {
@@ -407,7 +407,7 @@ var TVSYM = {
   VIVT3:"BMFBOVESPA:VIVT3", EQTL3:"BMFBOVESPA:EQTL3", DOLA11:"BMFBOVESPA:DOLA11",
   RDOR3:"BMFBOVESPA:RDOR3", UGPA3:"BMFBOVESPA:UGPA3"
 };
-// Brapi endpoint — busca em lotes de 10 (limite PRO por req)
+// Brapi endpoint  busca em lotes de 10 (limite PRO por req)
 var TICKERS_A = TICKERS.slice(0, 10); // batch 1
 var TICKERS_B = TICKERS.slice(10);    // batch 2
 
@@ -417,9 +417,9 @@ var REFRESH = 60; // 1 minuto
 var LS_TOKEN  = "hb_token_v6";
 var LS_STATE  = "hb_state_v3";
 var LS_GOAL   = "hb_goal_v1";
-var LS_EQUITY = "hb_equity_v1"; // histórico patrimônio
+var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
 
-// ── State ─────────────────────────────────────────────────────────────────────
+//  State 
 var token = localStorage.getItem(LS_TOKEN) || "";
 
 function loadState() {
@@ -452,7 +452,7 @@ function loadEquityHistory() {
   try { return JSON.parse(localStorage.getItem(LS_EQUITY)||"[]"); } catch(e) { return []; }
 }
 function saveEquityHistory() {
-  // Mantém últimos 90 pontos
+  // Mantm ltimos 90 pontos
   if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
   localStorage.setItem(LS_EQUITY, JSON.stringify(equityHistory));
 }
@@ -485,7 +485,7 @@ function notif(msg, t) {
   clearTimeout(nft); nft = setTimeout(function(){ e.classList.remove("on"); }, 3500);
 }
 
-// ── TradingView ────────────────────────────────────────────────────────────────
+//  TradingView 
 function loadTV() {
   var uid = "tv"+Date.now();
   $("tvw").innerHTML = '<div id="'+uid+'" style="width:100%;height:100%"></div>';
@@ -511,14 +511,14 @@ function loadTV() {
   s.src="https://s3.tradingview.com/tv.js"; s.onload=doInit; document.head.appendChild(s);
 }
 
-// ── Brapi: cotações em 2 batches + IBOV ──────────────────────────────────────
+//  Brapi: cotaes em 2 batches + IBOV 
 function setSts(s) {
   var e = $("sts");
   if (s==="loading") {
     e.innerHTML='<span class="spin" style="display:inline-block;width:8px;height:8px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;vertical-align:middle;margin-right:4px"></span><span style="color:var(--a)">BUSCANDO</span>';
   } else if (s==="ok") {
     var iv = getRefreshInterval();
-    var label = iv===60 ? "REAL · 1MIN" : iv===300 ? "REAL · 5MIN" : "REAL";
+    var label = iv===60 ? "REAL 1MIN" : iv===300 ? "REAL 5MIN" : "REAL";
     e.innerHTML='<span class="dot" style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--g);vertical-align:middle;margin-right:4px"></span><span style="color:var(--g)">'+label+'</span>';
   } else if (s==="frozen") {
     e.innerHTML='<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--tx3);vertical-align:middle;margin-right:4px"></span><span style="color:var(--tx3)">CONGELADO</span>';
@@ -560,14 +560,14 @@ function fetchQ() {
     $("hupd").textContent = "Atualizado: "+new Date().toLocaleTimeString("pt-BR");
     cd = REFRESH;
 
-    // Registra ponto no histórico de patrimônio
+    // Registra ponto no histrico de patrimnio
     var pv = portValue();
     var te = bal + pv;
     var now = new Date();
     equityHistory.push({ t: now.getTime(), v: te, d: now.toLocaleDateString("pt-BR") });
     saveEquityHistory();
 
-    // Checa dividendos, ordens e pregão
+    // Checa dividendos, ordens e prego
     checkScheduledOrders();
     checkDividends();
     checkPending();
@@ -579,18 +579,18 @@ function fetchQ() {
   });
 }
 
-// ── Smart refresh: adapts to market hours ────────────────────────────────────
-// 10:00-17:00 BRT  → every 1 min  (pregão aberto)
-// 17:00-19:00 BRT  → every 5 min  (pós-fechamento)
-// 19:00-10:00 BRT  → parado        (cotações congeladas no fechamento)
+//  Smart refresh: adapts to market hours 
+// 10:00-17:00 BRT   every 1 min  (prego aberto)
+// 17:00-19:00 BRT   every 5 min  (ps-fechamento)
+// 19:00-10:00 BRT   parado        (cotaes congeladas no fechamento)
 function getRefreshInterval() {
   var brt = getBRTDate();
   var dow = brt.getDay();
-  if (dow === 0 || dow === 6) return 0; // fim de semana — parado
+  if (dow === 0 || dow === 6) return 0; // fim de semana - parado
   var mins = brt.getHours()*60 + brt.getMinutes();
-  if (mins >= 600 && mins < 1020) return 60;    // pregão: 1 min
-  if (mins >= 1020 && mins < 1140) return 300;  // pós: 5 min
-  return 0; // fora de horário — parado
+  if (mins >= 600 && mins < 1020) return 60;    // pregao: 1 min
+  if (mins >= 1020 && mins < 1140) return 300;  // pos: 5 min
+  return 0; // fora de horario - parado
 }
 
 function isMarketDataActive() {
@@ -606,13 +606,13 @@ function startRefresh() {
     rfi = setInterval(function() {
       var newInterval = getRefreshInterval();
       if (newInterval === 0) {
-        // Entered quiet hours — stop fetching, freeze prices
+        // Entered quiet hours  stop fetching, freeze prices
         clearInterval(rfi);
         setSts("frozen");
         $("hupd").textContent = "Fechamento: " + new Date().toLocaleTimeString("pt-BR");
         return;
       }
-      // Interval may have changed (e.g. pregão -> pós)
+      // Interval may have changed (e.g. prego -> ps)
       if (newInterval !== interval) {
         clearInterval(rfi);
         interval = newInterval;
@@ -622,7 +622,7 @@ function startRefresh() {
       fetchQ();
     }, interval*1000);
   } else {
-    // Already in quiet hours on startup — just show frozen status
+    // Already in quiet hours on startup  just show frozen status
     setSts("frozen");
   }
   cdi = setInterval(function(){
@@ -636,7 +636,7 @@ function startRefresh() {
   }, 1000);
 }
 
-// ── Pregão B3: 10:00–17:00 BRT, seg–sex ──────────────────────────────────────
+//  Prego B3: 10:00-17:00 BRT, segsex 
 function getBRTDate() {
   // Returns a Date object in BRT (UTC-3)
   var now = new Date();
@@ -650,7 +650,7 @@ function isPregaoOpen() {
   if (dow === 0 || dow === 6) return false;
   var h = brt.getHours(), m = brt.getMinutes();
   var mins = h*60+m;
-  return mins >= 600 && mins < 1020; // 10:00–17:00
+  return mins >= 600 && mins < 1020; // 10:00-17:00
 }
 
 function nextPregaoOpen() {
@@ -681,7 +681,7 @@ function updatePregaoBar() {
   var open = isPregaoOpen();
   var sts = $("pregao-sts"), cd2 = $("pregao-cd");
   if (open) {
-    sts.className="pregao-open"; sts.textContent="● PREGAO ABERTO";
+    sts.className="pregao-open"; sts.textContent="* PREGAO ABERTO";
     // Time to close
     var brt=getBRTDate(), closeMs=(17*60-(brt.getHours()*60+brt.getMinutes()))*60000-brt.getSeconds()*1000;
     var h2=Math.floor(closeMs/3600000), m2=Math.floor((closeMs%3600000)/60000), s2=Math.floor((closeMs%60000)/1000);
@@ -691,18 +691,18 @@ function updatePregaoBar() {
     var brt2=getBRTDate(), mins2=brt2.getHours()*60+brt2.getMinutes();
     var dow2=brt2.getDay();
     var isPostClose = (dow2>0&&dow2<6) && (mins2>=1020 && mins2<1140);
-    sts.textContent = isPostClose ? "● POS-FECHAMENTO" : "● PREGAO FECHADO";
+    sts.textContent = isPostClose ? "* POS-FECHAMENTO" : "* PREGAO FECHADO";
     var ms=nextPregaoOpen();
     var h3=Math.floor(ms/3600000), m3=Math.floor((ms%3600000)/60000), s3=Math.floor((ms%60000)/1000);
     var frozen = !isMarketDataActive();
-    cd2.textContent=(frozen?"Dados congelados · ":"")+"Abre em "+String(h3).padStart(2,"0")+":"+String(m3).padStart(2,"0")+":"+String(s3).padStart(2,"0");
+    cd2.textContent=(frozen?"Dados congelados - ":"")+"Abre em "+String(h3).padStart(2,"0")+":"+String(m3).padStart(2,"0")+":"+String(s3).padStart(2,"0");
   }
 }
 
-// Update pregão bar every second
+// Update prego bar every second
 setInterval(updatePregaoBar, 1000);
 
-// Check if scheduled orders should fire at pregão open
+// Check if scheduled orders should fire at prego open
 function checkScheduledOrders() {
   if (!isPregaoOpen()) return;
   var toActivate=[], keep=[];
@@ -729,17 +729,17 @@ function showAHO(orderObj) {
   var side = orderObj.side==="buy"?"COMPRA":"VENDA";
   var type = orderObj.lp ? "LIMITADA @ "+R(orderObj.lp) : "A MERCADO";
   $("aho-summary").innerHTML =
-    '<span style="color:'+(orderObj.side==="buy"?"var(--g)":"var(--r)")+';font-weight:700">'+side+'</span> · '+
-    '<span style="color:var(--bl);font-weight:700">'+orderObj.tk+'</span> · '+
-    orderObj.qty+' cotas · '+type+'<br>'+
-    '<span style="color:var(--a);font-size:10px">Agendada para: '+nextPregaoDateStr()+' às 10:00</span>';
+    '<span style="color:'+(orderObj.side==="buy"?"var(--g)":"var(--r)")+';font-weight:700">'+side+'</span> - '+
+    '<span style="color:var(--bl);font-weight:700">'+orderObj.tk+'</span> - '+
+    orderObj.qty+' cotas - '+type+'<br>'+
+    '<span style="color:var(--a);font-size:10px">Agendada para: '+nextPregaoDateStr()+' as 10:00</span>';
   $("aho-modal").style.display="flex";
 }
 
-// ── Dividendos ────────────────────────────────────────────────────────────────
+//  Dividendos 
 function checkDividends() {
   var today = new Date().toISOString().split("T")[0];
-  if (checkedDivDate === today) return; // já checou hoje
+  if (checkedDivDate === today) return; // ja checou hoje
   checkedDivDate = today;
 
   var held = Object.keys(port);
@@ -768,11 +768,11 @@ function checkDividends() {
       if (!divList || !divList.length) return;
 
       divList.forEach(function(d) {
-        // Verifica se a data de pagamento é hoje e se ainda não processamos
+        // Verifica se a data de pagamento  hoje e se ainda no processamos
         var payDate = (d.paymentDate || d.approvedOn || "").split("T")[0];
         if (payDate !== today) return;
 
-        // Verifica se já creditamos este dividendo
+        // Verifica se j creditamos este dividendo
         var divId = ticker+"_"+payDate+"_"+d.rate;
         var alreadyCredited = divs.some(function(x){ return x.id === divId; });
         if (alreadyCredited) return;
@@ -789,7 +789,7 @@ function checkDividends() {
         };
         divs.unshift(divRec);
         if (divs.length > 100) divs.pop();
-        notif("Dividendo: +" + R(value) + " (" + ticker + " · R$" + fr(d.rate) + "/cota)");
+        notif("Dividendo: +" + R(value) + " (" + ticker + " - R$" + fr(d.rate) + "/cota)");
         credited = true;
       });
     });
@@ -797,14 +797,14 @@ function checkDividends() {
   }).catch(function(){});
 }
 
-// ── Ordens pendentes ──────────────────────────────────────────────────────────
+//  Ordens pendentes 
 function checkPending() {
   if (!pending.length) return;
-  if (!isPregaoOpen()) return; // só executa durante pregão
+  if (!isPregaoOpen()) return; // so executa durante pregao
   var keep = [], changed = false;
   for (var i=0; i<pending.length; i++) {
     var o = pending[i];
-    if (o.scheduled) { keep.push(o); continue; } // aguarda ativação no pregão
+    if (o.scheduled) { keep.push(o); continue; } // aguarda ativacao no pregao
 
     var p = prices[o.tk];
     if (!p) { keep.push(o); continue; }
@@ -815,17 +815,17 @@ function checkPending() {
       changed = true; continue;
     }
 
-    // Limit order: executa quando preço cruzar o limite (qualquer direção)
-    // Compra: executa quando p <= lp (mercado caiu até o alvo)
-    // Venda: executa quando p >= lp (mercado subiu até o alvo)
-    // Se mercado já passou além do limite, executa no preço de mercado
+    // Limit order: executa quando preo cruzar o limite (qualquer direo)
+    // Compra: executa quando p <= lp (mercado caiu at o alvo)
+    // Venda: executa quando p >= lp (mercado subiu at o alvo)
+    // Se mercado j passou alm do limite, executa no preo de mercado
     var hit = (o.side==="buy" && p<=o.lp) || (o.side==="sell" && p>=o.lp);
     if (!hit) { keep.push(o); continue; }
 
-    var execPrice = p; // executa no preço de mercado quando atingir o limite
+    var execPrice = p; // executa no preco de mercado quando atingir o limite
     var tot = execPrice * o.qty;
     if (o.side==="buy") {
-      if (tot>bal) { notif("Ordem cancelada — saldo insuf. ("+o.tk+")", "err"); changed=true; continue; }
+      if (tot>bal) { notif("Ordem cancelada - saldo insuf. ("+o.tk+")", "err"); changed=true; continue; }
       bal -= tot;
       if (port[o.tk]) { var x=port[o.tk],nq=x.qty+o.qty; port[o.tk]={qty:nq,avgPrice:(x.qty*x.avgPrice+tot)/nq}; }
       else port[o.tk] = {qty:o.qty,avgPrice:execPrice};
@@ -845,7 +845,7 @@ function checkPending() {
   if (changed) saveState();
 }
 
-// ── Equity Canvas Chart ───────────────────────────────────────────────────────
+//  Equity Canvas Chart 
 function drawEquityChart() {
   var canvas = $("equity-chart");
   if (!canvas) return;
@@ -937,7 +937,7 @@ function drawEquityChart() {
   }
 }
 
-// ── Render helpers ────────────────────────────────────────────────────────────
+//  Render helpers 
 function portValue() {
   var v=0; Object.keys(port).forEach(function(t){ v+=port[t].qty*(prices[t]||0); }); return v;
 }
@@ -1067,11 +1067,11 @@ function renderOrders() {
         var qinpEl = $("qinp");
         qinpEl.parentNode.insertBefore(maxHint, qinpEl.nextSibling);
       }
-      maxHint.textContent = "Máx. disponível: " + maxSell + " cotas";
+      maxHint.textContent = "Max. disponivel: " + maxSell + " cotas";
     }
     $("bsel").style.opacity = !hasSel ? "0.4" : "1";
   } else {
-    // Buy side — remove cap and hint
+    // Buy side  remove cap and hint
     $("qinp").removeAttribute("max");
     var hint = $("sell-max-hint");
     if (hint) hint.textContent = "";
@@ -1090,7 +1090,7 @@ function renderPending() {
     e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
       '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(o.side==="buy"?"COMPRA":"VENDA")+'</span>'+
       '<span style="color:var(--bl);font-weight:700;font-size:12px">'+o.tk+'</span></div>'+
-      '<div style="font-size:9px;color:var(--tx4)">'+o.qty+' cotas · limite '+R(o.lp)+'</div></div>'+
+      '<div style="font-size:9px;color:var(--tx4)">'+o.qty+' cotas - limite '+R(o.lp)+'</div></div>'+
       '<button class="cancel-btn" onclick="cancelPending('+o.id+')">CANCELAR</button>';
     list.appendChild(e);
   });
@@ -1136,7 +1136,7 @@ function renderHist() {
       e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
         '<span class="bdg" style="background:rgba(0,200,150,.15);color:var(--g)">DIVIDENDO</span>'+
         '<span style="color:var(--bl);font-weight:700;font-size:12px">'+d.ticker+'</span></div>'+
-        '<div style="font-size:9px;color:var(--tx4)">'+d.qty+' cotas × R$'+fr(d.rate)+'</div></div>'+
+        '<div style="font-size:9px;color:var(--tx4)">'+d.qty+' cotas x R$'+fr(d.rate)+'</div></div>'+
         '<div style="text-align:right"><div style="font-weight:700;font-size:12px;color:var(--g)">+'+R(d.value)+'</div>'+
         '<div style="font-size:9px;color:var(--tx4)">'+d.date+'</div></div>';
       dl.appendChild(e);
@@ -1155,7 +1155,7 @@ function renderHist() {
       '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(t.tp==="C"?"COMPRA":"VENDA")+'</span>'+
       '<span style="color:var(--bl);font-weight:700;font-size:12px">'+t.tk+'</span>'+
       (t.note?'<span style="font-size:8px;color:var(--a)">&#127919;</span>':'')+
-      '</div><div style="font-size:10px;color:var(--tx4)">'+t.qty+' cotas @ '+R(t.pr)+(t.note?' · '+t.note:'')+'</div></div>'+
+      '</div><div style="font-size:10px;color:var(--tx4)">'+t.qty+' cotas @ '+R(t.pr)+(t.note?' - '+t.note:'')+'</div></div>'+
       '<div style="text-align:right"><div style="font-weight:700;font-size:12px">'+R(t.tot)+'</div>'+
       '<div style="font-size:9px;color:var(--tx4)">'+t.tm+'</div></div>';
     l.appendChild(e);
@@ -1173,7 +1173,7 @@ function render() {
   try { renderGoalBar(); } catch(e) {}
 }
 
-// ── Trading ────────────────────────────────────────────────────────────────────
+//  Trading 
 function doMarketOrder(tk, sd, q, isScheduled) {
   var p = prices[tk]; if (!p) { notif("Sem cotacao","err"); return; }
   var tot = p*q;
@@ -1201,12 +1201,12 @@ function doMarketOrder(tk, sd, q, isScheduled) {
 }
 
 function execOrder() {
-  if (sel==="IBOV") { notif("IBOV e indice — nao e possivel operar","err"); return; }
+  if (sel==="IBOV") { notif("IBOV e indice - nao e possivel operar","err"); return; }
   var p=prices[sel]; if (!p) { notif("Sem cotacao disponivel","err"); return; }
 
   var open = isPregaoOpen();
 
-  // ── Limit order ────────────────────────────────────────────────────────────
+  //  Limit order 
   if (orderMode==="limit") {
     var lp=parseFloat($("lmt-price").value);
     if (!lp||lp<=0) { notif("Informe o preco limite","err"); return; }
@@ -1227,7 +1227,7 @@ function execOrder() {
     notif("Ordem limitada enviada: "+qty+" "+sel+" @ "+R(lp)); return;
   }
 
-  // ── Market order ──────────────────────────────────────────────────────────
+  //  Market order 
   if (!open) {
     // Offer to schedule as market order at next open
     showAHO({id:Date.now(),tk:sel,side:side,qty:qty,lp:null,scheduled:true,market:true});
@@ -1236,8 +1236,8 @@ function execOrder() {
   doMarketOrder(sel,side,qty,false);
 }
 
-// ── UI wiring ─────────────────────────────────────────────────────────────────
-// ── Ticker tape auto-scroll ────────────────────────────────────────────────────
+//  UI wiring 
+//  Ticker tape auto-scroll 
 var tapeX = 0;
 var tapeSpeed = 1.2;     // px per frame
 var tapePaused = false;
@@ -1314,7 +1314,7 @@ function updateExecBtn() {
   }
 }
 
-// ── News system ──────────────────────────────────────────────────────────────
+//  News system 
 var newsCache = [];
 var newsTapeItems = [];
 var newsTapeX = 0;
@@ -1325,7 +1325,7 @@ var newsTapeDragging = false;
 var newsTapeDragStartX = 0;
 var newsTapeDragStartTapeX = 0;
 var newsLastFetch = 0;
-var NEWS_REFRESH = 15 * 60 * 1000; // 15 min during pregão
+var NEWS_REFRESH = 15 * 60 * 1000; // 15 min during pregao
 var focusNewsId = null; // news to scroll to when opening tab
 
 // RSS feeds via Claude proxy (CORS bypass)
@@ -1346,40 +1346,41 @@ function fetchNews() {
   if (now - newsLastFetch < NEWS_REFRESH) return;
   newsLastFetch = now;
 
-  var prompt = 'Busque as últimas notícias financeiras do mercado brasileiro relacionadas a estas empresas e tickers: ' +
-    TICKERS.join(", ") + ', Ibovespa, B3, Banco Central, Selic, política monetária, Ministério da Fazenda.
-
-' +
-    'Retorne SOMENTE um JSON válido com este formato, sem texto adicional:
-' +
-    '{"news":[{"id":1,"title":"título da notícia","source":"nome da fonte","type":"macro ou company","ticker":"PETR4 ou vazio","time":"há X minutos/horas","url":"https://..."}]}
-
-' +
-    'Retorne 20 notícias recentes, apenas em português, priorizando as mais recentes. ' +
-    'type deve ser "macro" para BC/Selic/Fazenda/economia e "company" para notícias de empresas específicas.';
+  var tickers = TICKERS.join(", ");
+  var prompt = [
+    "Busque as ultimas noticias financeiras do mercado brasileiro sobre: " + tickers,
+    "Ibovespa, B3, Banco Central, Selic, politica monetaria, Ministerio da Fazenda.",
+    "Retorne APENAS JSON valido neste formato exato, sem texto antes ou depois:",
+    '{"news":[{"id":1,"title":"titulo","source":"fonte","type":"macro","ticker":"","time":"ha X min","url":"https://exemplo.com"}]}',
+    "Regras: 20 noticias, apenas portugues, type=macro para BC/Selic/Fazenda, type=company para empresas."
+  ].join(" ");
 
   fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      model:"claude-sonnet-4-20250514",
-      max_tokens:2000,
-      tools:[{type:"web_search_20250305",name:"web_search"}],
-      messages:[{role:"user",content:prompt}]
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      tools: [{type: "web_search_20250305", name: "web_search"}],
+      messages: [{role: "user", content: prompt}]
     })
   })
-  .then(function(r){ return r.json(); })
+  .then(function(r) { return r.json(); })
   .then(function(d) {
-    var text = d.content.map(function(b){ return b.type==="text"?b.text:""; }).join("");
-    var match = text.match(/\{[\s\S]*"news"[\s\S]*\}/);
-    if (!match) return;
-    var parsed = JSON.parse(match[0]);
-    if (!parsed.news || !parsed.news.length) return;
-    newsCache = parsed.news;
-    renderNewsTab();
-    buildNewsTape();
+    var text = d.content.map(function(b) { return b.type === "text" ? b.text : ""; }).join("");
+    var start = text.indexOf('{"news":');
+    if (start === -1) return;
+    var end = text.lastIndexOf("}") + 1;
+    if (end <= start) return;
+    try {
+      var parsed = JSON.parse(text.slice(start, end));
+      if (!parsed.news || !parsed.news.length) return;
+      newsCache = parsed.news;
+      renderNewsTab();
+      buildNewsTape();
+    } catch(e) {}
   })
-  .catch(function(){});
+  .catch(function() {});
 }
 
 function renderNewsTab() {
@@ -1418,7 +1419,7 @@ function renderNewsTab() {
           '<span style="font-size:9px;color:var(--tx4)">'+n.time+'</span>' +
         '</div>' +
         '<div style="font-size:12px;color:var(--tx);line-height:1.5;font-weight:600;margin-bottom:4px">'+n.title+'</div>' +
-        '<div style="font-size:10px;color:var(--tx3)">'+n.source+' · Toque para abrir</div>';
+        '<div style="font-size:10px;color:var(--tx3)">'+n.source+' - Toque para abrir</div>';
       el.onclick = function() {
         if (n.url && n.url.startsWith("http")) window.open(n.url,"_blank");
       };
@@ -1459,7 +1460,7 @@ function buildNewsTape() {
       span.className = "news-tape-item";
       var tagColor = n.type==="macro" ? "#f59e0b" : "#60a5fa";
       var tag = n.ticker || n.source;
-      span.innerHTML = '<span class="nt-tag" style="color:'+tagColor+'">['+ tag +']</span> '+n.title+' &nbsp;&nbsp;·&nbsp;&nbsp;';
+      span.innerHTML = '<span class="nt-tag" style="color:'+tagColor+'">['+ tag +']</span> '+n.title+' &nbsp;&nbsp;-&nbsp;&nbsp;';
       span.dataset.newsId = n.id;
       span.onclick = function() {
         var nid = parseInt(span.dataset.newsId);
@@ -1524,7 +1525,7 @@ function initNewsTape() {
   }, {passive:true});
 }
 
-// ── Ticker quick search ───────────────────────────────────────────────────────
+//  Ticker quick search 
 function initTickerSearch() {
   var input = $("ticker-search");
   var results = $("ticker-results");
