@@ -1421,82 +1421,74 @@ function fetchNews() {
 }
 
 
-// ── News summary: fetch article via proxy and extract text ────────────────────
+// ── News summary via CORS proxy ──────────────────────────────────────────────
 function fetchSummary(item, cardEl) {
   var btn = cardEl.querySelector(".news-expand-btn");
   var box = cardEl.querySelector(".news-summary-box");
   if (!btn || !box) return;
 
-  // Toggle collapse
   if (box.style.display === "block") {
     box.style.display = "none";
     btn.textContent = "Ver resumo";
     return;
   }
 
-  // Show loading
   btn.textContent = "Carregando...";
   btn.disabled = true;
   box.style.display = "block";
-  box.innerHTML = '<div style="color:var(--tx3);font-size:11px"><span class="spin" style="display:inline-block;width:9px;height:9px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;vertical-align:middle;margin-right:6px"></span>Carregando conteudo...</div>';
+  box.textContent = "Buscando conteudo...";
 
-  function showResult(text) {
-    box.innerHTML =
-      '<div style="font-size:11px;color:var(--tx2);line-height:1.8;margin-bottom:10px">' +
-        text.replace(/</g,"&lt;").replace(/>/g,"&gt;") +
-      '</div>' +
-      (item.url ? '<a href="' + item.url + '" target="_blank" style="font-size:10px;color:var(--bl);font-weight:700;text-decoration:none">Ler noticia completa &rarr;</a>' : '');
+  function showResult(text, url) {
+    box.innerHTML = "";
+    var p = document.createElement("p");
+    p.style.cssText = "font-size:11px;color:var(--tx2);line-height:1.8;margin-bottom:10px;white-space:pre-line";
+    p.textContent = text;
+    box.appendChild(p);
+    if (url) {
+      var a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.style.cssText = "font-size:10px;color:var(--bl);font-weight:700;text-decoration:none";
+      a.textContent = "Ler noticia completa";
+      box.appendChild(a);
+    }
     btn.textContent = "Fechar";
     btn.disabled = false;
   }
 
-  function showFallback() {
-    // No proxy worked - show title + source as summary
-    var text = item.title + "
-
-Fonte: " + item.source + (item.time ? " - " + item.time : "");
-    showResult(text);
+  if (!item.url) {
+    showResult(item.title + "\n\nFonte: " + item.source, null);
+    return;
   }
 
-  if (!item.url) { showFallback(); return; }
-
-  // Try to fetch article via allorigins CORS proxy and extract paragraphs
   var proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(item.url);
   fetch(proxy)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var html = data.contents || "";
-      if (!html) { showFallback(); return; }
-
-      // Parse HTML and extract text from <p> tags
+      if (!html) { showResult(item.title, item.url); return; }
       var parser = new DOMParser();
       var doc = parser.parseFromString(html, "text/html");
-
-      // Remove scripts, styles, nav, header, footer
-      ["script","style","nav","header","footer","aside","figure","figcaption"].forEach(function(tag) {
+      var remove = ["script","style","nav","header","footer","aside","figure"];
+      remove.forEach(function(tag) {
         var els = doc.querySelectorAll(tag);
-        els.forEach(function(el){ el.remove(); });
+        for (var i = 0; i < els.length; i++) els[i].parentNode.removeChild(els[i]);
       });
-
-      // Get paragraphs
       var paras = doc.querySelectorAll("p");
       var texts = [];
-      paras.forEach(function(p) {
-        var t = p.textContent.trim();
-        if (t.length > 60) texts.push(t); // filter short/nav text
-      });
-
-      if (texts.length === 0) { showFallback(); return; }
-
-      // Take first 4 meaningful paragraphs
-      var summary = texts.slice(0, 4).join("
-
-");
+      for (var i = 0; i < paras.length; i++) {
+        var t = paras[i].textContent.trim();
+        if (t.length > 60) texts.push(t);
+        if (texts.length >= 4) break;
+      }
+      if (!texts.length) { showResult(item.title, item.url); return; }
+      var summary = texts.join("\n\n");
       if (summary.length > 800) summary = summary.slice(0, 800) + "...";
-      showResult(summary);
+      showResult(summary, item.url);
     })
-    .catch(function() { showFallback(); });
+    .catch(function() { showResult(item.title, item.url); });
 }
+
 
 function renderNewsTab() {
   var hdr  = document.getElementById("news-hdr");
@@ -1581,7 +1573,7 @@ function buildNewsTape() {
       span.className = "news-tape-item";
       var tagColor = n.type==="macro" ? "#f59e0b" : "#60a5fa";
       var tag = n.ticker || n.source;
-      span.innerHTML = '<span class="nt-tag" style="color:'+tagColor+'">['+ tag +']</span> '+n.title+' &nbsp;&nbsp;-&nbsp;&nbsp;';
+      span.textContent = '[' + tag + '] ' + n.title + '  -  ';
       span.dataset.newsId = n.id;
       span.onclick = function() {
         var nid = parseInt(span.dataset.newsId);
