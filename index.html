@@ -1741,8 +1741,8 @@ function initApp() {
   updateExecBtn(); updatePregaoBar(); render(); loadTV(); startRefresh();
   initTickerSearch();
   initNewsTape();
-  // Fetch news after a short delay to not block startup
-  setTimeout(function(){ fetchNews(); }, 4000);
+  // Fetch news after 2s to not block startup
+  setTimeout(function(){ fetchNews(); }, 2000);
   // Refresh news every 15 min
   setInterval(function(){ fetchNews(); }, 15*60*1000);
 }
