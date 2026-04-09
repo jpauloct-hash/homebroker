@@ -403,6 +403,7 @@ var BRAPI   = "https://brapi.dev/api";
 var REFRESH = 60; // 1 minuto
 
 var LS_TOKEN  = "hb_token_v6";
+var LS_NEWS   = "hb_news_v1";
 var LS_STATE  = "hb_state_v3";
 var LS_GOAL   = "hb_goal_v1";
 var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
@@ -1303,7 +1304,10 @@ function updateExecBtn() {
 }
 
 //  News system 
-var newsCache = [];
+var newsCache = (function(){
+  try { var n=JSON.parse(localStorage.getItem("hb_news_v1")||"[]"); return Array.isArray(n)?n:[]; }
+  catch(e){ return []; }
+})();
 var newsTapeItems = [];
 var newsTapeX = 0;
 var newsTapeOneW = 0;
@@ -1361,6 +1365,7 @@ function fetchNews() {
       return true;
     }).slice(0, 30);
     newsCache.forEach(function(n, i){ n.id = i+1; });
+    try { localStorage.setItem("hb_news_v1", JSON.stringify(newsCache)); } catch(e){}
 
     var loading = $("news-loading");
     if (loading) loading.style.display = "none";
@@ -1430,11 +1435,7 @@ function renderNewsTab() {
     return;
   }
 
-  // FORCE visibility test
-  list.style.cssText = "display:block;min-height:200px;";
-  list.innerHTML = '<div style="color:#f59e0b;font-size:16px;font-weight:700;padding:20px">TESTE: '+n+' noticias</div>';
-  notif("list populado com " + n + " itens");
-  return;
+
 
   newsCache.forEach(function(item) {
     var e = document.createElement("div");
@@ -1706,7 +1707,9 @@ function initApp() {
   updateExecBtn(); updatePregaoBar(); render(); loadTV(); startRefresh();
   initTickerSearch();
   initNewsTape();
-  // Fetch news after 2s to not block startup
+  // If cached news exist, build tape immediately
+  if (newsCache.length) { buildNewsTape(); }
+  // Fetch fresh news after 2s
   setTimeout(function(){ fetchNews(); }, 2000);
   // Refresh news every 15 min
   setInterval(function(){ fetchNews(); }, 15*60*1000);
