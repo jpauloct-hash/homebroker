@@ -1005,7 +1005,48 @@ function renderOrders() {
     $("pqty").textContent=pos.qty; $("ppm").textContent=R(pos.avgPrice);
     $("ppnl").textContent=(pnl>=0?"+":"")+R(pnl)+" ("+(pp>=0?"+":"")+pp.toFixed(2)+"%)";
     $("ppnl").style.color=pnl>=0?"var(--g)":"var(--r)";
-  } else $("pbox").style.display="none";
+  } else {
+    $("pbox").style.display="none";
+  }
+
+  // Disable sell / cap quantity if no position or insufficient
+  var hasSel = !!port[sel];
+  var maxSell = hasSel ? port[sel].qty : 0;
+
+  if (side==="sell" && !isIndex) {
+    if (!hasSel) {
+      execEl.disabled = true;
+      execEl.style.opacity = "0.35";
+      execEl.textContent = "SEM POSICAO EM "+sel;
+    } else {
+      // Cap qty to max owned
+      if (qty > maxSell) {
+        qty = maxSell;
+        $("qinp").value = qty;
+        document.querySelectorAll(".pr").forEach(function(b){
+          b.classList.toggle("on", +b.dataset.q===qty);
+        });
+      }
+      $("qinp").max = maxSell;
+      // Show max available
+      var maxHint = $("sell-max-hint");
+      if (!maxHint) {
+        maxHint = document.createElement("div");
+        maxHint.id = "sell-max-hint";
+        maxHint.style.cssText = "font-size:9px;color:var(--tx3);margin-top:-8px;margin-bottom:8px;text-align:right;";
+        var qinpEl = $("qinp");
+        qinpEl.parentNode.insertBefore(maxHint, qinpEl.nextSibling);
+      }
+      maxHint.textContent = "Máx. disponível: " + maxSell + " cotas";
+    }
+    $("bsel").style.opacity = !hasSel ? "0.4" : "1";
+  } else {
+    // Buy side — remove cap and hint
+    $("qinp").removeAttribute("max");
+    var hint = $("sell-max-hint");
+    if (hint) hint.textContent = "";
+    $("bsel").style.opacity = "1";
+  }
 }
 
 function renderPending() {
@@ -1140,6 +1181,10 @@ function execOrder() {
     var lp=parseFloat($("lmt-price").value);
     if (!lp||lp<=0) { notif("Informe o preco limite","err"); return; }
     if (side==="buy"&&lp*qty>bal) { notif("Saldo insuficiente","err"); return; }
+    if (side==="sell") {
+      var sp=port[sel]; if(!sp){notif("Voce nao possui "+sel+" em carteira","err");return;}
+      if(qty>sp.qty){notif("Quantidade excede posicao (max: "+sp.qty+")","err");qty=sp.qty;$("qinp").value=qty;renderOrders();return;}
+    }
     var orderObj = {id:Date.now(),tk:sel,side:side,qty:qty,lp:lp};
     if (!open) {
       // Show after-hours modal for scheduling
