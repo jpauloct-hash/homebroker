@@ -1346,78 +1346,84 @@ function fetchNews() {
   if (now - newsLastFetch < NEWS_REFRESH) return;
   newsLastFetch = now;
 
-  // RSS feeds via allorigins CORS proxy (no API key needed)
+  // rss2json.com converts RSS to JSON - reliable and free
+  var RSS2JSON = "https://api.rss2json.com/v1/api.json?rss_url=";
+
   var feeds = [
-    {url:"https://www.infomoney.com.br/feed/", label:"InfoMoney", type:"company"},
-    {url:"https://valoreconomico.globo.com/rss/financas/", label:"Valor", type:"company"},
-    {url:"https://agenciabrasil.ebc.com.br/rss/economia/feed.xml", label:"Ag.Brasil", type:"macro"},
-    {url:"https://www.bcb.gov.br/api/feed/pt-br/noticias", label:"BC", type:"macro"},
-    {url:"https://www.cvm.gov.br/noticias/rss.html", label:"CVM", type:"macro"}
+    {url:"https://www.infomoney.com.br/feed/",                      label:"InfoMoney", type:"company"},
+    {url:"https://valoreconomico.globo.com/rss/financas/",          label:"Valor",     type:"company"},
+    {url:"https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",  label:"Ag.Brasil", type:"macro"},
+    {url:"https://exame.com/invest/feed/",                          label:"Exame",     type:"company"},
+    {url:"https://www.moneytimes.com.br/feed/",                     label:"MoneyTimes",type:"macro"}
   ];
 
-  var PROXY = "https://api.allorigins.win/get?url=";
   var allNews = [];
   var completed = 0;
+  var total = feeds.length;
 
-  function done() {
+  function tryDone() {
     completed++;
-    if (completed < feeds.length) return;
-    // Sort by date desc, deduplicate
+    if (completed < total) return;
     allNews.sort(function(a,b){ return b.ts - a.ts; });
     var seen = {};
     newsCache = allNews.filter(function(n) {
-      if (seen[n.title]) return false;
-      seen[n.title] = true;
+      var key = n.title.slice(0,40);
+      if (seen[key]) return false;
+      seen[key] = true;
       return true;
     }).slice(0, 30);
-    // Assign IDs
     newsCache.forEach(function(n, i){ n.id = i+1; });
+
+    var loading = $("news-loading");
+    if (loading) loading.style.display = "none";
+
+    if (!newsCache.length) {
+      var emptyEl = $("news-empty");
+      if (emptyEl) emptyEl.style.display = "block";
+      return;
+    }
     renderNewsTab();
     buildNewsTape();
   }
 
   feeds.forEach(function(feed) {
-    fetch(PROXY + encodeURIComponent(feed.url))
+    fetch(RSS2JSON + encodeURIComponent(feed.url) + "&count=10")
       .then(function(r){ return r.json(); })
       .then(function(data) {
-        var xml = data.contents || "";
-        var parser = new DOMParser();
-        var doc = parser.parseFromString(xml, "text/xml");
-        var items = doc.querySelectorAll("item");
-        items.forEach(function(item, idx) {
-          if (idx >= 8) return; // max 8 per feed
-          var title = (item.querySelector("title")||{textContent:""}).textContent.trim();
-          var link  = (item.querySelector("link")||{textContent:""}).textContent.trim() ||
-                      (item.querySelector("guid")||{textContent:""}).textContent.trim();
-          var pubDate = (item.querySelector("pubDate")||{textContent:""}).textContent.trim();
-          if (!title || title.length < 5) return;
+        var items = (data.items || []);
+        items.forEach(function(item) {
+          var title = (item.title || "").trim();
+          var link  = item.link || item.guid || "";
+          var pubDate = item.pubDate || "";
+          if (!title || title.length < 10) return;
 
-          // Filter: only Portuguese/Brazil relevant
+          // Relevance filter
           var lower = title.toLowerCase();
-          var relevant = lower.match(/bolsa|ibovespa|selic|bc|real|juros|cvm|acoes|acao|mercado|brasil|b3|petrobras|vale|itau|bradesco|ambev|weg|embraer|dividendo|resultado|lucro|prejuizo|receita|banco|economia|inflacao|cambio|dolar|credito/);
+          var relevant = /bolsa|ibovespa|selic|banco central|juros|cvm|acoes|acao|mercado|brasil|b3|petrobras|vale|itau|bradesco|ambev|weg|embraer|dividendo|resultado|lucro|receita|economia|inflacao|cambio|dolar|credito|bovespa|investimento|fiscal|fazenda|pib|copom/.test(lower);
           if (!relevant) return;
 
-          // Detect ticker
+          // Detect ticker mention
           var ticker = "";
           TICKERS.forEach(function(t) {
             if (title.toUpperCase().indexOf(t) >= 0) ticker = t;
           });
 
-          // Time ago
-          var ts = pubDate ? new Date(pubDate).getTime() : Date.now();
+          var ts = pubDate ? new Date(pubDate).getTime() : (Date.now() - allNews.length*60000);
           var mins = Math.floor((Date.now() - ts) / 60000);
-          var timeStr = mins < 60 ? "ha " + mins + "min" :
+          var timeStr = mins < 1 ? "agora" :
+                        mins < 60 ? "ha " + mins + "min" :
                         mins < 1440 ? "ha " + Math.floor(mins/60) + "h" :
                         "ha " + Math.floor(mins/1440) + "d";
 
           allNews.push({
-            title: title, source: feed.label, type: feed.type,
+            title: title, source: feed.label,
+            type: ticker ? "company" : feed.type,
             ticker: ticker, time: timeStr, url: link, ts: ts
           });
         });
-        done();
+        tryDone();
       })
-      .catch(function(){ done(); });
+      .catch(function(){ tryDone(); });
   });
 }
 
