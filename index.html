@@ -525,6 +525,11 @@ function getTokenFromUrl() {
   if (enc) return decodeToken(enc);
   return "";
 }
+
+function isOwner() {
+  // Owner = typed token manually (not via invite link)
+  return localStorage.getItem("hb_is_owner") === "1";
+}
 var LS_THEME  = "hb_theme_v1";
 var LS_PROFILE = "hb_profile_v1";   // active profile name
 var LS_PROFILES = "hb_profiles_v1"; // list of profiles
@@ -2271,7 +2276,7 @@ function initApp() {
 $("tbtn").onclick=function() {
   var t=$("tinp").value.trim();
   if (!t) { $("terr").textContent="Cole seu token Brapi PRO"; $("terr").style.display="block"; return; }
-  $("terr").style.display="none"; localStorage.setItem(LS_TOKEN,t); token=t;
+  $("terr").style.display="none"; localStorage.setItem(LS_TOKEN,t); localStorage.setItem("hb_is_owner","1"); token=t;
   showProfileScreen();
 };
 $("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") $("tbtn").click(); });
