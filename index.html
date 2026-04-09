@@ -1429,9 +1429,9 @@ function fetchNews() {
 
 
 function renderNewsTab() {
+  notif("NEWS: " + newsCache.length + " itens | panel=" + (document.getElementById("news-panel") ? "OK" : "NULL"));
   var panel = document.getElementById("news-panel");
   if (!panel) {
-    alert("news-panel not found!");
     return;
   }
   var n = newsCache.length;
