@@ -1426,9 +1426,15 @@ function renderNewsTab() {
   list.innerHTML = "";
 
   if (!n) {
-    list.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:10px">&#128240;</div>Buscando noticias...</div>';
+    list.innerHTML = '<div class="empty">Buscando noticias...</div>';
     return;
   }
+
+  // FORCE visibility test
+  list.style.cssText = "display:block;min-height:200px;";
+  list.innerHTML = '<div style="color:#f59e0b;font-size:16px;font-weight:700;padding:20px">TESTE: '+n+' noticias</div>';
+  notif("list populado com " + n + " itens");
+  return;
 
   newsCache.forEach(function(item) {
     var e = document.createElement("div");
