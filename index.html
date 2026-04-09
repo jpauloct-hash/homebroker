@@ -312,7 +312,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       </div>
     <div id="news-panel" class="panel">
       <div class="sp">
-        <div id="news-loading" style="text-align:center;padding:30px 20px;color:var(--tx4);font-size:11px">
+        <div id="news-loading" style="text-align:center;padding:30px 20px;color:var(--tx4);font-size:11px;display:none">
           <div class="spin" style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;margin-bottom:8px"></div><br>
           Buscando notícias...
         </div>
@@ -1382,8 +1382,8 @@ function fetchNews() {
       if (emptyEl) emptyEl.style.display = "block";
       return;
     }
-    renderNewsTab();
     buildNewsTape();
+    renderNewsTab();
   }
 
   feeds.forEach(function(feed) {
@@ -1435,13 +1435,17 @@ function renderNewsTab() {
   var emptyEl = $("news-empty");
 
   if (!newsCache.length) {
-    if (loading) loading.style.display = "none";
-    if (emptyEl) emptyEl.style.display = "block";
+    if (loading) loading.style.display = "block";
+    if (emptyEl) emptyEl.style.display = "none";
     return;
   }
-
   if (loading) loading.style.display = "none";
   if (emptyEl) emptyEl.style.display = "none";
+  // Make sure sections are reset
+  var macroSec2 = $("news-macro-sec");
+  var coSec2 = $("news-co-sec");
+  if (macroSec2) macroSec2.style.display = "none";
+  if (coSec2) coSec2.style.display = "none";
 
   var macroNews = newsCache.filter(function(n){ return n.type==="macro"; }).slice(0,20);
   var coNews    = newsCache.filter(function(n){ return n.type==="company"; }).slice(0,20);
