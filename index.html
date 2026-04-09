@@ -143,12 +143,28 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   </div>
 </div>
 
+<!-- PROFILE SCREEN -->
+<div id="ps" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;">
+  <div style="text-align:center">
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER B3</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:4px">Selecionar Perfil</div>
+    <div style="font-size:10px;color:var(--tx3)">Cada perfil tem carteira e historico independentes</div>
+  </div>
+  <div id="profile-list" style="width:100%;max-width:400px"></div>
+  <div style="width:100%;max-width:400px;background:var(--bg2);border-radius:14px;padding:18px;border:1px solid var(--bd)">
+    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:10px">NOVO PERFIL</div>
+    <input id="profile-name" class="tinp" placeholder="Digite seu nome..." maxlength="20" autocomplete="off" style="text-transform:capitalize">
+    <button id="profile-create" class="tbtn">CRIAR E ENTRAR</button>
+  </div>
+</div>
+
 <!-- MAIN APP -->
 <div id="ma" style="display:none;flex-direction:column;height:100%;min-height:0">
   <div id="hdr">
     <div class="hr">
       <div>
         <div style="font-size:9px;letter-spacing:3px;color:var(--tx4);text-transform:uppercase;margin-bottom:2px">Simulador</div>
+        <div id="profile-indicator" style="font-size:9px;color:var(--bl);margin-bottom:2px"></div>
         <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER B3</div>
       </div>
       <div style="text-align:right">
@@ -360,6 +376,16 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">Escolha ate 18 tickers adicionais (atual: <span id="tape-count">0</span>)</div>
     <div id="tape-picker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
     <button id="tape-save" style="width:100%;padding:9px;border:none;border-radius:7px;background:#1e4a80;color:#fff;font-size:11px;font-weight:700;margin-bottom:16px">SALVAR TAPE</button>
+    <div style="border-top:1px solid var(--bd);padding-top:16px;margin-bottom:16px">
+      <div style="font-size:10px;font-weight:700;color:var(--bl);letter-spacing:1px;margin-bottom:10px">PERFIS</div>
+      <div id="settings-profiles" style="margin-bottom:8px"></div>
+      <button id="switch-profile-btn" style="width:100%;padding:9px;border:1px solid var(--bl);border-radius:8px;color:var(--bl);font-size:11px;font-weight:700;background:transparent;margin-bottom:8px">Trocar / Criar Perfil</button>
+      <button id="invite-btn" style="width:100%;padding:9px;border:none;border-radius:8px;background:#25d366;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Convidar pelo WhatsApp
+      </button>
+    </div>
+
     <div style="border-top:1px solid var(--bd);padding-top:16px">
       <div style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
       <button id="s-rst" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;margin-bottom:8px">RESETAR SIMULADOR</button>
@@ -481,7 +507,83 @@ var BRAPI   = "https://brapi.dev/api";
 var REFRESH = 60; // 1 minuto
 
 var LS_TOKEN  = "hb_token_v6";
+var LS_INVITE = "hb_invite_v1"; // invite code set by owner
+
+// Simple obfuscation - not encryption, just avoids plain token in URL
+function encodeToken(t) {
+  return btoa(t.split("").reverse().join("")).replace(/=/g,"");
+}
+function decodeToken(s) {
+  var pad = s.length % 4 === 0 ? s : s + "====".slice(s.length % 4);
+  try { return atob(pad).split("").reverse().join(""); } catch(e) { return ""; }
+}
+
+// Check URL for encoded token (invite link)
+function getTokenFromUrl() {
+  var params = new URLSearchParams(window.location.search);
+  var enc = params.get("t");
+  if (enc) return decodeToken(enc);
+  return "";
+}
 var LS_THEME  = "hb_theme_v1";
+var LS_PROFILE = "hb_profile_v1";   // active profile name
+var LS_PROFILES = "hb_profiles_v1"; // list of profiles
+
+function getProfileKey(key) {
+  var profile = localStorage.getItem(LS_PROFILE) || "default";
+  return key + "_" + profile;
+}
+
+function loadStateForProfile() {
+  try {
+    var s = JSON.parse(localStorage.getItem(getProfileKey("hb_state_v3")) || "{}");
+    return {
+      bal:            s.bal      !== undefined ? s.bal : 100000,
+      port:           s.port     || {},
+      trd:            s.trd      || [],
+      pending:        s.pending  || [],
+      divs:           s.divs     || [],
+      totalDiv:       s.totalDiv || 0,
+      checkedDivDate: s.checkedDivDate || "",
+      initialBal:     s.initialBal || 100000,
+      firstTradeDate: s.firstTradeDate || ""
+    };
+  } catch(e) { return {bal:100000,port:{},trd:[],pending:[],divs:[],totalDiv:0,checkedDivDate:"",initialBal:100000,firstTradeDate:""}; }
+}
+
+function saveStateForProfile() {
+  localStorage.setItem(getProfileKey("hb_state_v3"), JSON.stringify({
+    bal:bal, port:port, trd:trd, pending:pending,
+    divs:divs, totalDiv:totalDiv, checkedDivDate:checkedDivDate,
+    initialBal:initialBal, firstTradeDate:firstTradeDate
+  }));
+}
+
+function getProfiles() {
+  try { return JSON.parse(localStorage.getItem(LS_PROFILES) || "[]"); }
+  catch(e) { return []; }
+}
+
+function saveProfile(name) {
+  var profiles = getProfiles();
+  if (profiles.indexOf(name) === -1) profiles.push(name);
+  localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
+  localStorage.setItem(LS_PROFILE, name);
+}
+
+function deleteProfile(name) {
+  // Remove all keys for this profile
+  var keys = ["hb_state_v3","hb_goal_v1","hb_equity_v1","hb_news_v1","hb_tape_v1"];
+  keys.forEach(function(k){ localStorage.removeItem(k+"_"+name); });
+  var profiles = getProfiles().filter(function(p){ return p !== name; });
+  localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
+  // If deleted active profile, clear it
+  if (localStorage.getItem(LS_PROFILE) === name) localStorage.removeItem(LS_PROFILE);
+}
+
+function getCurrentProfile() {
+  return localStorage.getItem(LS_PROFILE) || "";
+}
 
 function applyTheme(t) {
   if (t === "light") document.documentElement.classList.add("light");
@@ -501,31 +603,13 @@ var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
 //  State 
 var token = localStorage.getItem(LS_TOKEN) || "";
 
-function loadState() {
-  try {
-    var s = JSON.parse(localStorage.getItem(LS_STATE) || "{}");
-    return {
-      bal:            s.bal      !== undefined ? s.bal : 100000,
-      port:           s.port     || {},
-      trd:            s.trd      || [],
-      pending:        s.pending  || [],
-      divs:           s.divs     || [],
-      totalDiv:       s.totalDiv || 0,
-      checkedDivDate: s.checkedDivDate || "",
-      initialBal:     s.initialBal || 100000,
-      firstTradeDate: s.firstTradeDate || ""
-    };
-  } catch(e) { return {bal:100000,port:{},trd:[],pending:[],divs:[],totalDiv:0,checkedDivDate:"",initialBal:100000,firstTradeDate:""}; }
+function loadState() { return loadStateForProfile(); }
+function saveState() { saveStateForProfile(); }
+function loadGoal() {
+  try { return JSON.parse(localStorage.getItem(getProfileKey("hb_goal_v1"))||"{}"); }
+  catch(e) { return {}; }
 }
-function saveState() {
-  localStorage.setItem(LS_STATE, JSON.stringify({
-    bal:bal,port:port,trd:trd,pending:pending,
-    divs:divs,totalDiv:totalDiv,checkedDivDate:checkedDivDate,
-    initialBal:initialBal,firstTradeDate:firstTradeDate
-  }));
-}
-function loadGoal() { try { return JSON.parse(localStorage.getItem(LS_GOAL)||"{}"); } catch(e) { return {}; } }
-function saveGoal() { localStorage.setItem(LS_GOAL, JSON.stringify(goal)); }
+function saveGoal() { localStorage.setItem(getProfileKey("hb_goal_v1"), JSON.stringify(goal)); }
 
 function loadEquityHistory() {
   try { return JSON.parse(localStorage.getItem(LS_EQUITY)||"[]"); } catch(e) { return []; }
@@ -1947,6 +2031,100 @@ function buildTapePicker() {
 }
 
 
+// ── Profile system ────────────────────────────────────────────────────────────
+function showProfileScreen() {
+  $("ts").style.display = "none";
+  $("ma").style.display = "none";
+  $("ps").style.display = "flex";
+  renderProfileList();
+}
+
+function renderProfileList() {
+  var list = $("profile-list");
+  if (!list) return;
+  list.innerHTML = "";
+  var profiles = getProfiles();
+  if (!profiles.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--tx4);font-size:11px;padding:10px">Nenhum perfil ainda. Crie o primeiro!</div>';
+    return;
+  }
+  profiles.forEach(function(name) {
+    var card = document.createElement("div");
+    card.style.cssText = "background:var(--bg2);border-radius:10px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;";
+    var left = document.createElement("div");
+    var avatar = document.createElement("div");
+    avatar.style.cssText = "width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#1e4a80,#2563eb);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;margin-right:10px;vertical-align:middle";
+    avatar.textContent = name.charAt(0).toUpperCase();
+    var nameEl = document.createElement("span");
+    nameEl.style.cssText = "font-weight:700;font-size:13px;color:var(--tx);vertical-align:middle";
+    nameEl.textContent = name;
+    left.style.display = "flex";
+    left.style.alignItems = "center";
+    left.appendChild(avatar);
+    left.appendChild(nameEl);
+    var enterBtn = document.createElement("button");
+    enterBtn.style.cssText = "padding:7px 16px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit";
+    enterBtn.textContent = "ENTRAR";
+    (function(n){ enterBtn.onclick = function(){ enterProfile(n); }; })(name);
+    card.appendChild(left);
+    card.appendChild(enterBtn);
+    list.appendChild(card);
+  });
+}
+
+function enterProfile(name) {
+  saveProfile(name);
+  // Reload state for this profile
+  var st2 = loadState();
+  bal = st2.bal; port = st2.port; trd = st2.trd; pending = st2.pending;
+  divs = st2.divs; totalDiv = st2.totalDiv; checkedDivDate = st2.checkedDivDate;
+  initialBal = st2.initialBal; firstTradeDate = st2.firstTradeDate;
+  goal = loadGoal();
+  equityHistory = loadEquityHistory();
+  $("ps").style.display = "none";
+  if (!$("ma").style.display || $("ma").style.display === "none") {
+    initApp();
+  } else {
+    updateProfileIndicator();
+    render();
+  }
+}
+
+function updateProfileIndicator() {
+  var el = $("profile-indicator");
+  if (el) el.textContent = getCurrentProfile() ? "Perfil: " + getCurrentProfile() : "";
+}
+
+function renderSettingsProfiles() {
+  var el = $("settings-profiles");
+  if (!el) return;
+  var profiles = getProfiles();
+  var current = getCurrentProfile();
+  el.innerHTML = "";
+  profiles.forEach(function(name) {
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)";
+    var nameEl = document.createElement("span");
+    nameEl.style.cssText = "font-size:11px;color:" + (name === current ? "var(--bl)" : "var(--tx2)") + ";font-weight:" + (name === current ? "700" : "400");
+    nameEl.textContent = name + (name === current ? " (ativo)" : "");
+    var delBtn = document.createElement("button");
+    delBtn.style.cssText = "padding:3px 8px;background:transparent;border:1px solid rgba(240,64,96,.4);border-radius:5px;color:var(--r);font-size:9px;font-weight:700;cursor:pointer;font-family:inherit";
+    delBtn.textContent = "EXCLUIR";
+    (function(n){
+      delBtn.onclick = function(){
+        if (n === current) { notif("Nao pode excluir o perfil ativo","err"); return; }
+        if (!confirm("Excluir perfil " + n + "? Todos os dados serao apagados.")) return;
+        deleteProfile(n);
+        renderSettingsProfiles();
+        notif("Perfil " + n + " excluido");
+      };
+    })(name);
+    row.appendChild(nameEl);
+    if (name !== current) row.appendChild(delBtn);
+    el.appendChild(row);
+  });
+}
+
 function initApp() {
   $("ts").style.display="none"; $("ma").style.display="flex";
 
@@ -2066,8 +2244,20 @@ function initApp() {
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
   $("logb").onclick=function() { localStorage.removeItem(LS_TOKEN); location.reload(); };
+  $("switch-profile-btn").onclick = function() { $("sht").classList.remove("on"); showProfileScreen(); };
+  $("invite-btn").onclick = function() {
+    if (!token) { notif("Entre no app primeiro","err"); return; }
+    var base = window.location.href.split("?")[0];
+    var enc = encodeToken(token);
+    var url = base + "?t=" + enc;
+    var msg = "Oi! Te convido para simular investimentos na bolsa comigo no Home Broker B3." +
+      " Acesse o link abaixo, crie seu perfil e comece a operar com cotacoes reais da B3:" +
+      " " + url +
+      " Nao precisa criar conta em nenhum lugar. So clicar, criar seu nome e comecar!";
+    window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+  };
 
-  updateExecBtn(); updatePregaoBar(); render(); loadTV(); startRefresh();
+  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
   initTickerSearch();
   initNewsTape();
   // If cached news exist, build tape immediately
@@ -2081,11 +2271,37 @@ function initApp() {
 $("tbtn").onclick=function() {
   var t=$("tinp").value.trim();
   if (!t) { $("terr").textContent="Cole seu token Brapi PRO"; $("terr").style.display="block"; return; }
-  $("terr").style.display="none"; localStorage.setItem(LS_TOKEN,t); token=t; initApp();
+  $("terr").style.display="none"; localStorage.setItem(LS_TOKEN,t); token=t;
+  showProfileScreen();
 };
 $("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") $("tbtn").click(); });
 
-if (token) initApp();
+$("profile-create").onclick = function() {
+  var name = $("profile-name").value.trim();
+  if (!name || name.length < 2) { notif("Digite um nome (min. 2 caracteres)","err"); return; }
+  enterProfile(name);
+};
+$("profile-name").addEventListener("keydown",function(e){ if(e.key==="Enter") $("profile-create").click(); });
+
+// Check if arriving via invite link
+var urlToken = getTokenFromUrl();
+if (urlToken && !token) {
+  token = urlToken;
+  localStorage.setItem(LS_TOKEN, token);
+}
+
+if (token) {
+  if (getCurrentProfile()) {
+    var st2 = loadState();
+    bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+    initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+    goal=loadGoal(); equityHistory=loadEquityHistory();
+    initApp();
+  } else {
+    showProfileScreen();
+  }
+}
 </script>
 </body>
 </html>
