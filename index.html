@@ -2,6 +2,9 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Home Broker B3</title>
@@ -336,7 +339,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <button id="s-clr" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;background:transparent;color:var(--tx3);font-size:11px;font-weight:600;margin-bottom:16px">Remover meta / prazo</button>
 
     <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:8px">TICKER TAPE</div>
-    <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">IBOV e USD/BRL sao fixos. Escolha ate 18 adicionais (atual: <span id="tape-count">0</span>)</div>
+    <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">Escolha ate 18 tickers adicionais (atual: <span id="tape-count">0</span>)</div>
     <div id="tape-picker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
     <button id="tape-save" style="width:100%;padding:9px;border:none;border-radius:7px;background:#1e4a80;color:#fff;font-size:11px;font-weight:700;margin-bottom:16px">SALVAR TAPE</button>
     <div style="border-top:1px solid var(--bd);padding-top:16px">
@@ -442,7 +445,7 @@ var NAMES = {
   EQTL3:"Equatorial ON", DOLA11:"Dolar ETF", RDOR3:"Rede DOr ON", UGPA3:"Ultrapar ON"
 };
 var TVSYM = {
-  "USDBRL":"FX:USDBRL",
+  "USDBRL":"OANDA:USDBRL",
   "IBOV":"BMFBOVESPA:IBOV",
   IBOV:"BMFBOVESPA:IBOV", PETR4:"BMFBOVESPA:PETR4", VALE3:"BMFBOVESPA:VALE3",
   ITUB4:"BMFBOVESPA:ITUB4", BBDC4:"BMFBOVESPA:BBDC4", BBAS3:"BMFBOVESPA:BBAS3",
@@ -1839,21 +1842,32 @@ function buildTapePicker() {
   if (!picker) return;
   picker.innerHTML = "";
 
+  // Note about pinned tickers
+  var note = document.createElement("div");
+  note.style.cssText = "font-size:9px;color:var(--g);margin-bottom:8px;padding:5px 8px;background:rgba(0,200,150,.08);border-radius:5px;border:1px solid rgba(0,200,150,.2)";
+  note.textContent = "IBOV e USD/BRL sao fixos e sempre aparecem no tape.";
+  picker.appendChild(note);
+
   var segments = [
-    { label: "ACOES IBOVESPA", tickers: [
+    { label: "ACOES IBOVESPA", color: "var(--bl)", tickers: [
       "PETR4","PETR3","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3",
       "B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","ELET3","ELET6",
       "HAPV3","TOTS3","CPLE6","ENEV3","CSAN3","LREN3","MGLU3","BEEF3","BRFS3","CYRE3",
       "FLRY3","GGBR4","GOAU4","HYPE3","JBSS3","KLBN11","MRVE3","MULT3","RAIL3","SBSP3",
       "TAEE11","TIMS3","TRPL4","USIM5","YDUQ3","NTCO3","POMO4"
     ]},
-    { label: "ETFs", tickers: [
+    { label: "ETFs", color: "var(--a)", tickers: [
       "BOVA11","SMAL11","IVVB11","DOLA11","GOLD11","HASH11","PIBB11","SPXI11","BBSD11","EURP11"
     ]},
-    { label: "BDRs", tickers: [
+    { label: "BDRs", color: "#a78bfa", tickers: [
       "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34"
     ]}
   ];
+
+  // Non-pinned already selected
+  var alreadySelected = TAPE_TICKERS.filter(function(t){
+    return PINNED_TICKERS.indexOf(t) === -1;
+  });
 
   var updateCount = function() {
     var n = picker.querySelectorAll("input[type=checkbox]:checked").length;
@@ -1861,19 +1875,18 @@ function buildTapePicker() {
   };
 
   segments.forEach(function(seg) {
-    // Section header
     var hdr = document.createElement("div");
-    hdr.style.cssText = "font-size:9px;font-weight:700;color:var(--a);letter-spacing:2px;margin:10px 0 6px;width:100%";
+    hdr.style.cssText = "font-size:9px;font-weight:700;color:"+seg.color+";letter-spacing:2px;margin:10px 0 6px;width:100%";
     hdr.textContent = seg.label;
     picker.appendChild(hdr);
 
-    // Ticker chips
     seg.tickers.forEach(function(t) {
-      var isOn = TAPE_TICKERS.indexOf(t) >= 0;
+      // Skip pinned - they are always in tape
+      if (PINNED_TICKERS.indexOf(t) >= 0) return;
+      var isOn = alreadySelected.indexOf(t) >= 0;
 
       var chip = document.createElement("div");
-      chip.style.cssText = "display:inline-flex;align-items:center;padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;margin:2px;transition:all .15s;border:1px solid " + (isOn ? "#1e4a80" : "var(--bd)") + ";background:" + (isOn ? "#0d2040" : "transparent") + ";color:" + (isOn ? "var(--bl)" : "var(--tx3)") + ";";
-      chip.textContent = t;
+      chip.style.cssText = "display:inline-flex;align-items:center;padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;margin:2px;border:1px solid "+(isOn?"#1e4a80":"var(--bd)")+";background:"+(isOn?"#0d2040":"transparent")+";color:"+(isOn?"var(--bl)":"var(--tx3)")+";";
 
       var cb = document.createElement("input");
       cb.type = "checkbox";
@@ -1881,10 +1894,14 @@ function buildTapePicker() {
       cb.checked = isOn;
       cb.style.display = "none";
       chip.appendChild(cb);
+      chip.appendChild(document.createTextNode(t));
 
       chip.onclick = function() {
         var total = picker.querySelectorAll("input[type=checkbox]:checked").length;
-        if (!cb.checked && total >= 18) { notif("Maximo 18 tickers (IBOV e USD/BRL sao fixos)","err"); return; }
+        if (!cb.checked && total >= 18) {
+          notif("Maximo 18 (+ IBOV e USD/BRL fixos)","err");
+          return;
+        }
         cb.checked = !cb.checked;
         chip.style.border = cb.checked ? "1px solid #1e4a80" : "1px solid var(--bd)";
         chip.style.background = cb.checked ? "#0d2040" : "transparent";
