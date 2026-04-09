@@ -296,6 +296,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
             <span class="lbl">Resultado total</span><span id="pres" style="font-weight:700"></span>
           </div>
         </div>
+        <button id="liq-btn" style="width:100%;padding:10px;background:rgba(240,64,96,.1);border:1px solid rgba(240,64,96,.3);border-radius:8px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px">ZERAR POSICOES (vender tudo a mercado)</button>
         <div id="plist"></div>
       </div>
     </div>
@@ -333,6 +334,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div class="srow"><div class="slbl">META DE RENTABILIDADE (%)</div><input type="number" id="s-tgt" class="sinp" placeholder="Ex: 30" min="0" step="0.1"></div>
     <button id="s-save" style="width:100%;padding:11px;border:none;border-radius:8px;background:#1e4a80;color:#fff;font-size:12px;font-weight:700;margin-bottom:8px">SALVAR</button>
     <button id="s-clr" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;background:transparent;color:var(--tx3);font-size:11px;font-weight:600;margin-bottom:16px">Remover meta / prazo</button>
+
+    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:8px">TICKER TAPE</div>
+    <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">Escolha ate 20 tickers para o tape (atual: <span id="tape-count">0</span>)</div>
+    <div id="tape-picker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
+    <button id="tape-save" style="width:100%;padding:9px;border:none;border-radius:7px;background:#1e4a80;color:#fff;font-size:11px;font-weight:700;margin-bottom:16px">SALVAR TAPE</button>
     <div style="border-top:1px solid var(--bd);padding-top:16px">
       <div style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
       <button id="s-rst" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;margin-bottom:8px">RESETAR SIMULADOR</button>
@@ -378,6 +384,48 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <script>
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
 var TICKERS = ["PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
+
+// Full universe available for tape customization
+var ALL_TAPE_TICKERS = [
+  // Ibovespa mais negociados
+  "PETR4","PETR3","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3",
+  "B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","ELET3","ELET6",
+  "HAPV3","TOTS3","CPLE6","ENEV3","CSAN3","LREN3","MGLU3","NTCO3","BEEF3","BRFS3",
+  "CYRE3","EVEN3","FLRY3","GGBR4","GOAU4","HYPE3","IRBR3","JBSS3","KLBN11","MRVE3",
+  "MULT3","POMO4","QUAL3","RAIL3","SBSP3","TAEE11","TIMS3","TRPL4","USIM5","YDUQ3",
+  // ETFs populares
+  "BOVA11","SMAL11","IVVB11","DOLA11","BBSD11","GOLD11","HASH11","PIBB11","SPXI11","EURP11",
+  // BDRs mais negociados
+  "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34"
+];
+var ALL_TAPE_NAMES = {
+  PETR4:"Petrobras PN",PETR3:"Petrobras ON",VALE3:"Vale ON",ITUB4:"Itau PN",BBDC4:"Bradesco PN",
+  BBAS3:"Banco Brasil ON",ABEV3:"Ambev ON",WEGE3:"WEG ON",RENT3:"Localiza ON",PRIO3:"PetroReconcavo ON",
+  B3SA3:"B3 ON",EMBR3:"Embraer ON",RADL3:"Raia Drogasil ON",SUZB3:"Suzano ON",VIVT3:"Vivo ON",
+  EQTL3:"Equatorial ON",RDOR3:"Rede DOr ON",UGPA3:"Ultrapar ON",ELET3:"Eletrobras ON",ELET6:"Eletrobras PNB",
+  HAPV3:"Hapvida ON",TOTS3:"Totvs ON",CPLE6:"Copel PNB",ENEV3:"Eneva ON",CSAN3:"Cosan ON",
+  LREN3:"Lojas Renner ON",MGLU3:"Magazine Luiza ON",NTCO3:"Grupo Boticario ON",BEEF3:"Minerva ON",BRFS3:"BRF ON",
+  CYRE3:"Cyrela ON",EVEN3:"Even ON",FLRY3:"Fleury ON",GGBR4:"Gerdau PN",GOAU4:"Metalurgica Gerdau PN",
+  HYPE3:"Hypera ON",IRBR3:"IRB Brasil ON",JBSS3:"JBS ON",KLBN11:"Klabin UNT",MRVE3:"MRV ON",
+  MULT3:"Multiplan ON",POMO4:"Marcopolo PN",QUAL3:"Qualicorp ON",RAIL3:"Rumo ON",SBSP3:"Sabesp ON",
+  TAEE11:"Taesa UNT",TIMS3:"TIM ON",TRPL4:"CTEEP PN",USIM5:"Usiminas PNA",YDUQ3:"Yduqs ON",
+  BOVA11:"ETF Ibovespa",SMAL11:"ETF Small Caps",IVVB11:"ETF S&P500",DOLA11:"ETF Dolar",
+  BBSD11:"ETF BB Dividendos",GOLD11:"ETF Ouro",HASH11:"ETF Cripto",PIBB11:"ETF IBrX50",
+  SPXI11:"ETF S&P500 BRL",EURP11:"ETF Europa",
+  BERK34:"Berkshire BDR",AAPL34:"Apple BDR",AMZO34:"Amazon BDR",GOGL34:"Google BDR",
+  MSFT34:"Microsoft BDR",NVDC34:"Nvidia BDR",TSLA34:"Tesla BDR",META34:"Meta BDR",
+  NFLX34:"Netflix BDR",GOOGL34:"Alphabet BDR"
+};
+
+// Load tape tickers from localStorage or use defaults
+function loadTapeTickers() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("hb_tape_v1") || "null");
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+  } catch(e) {}
+  return ["IBOV","PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
+}
+var TAPE_TICKERS = loadTapeTickers();
 var DISPLAY_TICKERS = ["IBOV"].concat(TICKERS);
 var NAMES = {
   IBOV:"Ibovespa Index", PETR4:"Petrobras PN", VALE3:"Vale ON", ITUB4:"Itau Unibanco PN",
@@ -966,7 +1014,7 @@ function renderTickers() {
   var el=$("tks"); el.innerHTML="";
   // Duplicate list x3 for seamless infinite scroll
   for (var pass=0; pass<3; pass++) {
-    DISPLAY_TICKERS.forEach(function(t) {
+    TAPE_TICKERS.forEach(function(t) {
       el.appendChild(makeTkBtn(t));
     });
   }
@@ -1111,6 +1159,25 @@ function renderPort() {
       '<span>PM:<span style="color:var(--tx3);margin-left:3px">'+R(pos.avgPrice)+'</span></span>'+
       '<span>Atual:<span style="color:'+(dc>=0?"var(--g)":"var(--r)")+';margin-left:3px">'+R(p)+'</span></span>'+
       '<span>Dia:<span style="color:'+(dc>=0?"var(--g)":"var(--r)")+';margin-left:3px">'+(dc>=0?"+":"")+dc.toFixed(2)+'%</span></span></div>';
+    // Sell button
+    var sb2 = document.createElement("button");
+    sb2.style.cssText = "width:100%;padding:7px;background:rgba(240,64,96,.1);border:1px solid rgba(240,64,96,.35);border-radius:6px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px";
+    sb2.textContent = "VENDER " + t;
+    (function(tk, qty2){
+      sb2.onclick = function(){
+        sel = tk; side = "sell"; qty = qty2;
+        document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
+        document.querySelectorAll(".panel").forEach(function(p2){ p2.classList.remove("on"); });
+        document.querySelector(".tab[data-t='order']").classList.add("on");
+        $("order-panel").classList.add("on");
+        $("pb").style.display = "none";
+        $("bsel").style.cssText = "background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
+        $("bbuy").style.cssText = "background:var(--bg3);color:var(--tx3);";
+        $("qinp").value = qty2;
+        updateExecBtn(); render();
+      };
+    })(t, pos.qty);
+    e.appendChild(sb2);
     l.appendChild(e);
   });
 }
@@ -1391,9 +1458,15 @@ function fetchNews() {
           var pubDate = item.pubDate || "";
           if (!title || title.length < 10) return;
 
-          // Relevance filter
+          // Strict relevance filter - financial/market news only
           var lower = title.toLowerCase();
-          var relevant = /bolsa|ibovespa|selic|banco central|juros|cvm|acoes|acao|mercado|brasil|b3|petrobras|vale|itau|bradesco|ambev|weg|embraer|dividendo|resultado|lucro|receita|economia|inflacao|cambio|dolar|credito|bovespa|investimento|fiscal|fazenda|pib|copom/.test(lower);
+
+          // BLOCK: marketing, lifestyle, non-financial content
+          var blocked = /iphone|swarovski|bracelete|leilao da receita|vinho|celular|notebook|televisao|tv samsung|desconto|oferta|promocao|compre|comprar agora|black friday|cupom|frete gratis|receita federal leilao/.test(lower);
+          if (blocked) return;
+
+          // ALLOW: must match financial keywords
+          var relevant = /bolsa|ibovespa|selic|banco central|juros|cvm|acoes|acao|mercado financeiro|b3|petrobras|vale3|itau|bradesco|ambev|weg|embraer|dividendo|resultado trimestral|lucro liquido|receita liquida|economia brasileira|inflacao|cambio|dolar comercial|credito|bovespa|investimento|fiscal|fazenda|pib|copom|taxa de juros|tesouro|fundo|fii|etf|indice|commodities|petroleo|mineiro|exportacao/.test(lower);
           if (!relevant) return;
 
           // Detect ticker mention
@@ -1743,6 +1816,38 @@ function initTickerSearch() {
   });
 }
 
+function buildTapePicker() {
+  var picker = document.getElementById("tape-picker");
+  var countEl = document.getElementById("tape-count");
+  if (!picker) return;
+  picker.innerHTML = "";
+  ALL_TAPE_TICKERS.forEach(function(t) {
+    var isSelected = TAPE_TICKERS.indexOf(t) >= 0;
+    var label = document.createElement("label");
+    label.style.cssText = "display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid " + (isSelected ? "#1e4a80" : "var(--bd)") + ";background:" + (isSelected ? "#0d2040" : "transparent") + ";color:" + (isSelected ? "var(--bl)" : "var(--tx3)") + ";transition:all .15s;";
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "tape-check";
+    cb.value = t;
+    cb.checked = isSelected;
+    cb.style.display = "none";
+    cb.onchange = function() {
+      var checked = picker.querySelectorAll(".tape-check:checked").length;
+      if (cb.checked && checked > 20) { cb.checked = false; notif("Maximo 20 tickers","err"); return; }
+      label.style.border = cb.checked ? "1px solid #1e4a80" : "1px solid var(--bd)";
+      label.style.background = cb.checked ? "#0d2040" : "transparent";
+      label.style.color = cb.checked ? "var(--bl)" : "var(--tx3)";
+      if (countEl) countEl.textContent = picker.querySelectorAll(".tape-check:checked").length;
+    };
+    var name = ALL_TAPE_NAMES[t] ? t : t;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(t));
+    label.onclick = function(){ cb.checked = !cb.checked; cb.onchange(); };
+    picker.appendChild(label);
+  });
+  if (countEl) countEl.textContent = TAPE_TICKERS.length;
+}
+
 function initApp() {
   $("ts").style.display="none"; $("ma").style.display="flex";
 
@@ -1782,6 +1887,18 @@ function initApp() {
   $("csht").onclick=function(){ $("sht").classList.remove("on"); };
   $("sht").onclick=function(e){ if(e.target===$("sht")) $("sht").classList.remove("on"); };
 
+  $("tape-save").onclick = function() {
+    var selected = [];
+    var checks = document.querySelectorAll(".tape-check:checked");
+    for (var i=0; i<checks.length; i++) selected.push(checks[i].value);
+    if (!selected.length) { notif("Selecione ao menos 1 ticker","err"); return; }
+    TAPE_TICKERS = selected;
+    localStorage.setItem("hb_tape_v1", JSON.stringify(selected));
+    $("sht").classList.remove("on");
+    renderTickers();
+    notif("Tape atualizado: " + selected.length + " tickers!");
+  };
+
   $("s-save").onclick=function() {
     var d=$("s-end").value, t=parseFloat($("s-tgt").value);
     goal={}; if(d) goal.endDate=d; if(!isNaN(t)&&t>0) goal.target=t;
@@ -1798,6 +1915,22 @@ function initApp() {
     $("cfm").classList.add("on");
   };
   $("c-no").onclick=function() { $("cfm").classList.remove("on"); };
+  $("liq-btn").onclick = function(){
+    if (!isPregaoOpen()){ notif("Pregao fechado","err"); return; }
+    var tks = Object.keys(port);
+    if (!tks.length){ notif("Carteira vazia","err"); return; }
+    tks.forEach(function(tk){
+      var p=prices[tk], pos2=port[tk];
+      if (!p||!pos2) return;
+      var tot=p*pos2.qty; bal+=tot;
+      trd.unshift({id:Date.now(),tk:tk,tp:"V",qty:pos2.qty,pr:p,tot:tot,
+        tm:new Date().toLocaleTimeString("pt-BR"),note:"Liquidacao"});
+      delete port[tk];
+    });
+    if (trd.length>200) trd=trd.slice(0,200);
+    saveState(); render(); notif("Posicoes liquidadas!");
+  };
+
   $("c-yes").onclick=function() {
     var newBal = parseFloat($("reset-bal").value);
     if (!newBal||newBal<1000) { notif("Saldo minimo: R$ 1.000,00","err"); return; }
