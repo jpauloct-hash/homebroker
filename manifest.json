@@ -1,6 +1,6 @@
 {
-  "name": "Trading GP",
-  "short_name": "Trading GP",
+  "name": "HOME BROKER TGP",
+  "short_name": "TGP",
   "description": "Simulador de operações em Bolsa, com cotações atualizadas a cada minuto e 5 minutos de atraso. Gráfico com atraso de 15min.",
   "start_url": "./",
   "scope": "./",
