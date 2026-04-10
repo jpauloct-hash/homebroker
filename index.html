@@ -113,6 +113,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .ticker-result{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s;}
 .ticker-result:last-child{border-bottom:none;}
 .ticker-result:active{background:var(--bg3);}
+.pr-inc,.pr-set{padding:7px 4px;border:1px solid var(--bd);border-radius:6px;background:transparent;color:var(--tx3);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center;}
+.pr-inc:active,.pr-set:active{background:var(--bd2);color:var(--tx);}
+.pr-set.on{background:#1e3a5f;border-color:#1e4a80;color:var(--bl);}
 #nf{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:999;padding:9px 18px;border-radius:8px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none;pointer-events:none;}
 #nf.on{display:block;animation:fadein .2s ease;}
 /* Pregão status */
@@ -248,55 +251,98 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
     <div id="order-panel" class="panel">
       <div class="sp">
-        <!-- Quick ticker search -->
-        <div style="position:relative;margin-bottom:12px;">
-          <input type="text" id="ticker-search" placeholder="Buscar ticker... ex: PETR4"
+
+        <!-- Ticker search -->
+        <div style="position:relative;margin-bottom:14px">
+          <input type="text" id="ticker-search" placeholder="&#128269;  Buscar ticker... ex: PETR4"
             autocomplete="off" autocapitalize="characters"
-            style="width:100%;padding:10px 14px 10px 36px;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:13px;outline:none;font-family:inherit;letter-spacing:1px;">
-          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--tx3);">&#128269;</span>
+            style="width:100%;padding:11px 14px;background:var(--bg3);border:1px solid var(--bd);border-radius:10px;color:var(--tx);font-size:13px;outline:none;font-family:inherit;letter-spacing:1px;">
           <div id="ticker-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--bd2);border-radius:8px;margin-top:3px;z-index:50;overflow:hidden;"></div>
         </div>
-        <div class="bs">
+
+        <!-- Buy / Sell toggle -->
+        <div class="bs" style="margin-bottom:16px">
           <button class="bsb" id="bbuy" style="background:var(--g);color:#fff;box-shadow:0 0 20px rgba(0,200,150,.35)">&#9650; COMPRAR</button>
           <button class="bsb" id="bsel" style="background:var(--bg3);color:var(--tx3)">&#9660; VENDER</button>
         </div>
-        <div class="card">
-          <div class="row"><span class="lbl">Ativo</span><span id="osym" style="color:var(--bl);font-weight:700"></span></div>
-          <div class="row"><span class="lbl">Cotação atual</span><span id="oprc" style="font-weight:700"></span></div>
-          <div style="margin-bottom:12px">
-            <div class="lbl" style="font-size:11px;margin-bottom:6px;letter-spacing:1px">TIPO DE ORDEM</div>
-            <div class="ot-wrap">
-              <button class="ot-btn on" id="ot-mkt">A MERCADO</button>
-              <button class="ot-btn" id="ot-lmt">LIMITADA</button>
-            </div>
+
+        <!-- Asset + Price info -->
+        <div style="background:var(--bg3);border-radius:12px;padding:14px;border:1px solid var(--bd);margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:11px;color:var(--tx3);letter-spacing:1px">ATIVO</span>
+            <span id="osym" style="color:var(--bl);font-weight:700;font-size:16px;letter-spacing:1px"></span>
           </div>
-          <div id="lmt-wrap" style="display:none;margin-bottom:12px">
-            <div class="lbl" style="font-size:11px;margin-bottom:6px;letter-spacing:1px">PREÇO LIMITE (R$)</div>
-            <input type="number" id="lmt-price" class="qi" placeholder="0.00" min="0" step="0.01">
-            <div style="font-size:9px;color:var(--tx4);margin-top:3px;line-height:1.6">Compra: abaixo da cotação atual · Venda: acima da cotação atual</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:11px;color:var(--tx3)">Cotacao atual</span>
+            <span id="oprc" style="font-weight:700;font-size:15px"></span>
           </div>
-          <div>
-            <div class="lbl" style="font-size:11px;margin-bottom:6px;letter-spacing:1px">QUANTIDADE</div>
-            <input type="number" id="qinp" class="qi" value="10" min="1">
-            <div class="prs">
-              <button class="pr" data-q="1">1</button>
-              <button class="pr" data-q="5">5</button>
-              <button class="pr on" data-q="10">10</button>
-              <button class="pr" data-q="50">50</button>
-            </div>
-          </div>
-          <div class="dvd">
-            <span class="lbl" style="font-size:12px">Total estimado</span>
-            <span id="otot" style="color:var(--a);font-weight:700;font-size:15px"></span>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--bd)">
+            <span style="font-size:11px;color:var(--tx3)">Saldo disponivel</span>
+            <span id="o-bal" style="font-weight:700;font-size:13px;color:var(--g)"></span>
           </div>
         </div>
+
+        <!-- Order type -->
+        <div style="margin-bottom:14px">
+          <div style="font-size:10px;color:var(--tx3);letter-spacing:1px;margin-bottom:7px">TIPO DE ORDEM</div>
+          <div class="ot-wrap">
+            <button class="ot-btn on" id="ot-mkt">&#9889; A MERCADO</button>
+            <button class="ot-btn" id="ot-lmt">&#127919; LIMITADA</button>
+          </div>
+        </div>
+
+        <!-- Limit price -->
+        <div id="lmt-wrap" style="display:none;margin-bottom:14px">
+          <div style="font-size:10px;color:var(--tx3);letter-spacing:1px;margin-bottom:7px">PRECO LIMITE (R$)</div>
+          <input type="number" id="lmt-price" class="qi" placeholder="0.00" min="0" step="0.01">
+          <div style="font-size:9px;color:var(--tx3);margin-top:4px">Executa quando o mercado atingir este preco</div>
+        </div>
+
+        <!-- Quantity -->
+        <div style="background:var(--bg3);border-radius:12px;padding:14px;border:1px solid var(--bd);margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-size:10px;color:var(--tx3);letter-spacing:1px">QUANTIDADE</div>
+            <button id="max-btn" style="font-size:9px;font-weight:700;color:var(--a);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:5px;padding:3px 9px;cursor:pointer;font-family:inherit">USAR TUDO</button>
+          </div>
+          <input type="number" id="qinp" class="qi" value="10" min="1" style="margin-bottom:10px">
+          <!-- Increment buttons -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">
+            <button class="pr-inc" data-inc="50">+50</button>
+            <button class="pr-inc" data-inc="100">+100</button>
+            <button class="pr-inc" data-inc="500">+500</button>
+            <button class="pr-inc" data-inc="1000">+1000</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:6px">
+            <button class="pr-set" data-q="1">1</button>
+            <button class="pr-set" data-q="10">10</button>
+            <button class="pr-set" data-q="100">100</button>
+            <button class="pr-set" data-q="500">500</button>
+          </div>
+        </div>
+
+        <!-- Total + balance -->
+        <div style="background:var(--bg3);border-radius:12px;padding:14px;border:1px solid var(--bd);margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:11px;color:var(--tx3)">Total estimado</span>
+            <span id="otot" style="color:var(--a);font-weight:700;font-size:17px"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:10px;color:var(--tx3)">Saldo apos operacao</span>
+            <span id="o-after" style="font-size:12px;font-weight:600;color:var(--tx2)"></span>
+          </div>
+        </div>
+
         <button id="exec" class="eb" style="background:linear-gradient(135deg,var(--g),#00a078);box-shadow:0 4px 24px rgba(0,200,150,.35)">EXECUTAR COMPRA</button>
+
+        <!-- Pending orders -->
         <div id="pend-sec" style="display:none;margin-bottom:14px">
-          <div style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:8px">ORDENS PENDENTES</div>
+          <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">ORDENS PENDENTES</div>
           <div id="pend-list"></div>
         </div>
+
+        <!-- Current position -->
         <div id="pbox" class="pbox" style="display:none">
-          <div id="plbl" style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:8px"></div>
+          <div id="plbl" style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px"></div>
           <div style="display:flex;justify-content:space-between;font-size:12px">
             <span><span class="lbl">Qtd </span><span id="pqty" style="font-weight:600"></span></span>
             <span><span class="lbl">PM </span><span id="ppm" style="font-weight:600"></span></span>
@@ -1189,7 +1235,19 @@ function renderOrders() {
   $("oprc").textContent=p>0?R(p):"Aguardando...";
   $("oprc").style.color=p>0?(chg[sel]>=0?"var(--g)":"var(--r)"):"var(--tx2)";
   var usePrice=(orderMode==="limit")?(parseFloat($("lmt-price").value)||0):p;
-  $("otot").textContent=usePrice>0?R(usePrice*qty):"--";
+  var total = usePrice>0 ? usePrice*qty : 0;
+  $("otot").textContent=total>0?R(total):"--";
+  // Balance fields
+  if ($("o-bal")) $("o-bal").textContent = R(bal);
+  if ($("o-after")) {
+    var after = side==="buy" ? bal-total : bal+total;
+    $("o-after").textContent = total>0 ? R(after) : "--";
+    $("o-after").style.color = (side==="buy" && after<0) ? "var(--r)" : "var(--tx2)";
+  }
+  // Update set buttons
+  document.querySelectorAll(".pr-set").forEach(function(b){
+    b.classList.toggle("on", +b.dataset.q === qty);
+  });
 
   // Update exec button text for after-hours
   var execEl=$("exec");
@@ -2166,8 +2224,45 @@ function initApp() {
   $("bbuy").onclick=function() { side="buy"; $("bbuy").style.cssText="background:var(--g);color:#fff;box-shadow:0 0 20px rgba(0,200,150,.35);"; $("bsel").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
   $("bsel").onclick=function() { side="sell"; $("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);"; $("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
 
-  $("qinp").oninput=function(e){ qty=parseInt(e.target.value)||1; document.querySelectorAll(".pr").forEach(function(b){b.classList.toggle("on",+b.dataset.q===qty);}); renderOrders(); };
-  document.querySelectorAll(".pr").forEach(function(b){ b.onclick=function(){ qty=+b.dataset.q; $("qinp").value=qty; document.querySelectorAll(".pr").forEach(function(x){x.classList.toggle("on",x===b);}); renderOrders(); }; });
+  $("qinp").oninput=function(e){
+    qty=parseInt(e.target.value)||1;
+    if(qty<1) qty=1;
+    $("qinp").value=qty;
+    renderOrders();
+  };
+  // Increment buttons (+50, +100, +500, +1000)
+  document.querySelectorAll(".pr-inc").forEach(function(b){
+    b.onclick=function(){
+      var inc=+b.dataset.inc;
+      qty=Math.max(1, qty+inc);
+      $("qinp").value=qty;
+      renderOrders();
+    };
+  });
+  // Set buttons (1, 10, 100, 500)
+  document.querySelectorAll(".pr-set").forEach(function(b){
+    b.onclick=function(){
+      qty=+b.dataset.q;
+      $("qinp").value=qty;
+      renderOrders();
+    };
+  });
+  // Max button - use all available balance
+  $("max-btn").onclick=function(){
+    var p=prices[sel]||0;
+    if(!p){notif("Sem cotacao para calcular","err");return;}
+    if(side==="sell"){
+      var pos=port[sel];
+      if(!pos){notif("Sem posicao para vender","err");return;}
+      qty=pos.qty;
+    } else {
+      var useP=(orderMode==="limit")?(parseFloat($("lmt-price").value)||p):p;
+      qty=Math.max(1,Math.floor(bal/useP));
+    }
+    $("qinp").value=qty;
+    renderOrders();
+    notif("Quantidade maxima: "+qty+" cotas");
+  };
 
   $("exec").onclick=execOrder;
 
