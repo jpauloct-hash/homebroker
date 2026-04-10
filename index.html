@@ -2,6 +2,16 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="application-name" content="Trading GP">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Trading GP">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#fbbf24">
+<meta name="description" content="Simulador de operações em Bolsa com cotações em tempo real da B3.">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2462,6 +2472,21 @@ if (token) {
     showProfileScreen();
   }
 }
+</script>
+<script>
+// Only register SW on HTTPS (GitHub Pages), not local file
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js', {scope: './'})
+      .then(function(reg) { console.log('SW registered:', reg.scope); })
+      .catch(function(err) { console.log('SW skip (local):', err.message); });
+  });
+}
+var deferredPrompt;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+});
 </script>
 </body>
 </html>
