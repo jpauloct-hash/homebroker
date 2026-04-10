@@ -305,7 +305,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
             <button id="max-btn" style="font-size:9px;font-weight:700;color:var(--a);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:5px;padding:3px 9px;cursor:pointer;font-family:inherit">USAR TUDO</button>
           </div>
           <div style="position:relative;margin-bottom:10px">
-            <input type="number" id="qinp" class="qi" value="10" min="1" style="padding-right:40px">
+            <input type="number" id="qinp" class="qi" value="" min="0" placeholder="0" style="padding-right:40px">
             <button id="qclear" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--bd2);border:none;border-radius:50%;width:22px;height:22px;color:var(--tx3);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&#215;</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">
@@ -469,6 +469,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
 <div id="nf"></div>
 <script>
+//  Ativos:
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
 var TICKERS = ["PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
 
@@ -592,16 +593,12 @@ function getTokenFromUrl() {
 }
 
 function isOwner() {
-  // Check flag first
-  if (localStorage.getItem("hb_is_owner") === "1") return true;
-  // Auto-detect: has token but did NOT arrive via URL invite param
-  var urlParams = new URLSearchParams(window.location.search);
-  var arrivedViaInvite = !!urlParams.get("t");
-  if (token && !arrivedViaInvite) {
-    localStorage.setItem("hb_is_owner", "1");
-    return true;
+  // If flag not set yet, auto-detect based on URL
+  if (localStorage.getItem("hb_is_owner") === null) {
+    var isInvite = window.location.search.indexOf("?t=") >= 0;
+    localStorage.setItem("hb_is_owner", isInvite ? "0" : "1");
   }
-  return false;
+  return localStorage.getItem("hb_is_owner") === "1";
 }
 var LS_THEME  = "hb_theme_v1";
 var LS_PROFILE = "hb_profile_v1";   // active profile name
@@ -707,7 +704,7 @@ var goal = loadGoal();
 var equityHistory = loadEquityHistory();
 
 var prices = {}, chg = {}, pct = {};
-var sel = "IBOV", per = "D", side = "buy", qty = 10;
+var sel = "IBOV", per = "D", side = "buy", qty = 0;
 var orderMode = "market";
 var cd = REFRESH, cdi, rfi, nft;
 var tvWidget = null, tvScriptLoaded = false;
@@ -1666,6 +1663,9 @@ function fetchNews() {
     }
     buildNewsTape();
     renderNewsTab();
+    // Restart tape animation
+    cancelAnimationFrame(newsTapeRAF);
+    newsTapeLoop();
   }
 
   feeds.forEach(function(feed) {
@@ -2243,13 +2243,12 @@ function initApp() {
   $("bsel").onclick=function() { side="sell"; $("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);"; $("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
 
   $("qinp").oninput=function(e){
-    qty=parseInt(e.target.value)||1;
-    if(qty<1) qty=1;
-    $("qinp").value=qty;
+    qty=parseInt(e.target.value)||0;
+    if(qty<0) qty=0;
     renderOrders();
   };
   $("qclear").onclick=function(){
-    qty=1; $("qinp").value=""; $("qinp").focus(); renderOrders();
+    qty=0; $("qinp").value=""; $("qinp").focus(); renderOrders();
   };
   // Increment buttons (+50, +100, +500, +1000)
   document.querySelectorAll(".pr-inc").forEach(function(b){
@@ -2429,6 +2428,5 @@ if (token) {
     showProfileScreen();
   }
 }
-</script>
-</body>
+body>
 </html>
