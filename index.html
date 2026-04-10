@@ -546,6 +546,31 @@ var BRAPI   = "https://brapi.dev/api";
 var REFRESH = 60; // 1 minuto
 
 var LS_TOKEN  = "hb_token_v6";
+var LS_FONT   = "hb_font_v1";
+var FONT_SCALES = [0.82, 0.88, 0.94, 1.0, 1.08, 1.16, 1.25];
+var fontIdx = 3; // default = 1.0
+
+function applyFontScale(idx) {
+  fontIdx = Math.max(0, Math.min(FONT_SCALES.length-1, idx));
+  var scale = FONT_SCALES[fontIdx];
+  document.getElementById("app").style.setProperty("--fs", scale + "rem");
+  localStorage.setItem(LS_FONT, fontIdx);
+  var pct = Math.round(scale * 100);
+  var lbl = document.getElementById("fs-label");
+  if (lbl) lbl.textContent = pct + "%";
+  var up = document.getElementById("fs-up");
+  var dn = document.getElementById("fs-down");
+  if (up) up.style.opacity = fontIdx >= FONT_SCALES.length-1 ? "0.3" : "1";
+  if (dn) dn.style.opacity = fontIdx <= 0 ? "0.3" : "1";
+}
+
+// Load saved font scale
+(function(){
+  var saved = parseInt(localStorage.getItem(LS_FONT));
+  if (!isNaN(saved)) fontIdx = saved;
+  // Apply after DOM ready
+  setTimeout(function(){ applyFontScale(fontIdx); }, 0);
+})();
 var LS_INVITE = "hb_invite_v1"; // invite code set by owner
 
 // Simple obfuscation - not encryption, just avoids plain token in URL
@@ -2338,6 +2363,8 @@ function initApp() {
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
   $("logb").onclick=function() { localStorage.removeItem(LS_TOKEN); location.reload(); };
+  $("fs-up").onclick=function(){ applyFontScale(fontIdx+1); };
+  $("fs-down").onclick=function(){ applyFontScale(fontIdx-1); };
   $("switch-profile-btn").onclick = function() { $("sht").classList.remove("on"); showProfileScreen(); };
   $("invite-btn").onclick = function() {
     if (!token) { notif("Entre no app primeiro","err"); return; }
@@ -2385,9 +2412,11 @@ var urlToken = getTokenFromUrl();
 if (urlToken && !token) {
   token = urlToken;
   localStorage.setItem(LS_TOKEN, token);
+  localStorage.setItem("hb_is_owner", "0"); // guest
 }
 
 if (token) {
+  $("ts").style.display = "none"; // hide token screen immediately
   if (getCurrentProfile()) {
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
@@ -2397,9 +2426,6 @@ if (token) {
     initApp();
   } else {
     showProfileScreen();
-  }
-}
-eScreen();
   }
 }
 </script>
