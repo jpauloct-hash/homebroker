@@ -1632,11 +1632,18 @@ function fetchNews() {
   var RSS2JSON = "https://api.rss2json.com/v1/api.json?rss_url=";
 
   var feeds = [
-    {url:"https://www.infomoney.com.br/feed/",                      label:"InfoMoney", type:"company"},
-    {url:"https://valoreconomico.globo.com/rss/financas/",          label:"Valor",     type:"company"},
-    {url:"https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",  label:"Ag.Brasil", type:"macro"},
-    {url:"https://exame.com/invest/feed/",                          label:"Exame",     type:"company"},
-    {url:"https://www.moneytimes.com.br/feed/",                     label:"MoneyTimes",type:"macro"}
+    // Brasil
+    {url:"https://www.infomoney.com.br/feed/",                          label:"InfoMoney",  type:"company", lang:"pt"},
+    {url:"https://valoreconomico.globo.com/rss/financas/",              label:"Valor",      type:"company", lang:"pt"},
+    {url:"https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",      label:"Ag.Brasil",  type:"macro",   lang:"pt"},
+    {url:"https://exame.com/invest/feed/",                              label:"Exame",      type:"company", lang:"pt"},
+    {url:"https://www.moneytimes.com.br/feed/",                         label:"MoneyTimes", type:"macro",   lang:"pt"},
+    // Internacional
+    {url:"https://www.cnbc.com/id/10000664/device/rss/rss.html",        label:"CNBC",       type:"macro",   lang:"en"},
+    {url:"https://feeds.bbci.co.uk/news/business/rss.xml",              label:"BBC",        type:"macro",   lang:"en"},
+    {url:"https://feeds.reuters.com/reuters/businessNews",              label:"Reuters",    type:"macro",   lang:"en"},
+    {url:"https://rss.dw.com/rdf/rss-en-bus",                          label:"DW",         type:"macro",   lang:"en"},
+    {url:"https://rss.cnn.com/rss/money_news_international.rss",        label:"CNN",        type:"macro",   lang:"en"}
   ];
 
   var allNews = [];
@@ -1683,15 +1690,22 @@ function fetchNews() {
           var pubDate = item.pubDate || "";
           if (!title || title.length < 10) return;
 
-          // Strict relevance filter - financial/market news only
+          // Relevance filter
           var lower = title.toLowerCase();
+          var isIntl = feed.lang === "en";
 
-          // BLOCK: marketing, lifestyle, non-financial content
-          var blocked = /iphone|swarovski|bracelete|leilao da receita|vinho|celular|notebook|televisao|tv samsung|desconto|oferta|promocao|compre|comprar agora|black friday|cupom|frete gratis|receita federal leilao/.test(lower);
+          // BLOCK: marketing, lifestyle
+          var blocked = /iphone|swarovski|bracelete|vinho|celular|notebook|desconto|oferta|promocao|black friday|cupom/.test(lower);
           if (blocked) return;
 
-          // ALLOW: must match financial keywords
-          var relevant = /bolsa|ibovespa|selic|banco central|juros|cvm|acoes|acao|mercado financeiro|b3|petrobras|vale3|itau|bradesco|ambev|weg|embraer|dividendo|resultado trimestral|lucro liquido|receita liquida|economia brasileira|inflacao|cambio|dolar comercial|credito|bovespa|investimento|fiscal|fazenda|pib|copom|taxa de juros|tesouro|fundo|fii|etf|indice|commodities|petroleo|mineiro|exportacao/.test(lower);
+          var relevant;
+          if (isIntl) {
+            // International: finance, economy, geopolitics
+            relevant = /market|stock|economy|gdp|inflation|fed|rate|bank|trade|tariff|bond|oil|gold|dollar|euro|china|dollar|recession|growth|debt|deficit|war|conflict|sanction|geopolit|ukraine|middle east|opec|crude|treasury|nasdaq|dow|s&p|wall street|interest|central bank|imf|world bank|emerging/.test(lower);
+          } else {
+            // Brazil: financial keywords
+            relevant = /bolsa|ibovespa|selic|banco central|juros|cvm|acoes|acao|mercado|b3|petrobras|vale|itau|bradesco|ambev|weg|embraer|dividendo|resultado|lucro|receita|economia|inflacao|cambio|dolar|credito|bovespa|investimento|fiscal|fazenda|pib|copom|tesouro|fundo|fii|etf|commodities|petroleo|exportacao/.test(lower);
+          }
           if (!relevant) return;
 
           // Detect ticker mention
@@ -1713,7 +1727,7 @@ function fetchNews() {
             title: title, source: feed.label,
             type: ticker ? "company" : feed.type,
             ticker: ticker, time: timeStr, url: link, ts: ts,
-            desc: desc
+            desc: desc, lang: feed.lang || "pt"
           });
         });
         tryDone();
@@ -1911,7 +1925,9 @@ function buildNewsTape() {
       var span = document.createElement("span");
       span.className = "news-tape-item";
       var tagColor = n.type==="macro" ? "#f59e0b" : "#60a5fa";
+      var isEN = (n.lang === "en");
       var tag = n.ticker || n.source;
+      if (isEN) tag = "[EN] " + tag;
       span.textContent = '[' + tag + '] ' + n.title + '  -  ';
       span.dataset.newsId = n.id;
       span.onclick = function() {
