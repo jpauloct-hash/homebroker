@@ -304,19 +304,15 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
             <div style="font-size:10px;color:var(--tx3);letter-spacing:1px">QUANTIDADE</div>
             <button id="max-btn" style="font-size:9px;font-weight:700;color:var(--a);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:5px;padding:3px 9px;cursor:pointer;font-family:inherit">USAR TUDO</button>
           </div>
-          <input type="number" id="qinp" class="qi" value="10" min="1" style="margin-bottom:10px">
-          <!-- Increment buttons -->
+          <div style="position:relative;margin-bottom:10px">
+            <input type="number" id="qinp" class="qi" value="10" min="1" style="padding-right:40px">
+            <button id="qclear" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--bd2);border:none;border-radius:50%;width:22px;height:22px;color:var(--tx3);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&#215;</button>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">
             <button class="pr-inc" data-inc="50">+50</button>
             <button class="pr-inc" data-inc="100">+100</button>
             <button class="pr-inc" data-inc="500">+500</button>
             <button class="pr-inc" data-inc="1000">+1000</button>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:6px">
-            <button class="pr-set" data-q="1">1</button>
-            <button class="pr-set" data-q="10">10</button>
-            <button class="pr-set" data-q="100">100</button>
-            <button class="pr-set" data-q="500">500</button>
           </div>
         </div>
 
@@ -472,9 +468,6 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 </div>
 
 <div id="nf"></div>
-</div>
-
-<script>
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
 var TICKERS = ["PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
 
@@ -573,10 +566,12 @@ function getTokenFromUrl() {
 }
 
 function isOwner() {
-  // Owner = typed token manually OR already had token before profiles feature
+  // Check flag first
   if (localStorage.getItem("hb_is_owner") === "1") return true;
-  // If token exists but hb_is_owner not set = old user who typed token manually
-  if (token && !getTokenFromUrl()) {
+  // Auto-detect: has token but did NOT arrive via URL invite param
+  var urlParams = new URLSearchParams(window.location.search);
+  var arrivedViaInvite = !!urlParams.get("t");
+  if (token && !arrivedViaInvite) {
     localStorage.setItem("hb_is_owner", "1");
     return true;
   }
@@ -1244,10 +1239,7 @@ function renderOrders() {
     $("o-after").textContent = total>0 ? R(after) : "--";
     $("o-after").style.color = (side==="buy" && after<0) ? "var(--r)" : "var(--tx2)";
   }
-  // Update set buttons
-  document.querySelectorAll(".pr-set").forEach(function(b){
-    b.classList.toggle("on", +b.dataset.q === qty);
-  });
+
 
   // Update exec button text for after-hours
   var execEl=$("exec");
@@ -2230,6 +2222,9 @@ function initApp() {
     $("qinp").value=qty;
     renderOrders();
   };
+  $("qclear").onclick=function(){
+    qty=1; $("qinp").value=""; $("qinp").focus(); renderOrders();
+  };
   // Increment buttons (+50, +100, +500, +1000)
   document.querySelectorAll(".pr-inc").forEach(function(b){
     b.onclick=function(){
@@ -2239,14 +2234,7 @@ function initApp() {
       renderOrders();
     };
   });
-  // Set buttons (1, 10, 100, 500)
-  document.querySelectorAll(".pr-set").forEach(function(b){
-    b.onclick=function(){
-      qty=+b.dataset.q;
-      $("qinp").value=qty;
-      renderOrders();
-    };
-  });
+
   // Max button - use all available balance
   $("max-btn").onclick=function(){
     var p=prices[sel]||0;
@@ -2364,6 +2352,9 @@ function initApp() {
   };
 
   updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
+  // Show/hide invite button based on owner status
+  var invBtn = $("invite-btn");
+  if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
   initTickerSearch();
   initNewsTape();
   // If cached news exist, build tape immediately
@@ -2406,6 +2397,9 @@ if (token) {
     initApp();
   } else {
     showProfileScreen();
+  }
+}
+eScreen();
   }
 }
 </script>
