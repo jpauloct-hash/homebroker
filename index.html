@@ -26,6 +26,7 @@
 .light #pregao-bar #pregao-cd{color:#3a5878 !important;}
 .light #pregao-bar button{background:rgba(245,158,11,.2) !important;border-color:rgba(245,158,11,.5) !important;color:#b06000 !important;}
 html,body{height:100%;background:var(--bg);color:var(--tx);font-family:'JetBrains Mono',monospace;overflow:hidden;}
+#app{font-size:var(--fs,13px);}
 button,input{font-family:inherit;cursor:pointer;}
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 ::-webkit-scrollbar{width:2px;height:2px;}
@@ -407,6 +408,14 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <button id="theme-light" style="padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--bd2);background:#ffffff;color:#1a2a3a">Claro</button>
       </div>
     </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:1px">TAMANHO DA FONTE</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="fs-down" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);color:var(--tx2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">A-</button>
+        <span id="fs-label" style="font-size:11px;color:var(--tx2);min-width:36px;text-align:center">100%</span>
+        <button id="fs-up" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);color:var(--tx2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">A+</button>
+      </div>
+    </div>
     <div style="font-size:9px;color:var(--tx4);margin-bottom:16px">Cotacoes Brapi PRO · atualização 1min · delay 5min</div>
     <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:12px">CONFIGURAR SIMULADOR</div>
     <div class="srow"><div class="slbl">DATA DE ENCERRAMENTO</div><input type="date" id="s-end" class="sinp"></div>
@@ -593,11 +602,6 @@ function getTokenFromUrl() {
 }
 
 function isOwner() {
-  // If flag not set yet, auto-detect based on URL
-  if (localStorage.getItem("hb_is_owner") === null) {
-    var isInvite = window.location.search.indexOf("?t=") >= 0;
-    localStorage.setItem("hb_is_owner", isInvite ? "0" : "1");
-  }
   return localStorage.getItem("hb_is_owner") === "1";
 }
 var LS_THEME  = "hb_theme_v1";
@@ -2390,6 +2394,13 @@ function initApp() {
   setTimeout(function(){ fetchNews(); }, 2000);
   // Refresh news every 15 min
   setInterval(function(){ fetchNews(); }, 15*60*1000);
+  // Tape watchdog: restart animation if it stopped
+  setInterval(function(){
+    if (newsTapeOneW > 0) {
+      cancelAnimationFrame(newsTapeRAF);
+      newsTapeLoop();
+    }
+  }, 8000);
 }
 
 $("tbtn").onclick=function() {
@@ -2417,6 +2428,11 @@ if (urlToken && !token) {
 
 if (token) {
   $("ts").style.display = "none"; // hide token screen immediately
+  // Auto-mark as owner if no invite param in URL
+  if (localStorage.getItem("hb_is_owner") === null) {
+    var hasInvite = window.location.search.indexOf("t=") >= 0;
+    localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
+  }
   if (getCurrentProfile()) {
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
