@@ -401,7 +401,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <div id="sht">
   <div class="si">
     <div style="font-size:11px;font-weight:700;color:var(--bl);margin-bottom:16px">CONFIGURACOES</div>
-    <div style="font-size:10px;color:var(--tx2);margin-bottom:4px">Token: <span id="tdsp" style="color:var(--bl)"></span></div>
+    <span id="tdsp" style="display:none"></span>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">TEMA</div>
       <div style="display:flex;gap:6px">
@@ -565,7 +565,8 @@ var fontIdx = 3; // default = 1.0
 function applyFontScale(idx) {
   fontIdx = Math.max(0, Math.min(FONT_SCALES.length-1, idx));
   var scale = FONT_SCALES[fontIdx];
-  document.getElementById("app").style.setProperty("--fs", scale + "rem");
+  // Apply to html element so all rem units scale proportionally
+  document.documentElement.style.fontSize = (scale * 16) + "px";
   localStorage.setItem(LS_FONT, fontIdx);
   var pct = Math.round(scale * 100);
   var lbl = document.getElementById("fs-label");
