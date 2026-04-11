@@ -2,12 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="application-name" content="HOME BROKER TGP">
-<meta name="apple-mobile-web-app-title" content="HOME BROKER TGP">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Home Broker B3</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
@@ -134,30 +133,24 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
 <!-- TOKEN -->
 <div id="ts">
-  <div style="text-align:center;margin-bottom:32px">
-    <div style="font-size:9px;letter-spacing:5px;color:#3a5878;margin-bottom:10px">SIMULADOR B3</div>
-    <div style="font-size:26px;font-weight:700;letter-spacing:2px;color:#f0f6ff">HOME BROKER TGP</div>
-    <div style="font-size:9px;color:#3a5878;margin-top:6px">19 ativos · Dividendos · TradingView · v20260411-0318</div>
+  <div style="text-align:center">
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">SIMULADOR B3</div>
+    <div style="font-size:22px;font-weight:700;letter-spacing:1px">HOME BROKER</div>
+    <div style="font-size:10px;color:var(--tx3);margin-top:4px">19 ativos · Dividendos · TradingView</div>
   </div>
-
-  <div style="width:100%;max-width:380px;background:#0c1828;border:1px solid #1e3a5f;border-radius:16px;padding:24px">
-    <div style="font-size:10px;font-weight:700;color:#fbbf24;letter-spacing:2px;margin-bottom:6px">TOKEN BRAPI PRO</div>
-    <div style="font-size:11px;color:#3a5878;margin-bottom:16px">
-      Obtenha em <a href="https://brapi.dev" target="_blank" style="color:#60a5fa">brapi.dev</a> &rarr; Dashboard &rarr; API Token.
-    </div>
-    <input id="tinp" type="password"
-      placeholder="Cole aqui seu token..."
-      autocomplete="off" spellcheck="false"
-      style="width:100%;padding:13px;background:#060e18;border:1px solid #1e3a5f;border-radius:8px;color:#f0f6ff;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:6px">
-    <div id="terr" style="display:none;color:#ff4466;font-size:10px;margin-bottom:8px"></div>
-    <button id="tbtn" style="width:100%;padding:14px;margin-top:8px;border-radius:8px;background:linear-gradient(135deg,#1e4a80,#2563eb);color:#fff;font-weight:700;font-size:14px;font-family:inherit;border:none;cursor:pointer;letter-spacing:1px">ENTRAR</button>
+  <div class="tcard">
+    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:10px">TOKEN BRAPI PRO</div>
+    <div style="font-size:10px;color:var(--tx2);line-height:1.8;margin-bottom:14px">Obtenha em <span style="color:var(--bl)">brapi.dev</span> &rarr; Dashboard &rarr; API Token.</div>
+    <input id="tinp" class="tinp" placeholder="Cole aqui seu token..." type="password" autocomplete="off">
+    <div id="terr" style="font-size:10px;color:var(--r);margin-top:6px;display:none"></div>
+    <button id="tbtn" class="tbtn">ENTRAR</button>
   </div>
 </div>
 
 <!-- PROFILE SCREEN -->
 <div id="ps" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;">
   <div style="text-align:center">
-    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER TGP</div>
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER B3</div>
     <div style="font-size:20px;font-weight:700;margin-bottom:4px">Selecionar Perfil</div>
     <div style="font-size:10px;color:var(--tx3)">Cada perfil tem carteira e historico independentes</div>
   </div>
@@ -176,7 +169,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div>
         <div style="font-size:9px;letter-spacing:3px;color:var(--tx3);text-transform:uppercase;margin-bottom:2px">Simulador</div>
         <div id="profile-indicator" style="font-size:9px;color:var(--bl);margin-bottom:2px"></div>
-        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER TGP</div>
+        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER B3</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">PATRIMÔNIO</div>
@@ -480,7 +473,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div style="display:flex;gap:8px">
       <button id="aho-no" style="flex:1;padding:10px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Cancelar</button>
       <button id="aho-yes" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:11px;font-weight:700">Agendar para abertura</button>
-    </di
+    </div>
+  </div>
+</div>
+
+<div id="nf"></div>
 <script>
 //  Ativos:
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
@@ -606,43 +603,8 @@ function getTokenFromUrl() {
   return "";
 }
 
-function getInviteCode() {
-  var params = new URLSearchParams(window.location.search);
-  return params.get("t") || "";
-}
-
-function isInviteUsed() {
-  var code = getInviteCode();
-  if (!code) return false; // not an invite link
-  return localStorage.getItem("hb_invite_used_" + code) === "1";
-}
-
-function markInviteUsed() {
-  var code = getInviteCode();
-  if (code) localStorage.setItem("hb_invite_used_" + code, "1");
-}
-
 function isOwner() {
-  // Owner = has hb_is_owner=1 flag
-  // This is set ONLY when token is typed manually (not via ?t= invite link)
-  var flag = localStorage.getItem("hb_is_owner");
-  if (flag === "1") return true;
-  if (flag === "0") return false;
-  // Not set yet: check if arrived via invite link
-  var isInvite = window.location.search.indexOf("t=") >= 0;
-  var val = isInvite ? "0" : "1";
-  localStorage.setItem("hb_is_owner", val);
-  return val === "1";
-}
-
-function updateInviteBtn() {
-  var btn = document.getElementById("invite-btn");
-  if (!btn) return;
-  if (isOwner()) {
-    btn.style.display = "flex";
-  } else {
-    btn.style.display = "none";
-  }
+  return localStorage.getItem("hb_is_owner") === "1";
 }
 var LS_THEME  = "hb_theme_v1";
 var LS_PROFILE = "hb_profile_v1";   // active profile name
@@ -754,27 +716,6 @@ var cd = REFRESH, cdi, rfi, nft;
 var tvWidget = null, tvScriptLoaded = false;
 
 var $ = function(id) { return document.getElementById(id); };
-
-function doLogin() {
-  var t = document.getElementById("tinp").value.trim();
-  var err = document.getElementById("terr");
-  if (!t) {
-    err.textContent = "Cole seu token Brapi PRO";
-    err.style.display = "block";
-    return;
-  }
-  err.style.display = "none";
-  try {
-    localStorage.setItem("hb_token_v6", t);
-    localStorage.setItem("hb_is_owner", "1");
-    document.title = "TGP | saving=" + t.slice(0,8);
-  } catch(e) {
-    document.title = "TGP | LS_ERROR=" + e.message;
-    return;
-  }
-  token = t;
-  boot();
-}
 var fr = function(n) { return n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); };
 var R  = function(n) { return "R$ "+fr(n); };
 var CD = function(s) { return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); };
@@ -2201,24 +2142,10 @@ function buildTapePicker() {
 
 // ── Profile system ────────────────────────────────────────────────────────────
 function showProfileScreen() {
-  document.getElementById("ts").style.display = "none";
-  document.getElementById("ma").style.display = "none";
-  var ps = document.getElementById("ps");
-  ps.style.display = "flex";
-  ps.style.flexDirection = "column";
+  $("ts").style.display = "none";
+  $("ma").style.display = "none";
+  $("ps").style.display = "flex";
   renderProfileList();
-  // Hide new profile form if invite already used
-  var createBox = document.querySelector("#ps .card") || document.querySelector("#ps > div:last-child");
-  var inviteUsed = getInviteCode() && isInviteUsed();
-  var pname = $("profile-name");
-  var pcreate = $("profile-create");
-  if (inviteUsed && pname && pcreate) {
-    pname.style.display = "none";
-    pcreate.textContent = "Convite ja utilizado";
-    pcreate.disabled = true;
-    pcreate.style.background = "#1a2a3a";
-    pcreate.style.color = "var(--tx3)";
-  }
 }
 
 function renderProfileList() {
@@ -2248,26 +2175,8 @@ function renderProfileList() {
     enterBtn.style.cssText = "padding:7px 16px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit";
     enterBtn.textContent = "ENTRAR";
     (function(n){ enterBtn.onclick = function(){ enterProfile(n); }; })(name);
-
-    var delBtn = document.createElement("button");
-    delBtn.style.cssText = "padding:7px 10px;background:transparent;border:1px solid rgba(255,68,102,.4);border-radius:7px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:6px";
-    delBtn.textContent = "X";
-    (function(n){
-      delBtn.onclick = function(e){
-        e.stopPropagation();
-        if (!confirm("Excluir perfil " + n + "? Todos os dados serao apagados.")) return;
-        deleteProfile(n);
-        renderProfileList();
-      };
-    })(name);
-
-    var btns = document.createElement("div");
-    btns.style.display = "flex";
-    btns.appendChild(enterBtn);
-    btns.appendChild(delBtn);
-
     card.appendChild(left);
-    card.appendChild(btns);
+    card.appendChild(enterBtn);
     list.appendChild(card);
   });
 }
@@ -2281,8 +2190,8 @@ function enterProfile(name) {
   initialBal = st2.initialBal; firstTradeDate = st2.firstTradeDate;
   goal = loadGoal();
   equityHistory = loadEquityHistory();
-  document.getElementById("ps").style.display = "none";
-  if (!document.getElementById("ma").style.display || document.getElementById("ma").style.display === "none") {
+  $("ps").style.display = "none";
+  if (!$("ma").style.display || $("ma").style.display === "none") {
     initApp();
   } else {
     updateProfileIndicator();
@@ -2492,7 +2401,9 @@ function initApp() {
   };
 
   updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
-  updateInviteBtn();
+  // Show/hide invite button based on owner status
+  var invBtn = $("invite-btn");
+  if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
   initTickerSearch();
   initNewsTape();
   // If cached news exist, build tape immediately
@@ -2510,77 +2421,47 @@ function initApp() {
   }, 8000);
 }
 
-// Wire login button and enter key
-document.getElementById("tbtn").onclick = doLogin;
-document.getElementById("tinp").addEventListener("keydown", function(e){
-  if (e.key === "Enter") doLogin();
-});
+$("tbtn").onclick=function() {
+  var t=$("tinp").value.trim();
+  if (!t) { $("terr").textContent="Cole seu token Brapi PRO"; $("terr").style.display="block"; return; }
+  $("terr").style.display="none"; localStorage.setItem(LS_TOKEN,t); localStorage.setItem("hb_is_owner","1"); token=t;
+  showProfileScreen();
+};
+$("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") $("tbtn").click(); });
 
 $("profile-create").onclick = function() {
   var name = $("profile-name").value.trim();
   if (!name || name.length < 2) { notif("Digite um nome (min. 2 caracteres)","err"); return; }
-  // Check if invite already used
-  if (getInviteCode() && isInviteUsed()) {
-    notif("Este convite ja foi utilizado para criar um perfil","err");
-    return;
-  }
-  markInviteUsed();
   enterProfile(name);
 };
 $("profile-name").addEventListener("keydown",function(e){ if(e.key==="Enter") $("profile-create").click(); });
 
-// ── Boot ─────────────────────────────────────────────────────────────────────
+// Check if arriving via invite link
 var urlToken = getTokenFromUrl();
 if (urlToken && !token) {
   token = urlToken;
   localStorage.setItem(LS_TOKEN, token);
-  localStorage.setItem("hb_is_owner", "0");
+  localStorage.setItem("hb_is_owner", "0"); // guest
 }
 
-function boot() {
-  document.title = "TGP | token=" + (token ? token.slice(0,6) : "VAZIO");
-  
-  if (!token) {
-    document.getElementById("ts").style.display = "flex";
-    document.getElementById("ps").style.display = "none";
-    document.getElementById("ma").style.display = "none";
-    return;
-  }
-
-  document.title = "TGP | boot2";
-
+if (token) {
+  $("ts").style.display = "none"; // hide token screen immediately
+  // Auto-mark as owner if no invite param in URL
   if (localStorage.getItem("hb_is_owner") === null) {
-    localStorage.setItem("hb_is_owner", window.location.search.indexOf("t=") >= 0 ? "0" : "1");
+    var hasInvite = window.location.search.indexOf("t=") >= 0;
+    localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
   }
-
-  document.title = "TGP | boot3";
-
-  var profile = getCurrentProfile();
-  document.title = "TGP | profile=" + (profile || "NONE");
-
-  if (profile) {
-    // Load state and go to app
+  if (getCurrentProfile()) {
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
     divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
     initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
     goal=loadGoal(); equityHistory=loadEquityHistory();
-    document.getElementById("ts").style.display = "none";
-    document.getElementById("ps").style.display = "none";
     initApp();
   } else {
-    // Show profile screen
-    document.getElementById("ts").style.display = "none";
-    document.getElementById("ma").style.display = "none";
-    var ps = document.getElementById("ps");
-    ps.style.display = "flex";
-    ps.style.flexDirection = "column";
-    renderProfileList();
+    showProfileScreen();
   }
 }
-
-boot();
 </script>
-
 </body>
 </html>
