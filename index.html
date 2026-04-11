@@ -609,6 +609,22 @@ function getTokenFromUrl() {
   return "";
 }
 
+function getInviteCode() {
+  var params = new URLSearchParams(window.location.search);
+  return params.get("t") || "";
+}
+
+function isInviteUsed() {
+  var code = getInviteCode();
+  if (!code) return false; // not an invite link
+  return localStorage.getItem("hb_invite_used_" + code) === "1";
+}
+
+function markInviteUsed() {
+  var code = getInviteCode();
+  if (code) localStorage.setItem("hb_invite_used_" + code, "1");
+}
+
 function isOwner() {
   // Owner = has hb_is_owner=1 flag
   // This is set ONLY when token is typed manually (not via ?t= invite link)
@@ -2173,6 +2189,18 @@ function showProfileScreen() {
   $("ma").style.display = "none";
   $("ps").style.display = "flex";
   renderProfileList();
+  // Hide new profile form if invite already used
+  var createBox = document.querySelector("#ps .card") || document.querySelector("#ps > div:last-child");
+  var inviteUsed = getInviteCode() && isInviteUsed();
+  var pname = $("profile-name");
+  var pcreate = $("profile-create");
+  if (inviteUsed && pname && pcreate) {
+    pname.style.display = "none";
+    pcreate.textContent = "Convite ja utilizado";
+    pcreate.disabled = true;
+    pcreate.style.background = "#1a2a3a";
+    pcreate.style.color = "var(--tx3)";
+  }
 }
 
 function renderProfileList() {
@@ -2202,8 +2230,26 @@ function renderProfileList() {
     enterBtn.style.cssText = "padding:7px 16px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit";
     enterBtn.textContent = "ENTRAR";
     (function(n){ enterBtn.onclick = function(){ enterProfile(n); }; })(name);
+
+    var delBtn = document.createElement("button");
+    delBtn.style.cssText = "padding:7px 10px;background:transparent;border:1px solid rgba(255,68,102,.4);border-radius:7px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:6px";
+    delBtn.textContent = "X";
+    (function(n){
+      delBtn.onclick = function(e){
+        e.stopPropagation();
+        if (!confirm("Excluir perfil " + n + "? Todos os dados serao apagados.")) return;
+        deleteProfile(n);
+        renderProfileList();
+      };
+    })(name);
+
+    var btns = document.createElement("div");
+    btns.style.display = "flex";
+    btns.appendChild(enterBtn);
+    btns.appendChild(delBtn);
+
     card.appendChild(left);
-    card.appendChild(enterBtn);
+    card.appendChild(btns);
     list.appendChild(card);
   });
 }
@@ -2457,6 +2503,12 @@ $("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") $("tbtn").
 $("profile-create").onclick = function() {
   var name = $("profile-name").value.trim();
   if (!name || name.length < 2) { notif("Digite um nome (min. 2 caracteres)","err"); return; }
+  // Check if invite already used
+  if (getInviteCode() && isInviteUsed()) {
+    notif("Este convite ja foi utilizado para criar um perfil","err");
+    return;
+  }
+  markInviteUsed();
   enterProfile(name);
 };
 $("profile-name").addEventListener("keydown",function(e){ if(e.key==="Enter") $("profile-create").click(); });
@@ -2499,9 +2551,6 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 }
 var deferredPrompt;
 window.addEventListener('beforeinstallprompt', function(e) {
-  e.preventDefault();
-  deferredPrompt = e;
-});
   e.preventDefault();
   deferredPrompt = e;
 });
