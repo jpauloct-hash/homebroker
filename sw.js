@@ -1,5 +1,5 @@
 // Trading GP - Service Worker
-const CACHE = 'trading-gp-v1';
+const CACHE = 'trading-gp-202604110200';
 const ASSETS = [
   './',
   './index.html',
