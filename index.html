@@ -146,7 +146,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   <div style="text-align:center;margin-bottom:32px">
     <div style="font-size:9px;letter-spacing:5px;color:#3a5878;margin-bottom:10px">SIMULADOR B3</div>
     <div style="font-size:26px;font-weight:700;letter-spacing:2px;color:#f0f6ff">HOME BROKER TGP</div>
-    <div style="font-size:9px;color:#3a5878;margin-top:6px">19 ativos · Dividendos · TradingView · v20260411-0200</div>
+    <div style="font-size:9px;color:#3a5878;margin-top:6px">19 ativos · Dividendos · TradingView · v20260411-0301</div>
   </div>
 
   <div style="width:100%;max-width:380px;background:#0c1828;border:1px solid #1e3a5f;border-radius:16px;padding:24px">
@@ -2579,19 +2579,15 @@ function boot() {
 boot();
 </script>
 <script>
-// Only register SW on HTTPS (GitHub Pages), not local file
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js', {scope: './'})
-      .then(function(reg) { console.log('SW registered:', reg.scope); })
-      .catch(function(err) { console.log('SW skip (local):', err.message); });
+// Kill old service workers - they were causing caching issues
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(r) { r.unregister(); console.log('SW killed'); });
+  });
+  caches.keys().then(function(keys) {
+    keys.forEach(function(k) { caches.delete(k); });
   });
 }
-var deferredPrompt;
-window.addEventListener('beforeinstallprompt', function(e) {
-  e.preventDefault();
-  deferredPrompt = e;
-});
 </script>
 </body>
 </html>
