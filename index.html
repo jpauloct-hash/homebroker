@@ -153,7 +153,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div style="font-size:10px;color:var(--tx2);line-height:1.8;margin-bottom:14px">Obtenha em <span style="color:var(--bl)">brapi.dev</span> &rarr; Dashboard &rarr; API Token.</div>
     <input id="tinp" class="tinp" placeholder="Cole aqui seu token..." type="password" autocomplete="off">
     <div id="terr" style="font-size:10px;color:var(--r);margin-top:6px;display:none"></div>
-    <button id="tbtn" class="tbtn" onclick="alert('clicou!')">ENTRAR</button>
+    <button id="tbtn" class="tbtn">ENTRAR</button>
   </div>
 </div>
 
@@ -2200,7 +2200,6 @@ function showProfileScreen() {
     pcreate.style.color = "var(--tx3)";
   }
 }
-  } catch(e) { alert("showProfile err: " + e.message); }
 
 function renderProfileList() {
   var list = $("profile-list");
@@ -2493,12 +2492,12 @@ function initApp() {
 
 $("tbtn").onclick=function() {
   var t=$("tinp").value.trim();
-  if (!t) { alert("Cole o token!"); return; }
+  if (!t) { $("terr").textContent="Cole seu token Brapi PRO"; $("terr").style.display="block"; return; }
+  $("terr").style.display="none";
   localStorage.setItem(LS_TOKEN,t);
   localStorage.setItem("hb_is_owner","1");
   token=t;
-  alert("Token salvo! Recarregando...");
-  location.reload();
+  showProfileScreen();
 };
 $("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") $("tbtn").click(); });
 
