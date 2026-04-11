@@ -2538,8 +2538,7 @@ if (urlToken && !token) {
 }
 
 function boot() {
-  // Debug: show token status in title
-  document.title = "TGP | token=" + (token ? "OK" : "VAZIO");
+  document.title = "TGP | token=" + (token ? token.slice(0,6) : "VAZIO");
   
   if (!token) {
     document.getElementById("ts").style.display = "flex";
@@ -2548,12 +2547,17 @@ function boot() {
     return;
   }
 
-  // Set owner flag if not set
+  document.title = "TGP | boot2";
+
   if (localStorage.getItem("hb_is_owner") === null) {
     localStorage.setItem("hb_is_owner", window.location.search.indexOf("t=") >= 0 ? "0" : "1");
   }
 
+  document.title = "TGP | boot3";
+
   var profile = getCurrentProfile();
+  document.title = "TGP | profile=" + (profile || "NONE");
+
   if (profile) {
     // Load state and go to app
     var st2 = loadState();
