@@ -137,7 +137,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   <div style="text-align:center;margin-bottom:32px">
     <div style="font-size:9px;letter-spacing:5px;color:#3a5878;margin-bottom:10px">SIMULADOR B3</div>
     <div style="font-size:26px;font-weight:700;letter-spacing:2px;color:#f0f6ff">HOME BROKER TGP</div>
-    <div style="font-size:9px;color:#3a5878;margin-top:6px">19 ativos · Dividendos · TradingView · v20260411-0310</div>
+    <div style="font-size:9px;color:#3a5878;margin-top:6px">19 ativos · Dividendos · TradingView · v20260411-0318</div>
   </div>
 
   <div style="width:100%;max-width:380px;background:#0c1828;border:1px solid #1e3a5f;border-radius:16px;padding:24px">
@@ -150,17 +150,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       autocomplete="off" spellcheck="false"
       style="width:100%;padding:13px;background:#060e18;border:1px solid #1e3a5f;border-radius:8px;color:#f0f6ff;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:6px">
     <div id="terr" style="display:none;color:#ff4466;font-size:10px;margin-bottom:8px"></div>
-    <button
-      style="width:100%;padding:14px;margin-top:8px;border-radius:8px;background:linear-gradient(135deg,#1e4a80,#2563eb);color:#fff;font-weight:700;font-size:14px;font-family:inherit;border:none;cursor:pointer;letter-spacing:1px"
-      onclick="(function(){
-        var t = document.getElementById('tinp').value.trim();
-        var err = document.getElementById('terr');
-        if (!t) { err.textContent='Cole seu token Brapi PRO'; err.style.display='block'; return; }
-        err.style.display='none';
-        localStorage.setItem('hb_token_v6', t);
-        localStorage.setItem('hb_is_owner', '1');
-        location.reload();
-      })()">ENTRAR</button>
+    <button id="tbtn" style="width:100%;padding:14px;margin-top:8px;border-radius:8px;background:linear-gradient(135deg,#1e4a80,#2563eb);color:#fff;font-weight:700;font-size:14px;font-family:inherit;border:none;cursor:pointer;letter-spacing:1px">ENTRAR</button>
   </div>
 </div>
 
@@ -764,6 +754,27 @@ var cd = REFRESH, cdi, rfi, nft;
 var tvWidget = null, tvScriptLoaded = false;
 
 var $ = function(id) { return document.getElementById(id); };
+
+function doLogin() {
+  var t = document.getElementById("tinp").value.trim();
+  var err = document.getElementById("terr");
+  if (!t) {
+    err.textContent = "Cole seu token Brapi PRO";
+    err.style.display = "block";
+    return;
+  }
+  err.style.display = "none";
+  try {
+    localStorage.setItem("hb_token_v6", t);
+    localStorage.setItem("hb_is_owner", "1");
+    document.title = "TGP | saving=" + t.slice(0,8);
+  } catch(e) {
+    document.title = "TGP | LS_ERROR=" + e.message;
+    return;
+  }
+  token = t;
+  boot();
+}
 var fr = function(n) { return n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); };
 var R  = function(n) { return "R$ "+fr(n); };
 var CD = function(s) { return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); };
@@ -2499,15 +2510,10 @@ function initApp() {
   }, 8000);
 }
 
-// Token input enter key
-document.getElementById("tinp") && document.getElementById("tinp").addEventListener("keydown", function(e){
-  if (e.key === "Enter") {
-    var t = document.getElementById("tinp").value.trim();
-    if (!t) return;
-    localStorage.setItem("hb_token_v6", t);
-    localStorage.setItem("hb_is_owner", "1");
-    location.reload();
-  }
+// Wire login button and enter key
+document.getElementById("tbtn").onclick = doLogin;
+document.getElementById("tinp").addEventListener("keydown", function(e){
+  if (e.key === "Enter") doLogin();
 });
 
 $("profile-create").onclick = function() {
@@ -2532,8 +2538,10 @@ if (urlToken && !token) {
 }
 
 function boot() {
+  // Debug: show token status in title
+  document.title = "TGP | token=" + (token ? "OK" : "VAZIO");
+  
   if (!token) {
-    // Show token screen
     document.getElementById("ts").style.display = "flex";
     document.getElementById("ps").style.display = "none";
     document.getElementById("ma").style.display = "none";
