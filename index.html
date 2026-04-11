@@ -2175,8 +2175,25 @@ function renderProfileList() {
     enterBtn.style.cssText = "padding:7px 16px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit";
     enterBtn.textContent = "ENTRAR";
     (function(n){ enterBtn.onclick = function(){ enterProfile(n); }; })(name);
+
+    var delBtn = document.createElement("button");
+    delBtn.style.cssText = "padding:7px 10px;background:transparent;border:1px solid rgba(240,64,96,.4);border-radius:7px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:6px";
+    delBtn.textContent = "X";
+    (function(n){
+      delBtn.onclick = function(e){
+        e.stopPropagation();
+        if (!confirm("Excluir perfil " + n + "? Todos os dados serao apagados.")) return;
+        deleteProfile(n);
+        renderProfileList();
+      };
+    })(name);
+
+    var btns = document.createElement("div");
+    btns.style.display = "flex";
+    btns.appendChild(enterBtn);
+    btns.appendChild(delBtn);
     card.appendChild(left);
-    card.appendChild(enterBtn);
+    card.appendChild(btns);
     list.appendChild(card);
   });
 }
