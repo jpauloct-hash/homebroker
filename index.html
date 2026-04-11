@@ -2495,16 +2495,12 @@ function initApp() {
 
 $("tbtn").onclick=function() {
   var t=$("tinp").value.trim();
-  if (!t) { $("terr").textContent="Cole seu token Brapi PRO"; $("terr").style.display="block"; return; }
-  $("terr").style.display="none";
+  if (!t) { alert("Cole o token!"); return; }
   localStorage.setItem(LS_TOKEN,t);
   localStorage.setItem("hb_is_owner","1");
   token=t;
-  try {
-    showProfileScreen();
-  } catch(e) {
-    alert("Erro: " + e.message);
-  }
+  alert("Token salvo! Recarregando...");
+  location.reload();
 };
 $("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") $("tbtn").click(); });
 
