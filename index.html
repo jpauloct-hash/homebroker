@@ -2199,9 +2199,11 @@ function buildTapePicker() {
 
 // ── Profile system ────────────────────────────────────────────────────────────
 function showProfileScreen() {
-  $("ts").style.display = "none";
-  $("ma").style.display = "none";
-  $("ps").style.cssText = "display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;";
+  document.getElementById("ts").style.display = "none";
+  document.getElementById("ma").style.display = "none";
+  var ps = document.getElementById("ps");
+  ps.style.display = "flex";
+  ps.style.flexDirection = "column";
   renderProfileList();
   // Hide new profile form if invite already used
   var createBox = document.querySelector("#ps .card") || document.querySelector("#ps > div:last-child");
@@ -2277,8 +2279,8 @@ function enterProfile(name) {
   initialBal = st2.initialBal; firstTradeDate = st2.firstTradeDate;
   goal = loadGoal();
   equityHistory = loadEquityHistory();
-  $("ps").style.display = "none";
-  if (!$("ma").style.display || $("ma").style.display === "none") {
+  document.getElementById("ps").style.display = "none";
+  if (!document.getElementById("ma").style.display || document.getElementById("ma").style.display === "none") {
     initApp();
   } else {
     updateProfileIndicator();
@@ -2530,32 +2532,51 @@ $("profile-create").onclick = function() {
 };
 $("profile-name").addEventListener("keydown",function(e){ if(e.key==="Enter") $("profile-create").click(); });
 
-// Check if arriving via invite link
+// ── Boot ─────────────────────────────────────────────────────────────────────
 var urlToken = getTokenFromUrl();
 if (urlToken && !token) {
   token = urlToken;
   localStorage.setItem(LS_TOKEN, token);
-  localStorage.setItem("hb_is_owner", "0"); // guest
+  localStorage.setItem("hb_is_owner", "0");
 }
 
-if (token) {
-  $("ts").style.display = "none"; // hide token screen immediately
-  // Auto-mark as owner if no invite param in URL
-  if (localStorage.getItem("hb_is_owner") === null) {
-    var hasInvite = window.location.search.indexOf("t=") >= 0;
-    localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
+function boot() {
+  if (!token) {
+    // Show token screen
+    document.getElementById("ts").style.display = "flex";
+    document.getElementById("ps").style.display = "none";
+    document.getElementById("ma").style.display = "none";
+    return;
   }
-  if (getCurrentProfile()) {
+
+  // Set owner flag if not set
+  if (localStorage.getItem("hb_is_owner") === null) {
+    localStorage.setItem("hb_is_owner", window.location.search.indexOf("t=") >= 0 ? "0" : "1");
+  }
+
+  var profile = getCurrentProfile();
+  if (profile) {
+    // Load state and go to app
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
     divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
     initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
     goal=loadGoal(); equityHistory=loadEquityHistory();
+    document.getElementById("ts").style.display = "none";
+    document.getElementById("ps").style.display = "none";
     initApp();
   } else {
-    showProfileScreen();
+    // Show profile screen
+    document.getElementById("ts").style.display = "none";
+    document.getElementById("ma").style.display = "none";
+    var ps = document.getElementById("ps");
+    ps.style.display = "flex";
+    ps.style.flexDirection = "column";
+    renderProfileList();
   }
 }
+
+boot();
 </script>
 <script>
 // Only register SW on HTTPS (GitHub Pages), not local file
