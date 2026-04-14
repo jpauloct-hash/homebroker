@@ -565,8 +565,10 @@ var fontIdx = 3; // default = 1.0
 function applyFontScale(idx) {
   fontIdx = Math.max(0, Math.min(FONT_SCALES.length-1, idx));
   var scale = FONT_SCALES[fontIdx];
-  // Apply to html element so all rem units scale proportionally
+  // Set both html font-size AND --fs CSS variable
   document.documentElement.style.fontSize = (scale * 16) + "px";
+  var app = document.getElementById("app");
+  if (app) app.style.setProperty("--fs", (scale * 13) + "px");
   localStorage.setItem(LS_FONT, fontIdx);
   var pct = Math.round(scale * 100);
   var lbl = document.getElementById("fs-label");
@@ -1348,10 +1350,11 @@ function renderPending() {
     var e=document.createElement("div"); e.className="pend-item";
     var col=o.side==="buy"?"var(--g)":"var(--r)";
     var bgc=o.side==="buy"?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)";
+    var typeLabel = o.scheduled ? (o.market ? "AGENDADA - MERCADO" : "AGENDADA - LIMITE @ "+R(o.lp)) : "LIMITADA @ "+R(o.lp);
     e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
       '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(o.side==="buy"?"COMPRA":"VENDA")+'</span>'+
       '<span style="color:var(--bl);font-weight:700;font-size:12px">'+o.tk+'</span></div>'+
-      '<div style="font-size:9px;color:var(--tx4)">'+o.qty+' cotas - limite '+R(o.lp)+'</div></div>'+
+      '<div style="font-size:9px;color:var(--tx4)">'+o.qty+' cotas - '+typeLabel+'</div></div>'+
       '<button class="cancel-btn" onclick="cancelPending('+o.id+')">CANCELAR</button>';
     list.appendChild(e);
   });
