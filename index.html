@@ -418,15 +418,15 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <button id="fs-up" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);color:var(--tx2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">A+</button>
       </div>
     </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:1px">EFEITOS SONOROS</div>
+      <button id="sfx-btn" onclick="SFX_ENABLED=!SFX_ENABLED;localStorage.setItem('hb_sfx',SFX_ENABLED?'1':'0');this.textContent=SFX_ENABLED?'ON':'OFF';this.style.color=SFX_ENABLED?'var(--g)':'var(--r)'" style="padding:5px 16px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--g)">ON</button>
+    </div>
     <div style="font-size:9px;color:var(--tx4);margin-bottom:16px">Cotacoes Brapi PRO · atualização 1min · delay 5min</div>
     <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:12px">CONFIGURAR SIMULADOR</div>
     <div class="srow"><div class="slbl">DATA DE ENCERRAMENTO</div><input type="date" id="s-end" class="sinp"></div>
     <div class="srow"><div class="slbl">META DE RENTABILIDADE (%)</div><input type="number" id="s-tgt" class="sinp" placeholder="Ex: 30" min="0" step="0.1"></div>
     <button id="s-save" style="width:100%;padding:11px;border:none;border-radius:8px;background:#1e4a80;color:#fff;font-size:12px;font-weight:700;margin-bottom:8px">SALVAR</button>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:9px;color:var(--tx3);letter-spacing:1px">EFEITOS SONOROS</div>
-      <button id="sfx-btn" onclick="SFX_ENABLED=!SFX_ENABLED;localStorage.setItem('hb_sfx',SFX_ENABLED?'1':'0');this.textContent=SFX_ENABLED?'ON':'OFF';this.style.color=SFX_ENABLED?'var(--g)':'var(--r)'" style="padding:5px 16px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--g)">ON</button>
-    </div>
     <button id="s-clr" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;background:transparent;color:var(--tx3);font-size:11px;font-weight:600;margin-bottom:16px">Remover meta / prazo</button>
 
     <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:8px">TICKER TAPE</div>
