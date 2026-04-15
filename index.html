@@ -2572,6 +2572,12 @@ function initApp() {
     var type2=ahoOrder.market?"a mercado":"limitada @ "+R(ahoOrder.lp);
     notif("Agendada: "+ahoOrder.qty+" "+ahoOrder.tk+" "+side2+" "+type2);
     $("aho-modal").classList.remove("on"); ahoOrder=null;
+    // Switch to orders tab to show pending list
+    document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
+    document.querySelectorAll(".panel").forEach(function(p){p.classList.remove("on");});
+    document.querySelector(".tab[data-t='order']").classList.add("on");
+    $("order-panel").classList.add("on");
+    $("pb").style.display="none";
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
   $("logb").onclick=function() { localStorage.removeItem(LS_TOKEN); location.reload(); };
