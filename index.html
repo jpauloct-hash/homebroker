@@ -138,7 +138,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <div id="ts">
   <div style="text-align:center">
     <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">TRADING GP</div>
-    <div style="font-size:22px;font-weight:700;letter-spacing:1px">HOMEBROKER TGP</div>
+    <div style="font-size:22px;font-weight:700;letter-spacing:1px">HOME BROKER</div>
     <div style="font-size:10px;color:var(--tx3);margin-top:4px">19 ativos · Dividendos · TradingView</div>
   </div>
   <div class="tcard">
@@ -153,7 +153,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <!-- PROFILE SCREEN -->
 <div id="ps" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;">
   <div style="text-align:center">
-    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOMEBROKER TGP</div>
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER B3</div>
     <div style="font-size:20px;font-weight:700;margin-bottom:4px">Selecionar Perfil</div>
     <div style="font-size:10px;color:var(--tx3)">Cada perfil tem carteira e historico independentes</div>
   </div>
@@ -172,7 +172,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div>
         <div style="font-size:9px;letter-spacing:3px;color:var(--tx3);text-transform:uppercase;margin-bottom:2px">Simulador</div>
         <div id="profile-indicator" style="font-size:9px;color:var(--bl);margin-bottom:2px"></div>
-        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOMEBROKER TGP</div>
+        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER B3</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">PATRIMÔNIO</div>
@@ -504,11 +504,43 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <script>
 function doLogin() {
   var t = document.getElementById("tinp").value.trim();
-  if (!t) { document.getElementById("terr").textContent="Cole seu token Brapi PRO"; document.getElementById("terr").style.display="block"; return; }
-  document.getElementById("terr").style.display="none";
-  localStorage.setItem("hb_token_v6", t);
-  localStorage.setItem("hb_is_owner","1");
-  window.location.reload();
+  var terr = document.getElementById("terr");
+  var btn = document.getElementById("tbtn");
+  if (!t) {
+    terr.textContent = "Cole seu token Brapi PRO";
+    terr.style.display = "block";
+    return;
+  }
+  terr.style.display = "none";
+  btn.disabled = true;
+  btn.textContent = "VALIDANDO...";
+  fetch("https://brapi.dev/api/quote/PETR4?fundamental=false&token=" + encodeURIComponent(t))
+    .then(function(resp){
+      return resp.json().catch(function(){ return {}; }).then(function(data){
+        return { ok: resp.ok, status: resp.status, data: data };
+      });
+    })
+    .then(function(result){
+      var data = result.data || {};
+      var invalid = !result.ok || data.error === true || (data.message && !data.results) || !data.results || !data.results.length;
+      if (invalid) {
+        terr.textContent = data.message || ("Token inválido ou erro HTTP " + result.status);
+        terr.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "ENTRAR";
+        return;
+      }
+      localStorage.setItem("hb_token_v6", t);
+      if (localStorage.getItem("hb_is_owner") === null) localStorage.setItem("hb_is_owner", "1");
+      window.location.reload();
+    })
+    .catch(function(e){
+      console.error("Falha ao validar token:", e);
+      terr.textContent = "Falha de conexão ao validar o token.";
+      terr.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "ENTRAR";
+    });
 }
 
 var fbDb=null;
@@ -526,36 +558,21 @@ function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indispo
 function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:getCurrentProfile(),total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
 var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
 function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
-function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+currentRoomId;}
+function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
 function showCreateRoom(){var n=prompt("Nome do grupo:");if(!n)return;var b=parseFloat(prompt("Saldo inicial (R$):","100000"));if(isNaN(b))return;var d=prompt("Data fim (DD/MM/AAAA):");if(!d)return;var t=parseFloat(prompt("Meta (%):","5"))||0;createRoom(n,b,d,t).then(function(id){notif("Grupo criado! Código: "+id);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(e){notif("Erro: "+e.message,"err");});}
 function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;joinRoom(c.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});}
 function shareRoomInvite(){
   var r=currentRoomData||{};
   var msg =
-    "🚀 *TRADING GP - DESAFIO COMEÇOU* 🚀
-
-" +
-    "Você foi convidado para um campeonato de trading.
-
-" +
-    "🏁 Grupo: " + (r.name || "Trading GP") + "
-" +
-    "💰 Capital inicial: R$ " + Number(r.initialBal || 100000).toLocaleString("pt-BR") + "
-" +
-    "📅 Prazo: " + (r.endDate || "") + "
-" +
-    "🎯 Meta: " + (r.targetPct || 0) + "%
-
-" +
-    "📊 Simulador realista
-" +
-    "🏆 Ranking ao vivo
-" +
-    "🔥 Competição divertida entre jogadores
-
-" +
-    "👉 Entre agora e prove quem é o melhor trader do grupo:
-" +
+    "🚀 *TRADING GP - DESAFIO COMEÇOU* 🚀\n\n"+
+    "Você foi convidado para um campeonato de trading.\n\n"+
+    "💰 Capital inicial: R$ "+Number(r.initialBal||100000).toLocaleString("pt-BR",{minimumFractionDigits:2})+"\n"+
+    "📅 Prazo: "+(r.endDate||"")+"\n"+
+    "🎯 Meta: "+(r.targetPct||0)+"%\n\n"+
+    "📊 Simulador realista\n"+
+    "🏆 Ranking ao vivo\n"+
+    "🔥 Competição entre jogadores\n\n"+
+    "👉 Entre agora e mostre quem é o melhor trader:\n"+
     getRoomInviteLink();
   window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
 }
@@ -814,67 +831,47 @@ function notif(msg, t) {
   clearTimeout(nft); nft = setTimeout(function(){ e.classList.remove("on"); }, 3500);
 }
 
-var audioCtx = null;
-var audioUnlocked = false;
-
-function getAudioCtx() {
+var tradeAudioCtx = null;
+function ensureTradeAudio(){
   try {
-    var Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return null;
-    if (!audioCtx) audioCtx = new Ctx();
-    return audioCtx;
-  } catch(e) {
-    return null;
-  }
+    if (!tradeAudioCtx) tradeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (tradeAudioCtx.state === "suspended") tradeAudioCtx.resume();
+    return tradeAudioCtx;
+  } catch(e) { return null; }
 }
-
-function unlockAudio() {
-  var ctx = getAudioCtx();
+function beepTone(freq, start, dur, vol, type){
+  var ctx = ensureTradeAudio();
   if (!ctx) return;
-  if (ctx.state === "suspended") {
-    ctx.resume().then(function(){ audioUnlocked = true; }).catch(function(){});
-  } else {
-    audioUnlocked = true;
-  }
-}
-
-function playTone(freq, startAt, duration, gain) {
-  var ctx = getAudioCtx();
-  if (!ctx || !audioUnlocked) return;
   var osc = ctx.createOscillator();
-  var amp = ctx.createGain();
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(freq, startAt);
-  amp.gain.setValueAtTime(0.0001, startAt);
-  amp.gain.exponentialRampToValueAtTime(gain || 0.035, startAt + 0.01);
-  amp.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
-  osc.connect(amp);
-  amp.connect(ctx.destination);
-  osc.start(startAt);
-  osc.stop(startAt + duration + 0.02);
+  var gain = ctx.createGain();
+  osc.type = type || "sine";
+  osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
+  gain.gain.exponentialRampToValueAtTime(vol || 0.03, ctx.currentTime + start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime + start);
+  osc.stop(ctx.currentTime + start + dur + 0.02);
 }
-
-function playOrderSound(kind) {
-  var ctx = getAudioCtx();
-  if (!ctx || !audioUnlocked) return;
-  var now = ctx.currentTime + 0.01;
+function playTradeSound(kind){
   try {
     if (kind === "buy") {
-      playTone(660, now, 0.08, 0.03);
-      playTone(880, now + 0.07, 0.12, 0.04);
+      beepTone(740, 0.00, 0.09, 0.035, "triangle");
+      beepTone(988, 0.08, 0.11, 0.03, "triangle");
     } else if (kind === "sell") {
-      playTone(880, now, 0.08, 0.03);
-      playTone(620, now + 0.07, 0.13, 0.04);
+      beepTone(660, 0.00, 0.08, 0.035, "square");
+      beepTone(440, 0.07, 0.11, 0.03, "square");
     } else if (kind === "pending") {
-      playTone(740, now, 0.06, 0.025);
-      playTone(740, now + 0.09, 0.06, 0.025);
+      beepTone(620, 0.00, 0.05, 0.025, "triangle");
+      beepTone(620, 0.08, 0.05, 0.02, "triangle");
+    } else if (kind === "limit") {
+      beepTone(520, 0.00, 0.05, 0.022, "triangle");
+      beepTone(780, 0.06, 0.06, 0.026, "triangle");
+      beepTone(1040, 0.13, 0.08, 0.024, "triangle");
     }
   } catch(e) {}
 }
-
-["click","touchstart","keydown"].forEach(function(evt){
-  document.addEventListener(evt, unlockAudio, {passive:true, once:true});
-});
 
 //  TradingView 
 function loadTV() {
@@ -1237,7 +1234,7 @@ function checkPending() {
     trd.unshift({id:Date.now(),tk:o.tk,tp:o.side==="buy"?"C":"V",qty:o.qty,pr:execPrice,tot:tot,
       tm:new Date().toLocaleTimeString("pt-BR"),note:"Lim @ "+fr(o.lp)});
     if (trd.length>200) trd.pop();
-    playOrderSound(o.side==="buy" ? "buy" : "sell");
+    playTradeSound("limit");
     notif("Ordem limitada executada: "+o.qty+" "+o.tk+" @ "+R(execPrice));
     changed=true;
   }
@@ -1616,7 +1613,7 @@ function doMarketOrder(tk, sd, q, isScheduled) {
       tm:new Date().toLocaleTimeString("pt-BR"),
       note:isScheduled?"Agendada":""});
     if (!firstTradeDate) { firstTradeDate=new Date().toISOString().split("T")[0]; }
-    playOrderSound("buy");
+    playTradeSound("buy");
     notif("Compra executada: "+q+" "+tk+" @ "+R(p));
   } else {
     var pos=port[tk]; if(!pos||pos.qty<q){notif("Posicao insuficiente","err");return;}
@@ -1625,7 +1622,7 @@ function doMarketOrder(tk, sd, q, isScheduled) {
     trd.unshift({id:Date.now(),tk:tk,tp:"V",qty:q,pr:p,tot:tot,
       tm:new Date().toLocaleTimeString("pt-BR"),
       note:isScheduled?"Agendada":""});
-    playOrderSound("sell");
+    playTradeSound("sell");
     notif("Venda executada: "+q+" "+tk+" @ "+R(p));
   }
   if (trd.length>200) trd.pop();
@@ -1656,7 +1653,7 @@ function execOrder() {
     }
     pending.push(orderObj);
     saveState(); render();
-    playOrderSound("pending");
+    playTradeSound("pending");
     notif("Ordem limitada enviada: "+qty+" "+sel+" @ "+R(lp)); return;
   }
 
@@ -2533,7 +2530,7 @@ function initApp() {
     saveState(); render();
     var side2=ahoOrder.side==="buy"?"COMPRA":"VENDA";
     var type2=ahoOrder.market?"a mercado":"limitada @ "+R(ahoOrder.lp);
-    playOrderSound("pending");
+    playTradeSound("pending");
     notif("Agendada: "+ahoOrder.qty+" "+ahoOrder.tk+" "+side2+" "+type2);
     $("aho-modal").classList.remove("on"); ahoOrder=null;
   };
@@ -2544,11 +2541,13 @@ function initApp() {
   $("switch-profile-btn").onclick = function() { $("sht").classList.remove("on"); showProfileScreen(); };
   $("invite-btn").onclick = function() {
     if (!token) { notif("Entre no app primeiro","err"); return; }
-    if (currentRoomId && currentRoomData) { shareRoomInvite(); return; }
     var base = window.location.href.split("?")[0];
-    var url = base;
-    var msg = "🚀 Trading GP: simule operações, dispute ranking e desafie seus amigos em um game de trading divertido. " +
-      "Entre agora, crie seu perfil e comece a competir: " + url;
+    var enc = encodeToken(token);
+    var url = base + "?t=" + enc;
+    var msg = "Oi! Te convido para simular investimentos na bolsa comigo no Trading GP." +
+      " Acesse o link abaixo, crie seu perfil e comece a operar com cotacoes reais da B3:" +
+      " " + url +
+      " Nao precisa criar conta em nenhum lugar. So clicar, criar seu nome e comecar!";
     window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
   };
 
