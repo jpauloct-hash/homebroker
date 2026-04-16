@@ -1900,9 +1900,8 @@ function renderPort() {
         sel = tk; side = "sell"; qty = qty2;
         document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
         document.querySelectorAll(".panel").forEach(function(p2){ p2.classList.remove("on"); });
-        if(b.dataset.t==="group"){renderGroupPanel();}
-        document.querySelector(".tab[data-t='order']").classList.add("on");
-        $("order-panel").classList.add("on");
+        if(b.dataset.t==="group"){renderGroupPanel(); b.classList.add("on"); $("group-panel").classList.add("on"); return;}
+        $(b.dataset.t+"-panel").classList.add("on");
         $("pb").style.display = "none";
         $("bsel").style.cssText = "background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
         $("bbuy").style.cssText = "background:var(--bg3);color:var(--tx3);";
