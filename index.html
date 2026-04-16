@@ -543,7 +543,15 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div style="font-size:13px;font-weight:700;color:var(--a);margin-bottom:8px">Pregao Fechado</div>
     <div style="font-size:11px;color:var(--tx2);line-height:1.7;margin-bottom:12px">O pregao esta fechado. Deseja agendar esta ordem para a abertura do proximo pregao (10:00)?</div>
     <div id="aho-summary" style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--tx2)"></div>
-    <div style="
+    <div style="display:flex;gap:8px">
+      <button id="aho-no" style="flex:1;padding:10px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Cancelar</button>
+      <button id="aho-yes" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:11px;font-weight:700">Agendar para abertura</button>
+    </div>
+  </div>
+</div>
+
+<div id="nf"></div>
+
 <script>
 function doLogin() {
   var t = document.getElementById("tinp").value.trim();
@@ -3068,6 +3076,7 @@ if (token) {
     showProfileScreen();
   }
 }
+
 
 
 </script>
