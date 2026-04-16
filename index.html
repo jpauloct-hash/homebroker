@@ -267,7 +267,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <div id="group-room-name" style="font-size:13px;font-weight:700;color:var(--bl)"></div>
         <button onclick="shareRoomInvite()" style="padding:5px 12px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);border-radius:6px;color:#25d366;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">&#128279; CONVIDAR</button>
       </div>
-      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">EVOLUÇÃO</div>
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">EVOLUÇÃO DO PATRIMÔNIO</div>
       <canvas id="group-chart" height="160" style="width:100%;margin-bottom:16px;border-radius:8px;background:var(--bg3)"></canvas>
       <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">RANKING</div>
       <div id="group-ranking"></div>
@@ -515,103 +515,31 @@ function doLogin() {
 var fbDb=null;
 try {
   if(typeof firebase!=="undefined"){
-    var _FBC={apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"};
-    if(!firebase.apps.length) firebase.initializeApp(_FBC);
+    if(!firebase.apps.length) firebase.initializeApp({apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"});
     fbDb=firebase.database();
   }
 } catch(e){console.log("FB err:",e.message);}
 
-var currentRoomId=localStorage.getItem("hb_room_id")||"";
-var currentRoomData=null, groupUnsubscribe=null;
-
+var currentRoomId=localStorage.getItem("hb_room_id")||"",currentRoomData=null,groupUnsubscribe=null;
 function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
-function createRoom(name,initBal,endDate,tgt){
-  if(!fbDb) return Promise.reject(new Error("Firebase indisponível"));
-  var id=genRoomId();
-  return fbDb.ref("rooms/"+id).set({id:id,name:name,initialBal:initBal,endDate:endDate,targetPct:tgt,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){
-    localStorage.setItem("hb_room_id",id); currentRoomId=id; return id;
-  });
-}
-function joinRoom(id){
-  if(!fbDb) return Promise.reject(new Error("Firebase indisponível"));
-  return fbDb.ref("rooms/"+id).once("value").then(function(s){
-    if(!s.exists()) throw new Error("Sala não encontrada");
-    localStorage.setItem("hb_room_id",id); currentRoomId=id; currentRoomData=s.val(); return s.val();
-  });
-}
-function pushMyStats(){
-  if(!currentRoomId||!getCurrentProfile()||!fbDb) return;
-  var total=bal+portValue(), initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;
-  fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:getCurrentProfile(),total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});
-}
-var _lastPush=0;
-function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lastPush>60000){_lastPush=n;pushMyStats();}}
-function subscribeGroup(cb){
-  if(!currentRoomId||!fbDb)return;
-  if(groupUnsubscribe)groupUnsubscribe();
-  var ref=fbDb.ref("rooms/"+currentRoomId+"/members");
-  ref.on("value",function(s){cb(s.val()||{});});
-  groupUnsubscribe=function(){ref.off();};
-}
-function getRoomInviteLink(){var b=window.location.origin+window.location.pathname,enc=btoa(localStorage.getItem("hb_token_v6")||"");return b+"?t="+enc+"&room="+currentRoomId;}
-function showCreateRoom(){
-  var name=prompt("Nome do grupo:");if(!name)return;
-  var initB=parseFloat(prompt("Saldo inicial (R$):","100000"));if(isNaN(initB))return;
-  var endD=prompt("Data fim (DD/MM/AAAA):");if(!endD)return;
-  var tgt=parseFloat(prompt("Meta (%):","5"))||0;
-  createRoom(name,initB,endD,tgt).then(function(id){notif("Grupo criado! Código: "+id);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(e){notif("Erro: "+e.message,"err");});
-}
-function showJoinRoom(){
-  var code=prompt("Código do grupo:");if(!code)return;
-  joinRoom(code.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});
-}
-function shareRoomInvite(){
-  var r=currentRoomData||{};
-  window.open("https://wa.me/?text="+encodeURIComponent("🎯 *"+(r.name||"Trading TGP")+"*
+function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
+function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");localStorage.setItem("hb_room_id",id);currentRoomId=id;currentRoomData=s.val();return s.val();});}
+function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:getCurrentProfile(),total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
+var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
+function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
+function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?t="+btoa(localStorage.getItem("hb_token_v6")||"")+"&room="+currentRoomId;}
+function showCreateRoom(){var n=prompt("Nome do grupo:");if(!n)return;var b=parseFloat(prompt("Saldo inicial (R$):","100000"));if(isNaN(b))return;var d=prompt("Data fim (DD/MM/AAAA):");if(!d)return;var t=parseFloat(prompt("Meta (%):","5"))||0;createRoom(n,b,d,t).then(function(id){notif("Grupo criado! Código: "+id);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(e){notif("Erro: "+e.message,"err");});}
+function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;joinRoom(c.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});}
+function shareRoomInvite(){var r=currentRoomData||{};window.open("https://wa.me/?text="+encodeURIComponent("🎯 *"+(r.name||"Trading TGP")+"*
 Saldo: R$ "+(r.initialBal||100000).toLocaleString("pt-BR")+"
 Prazo: "+(r.endDate||"")+"
 Meta: "+(r.targetPct||0)+"%
 
-"+getRoomInviteLink()));
-}
-function renderGroupRoom(){
-  if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}
-  document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";
-  document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;
-}
-function renderGroupRanking(members){
-  drawGroupChart(members);
-  var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;
-  el.innerHTML="";
-  list.forEach(function(m,i){
-    var isMe=m.name===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");
-    div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";
-    div.innerHTML='<div style="font-size:16px;min-width:24px">'+medal+'</div><div style="flex:1"><div style="font-size:12px;font-weight:700">'+m.name+(isMe?' <span style="font-size:9px;color:var(--bl)">(você)</span>':'')+'</div><div style="font-size:9px;color:var(--tx4)">R$ '+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div></div><div style="font-size:14px;font-weight:700;color:'+color+'">'+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+'%</div>';
-    el.appendChild(div);
-  });
-}
-function drawGroupChart(members){
-  var canvas=document.getElementById("group-chart");if(!canvas)return;
-  var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;
-  var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);
-  var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];
-  list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});
-  if(!allPts.length)return;
-  var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;
-  list.forEach(function(m,ci){
-    if(!m.history||m.history.length<2)return;
-    ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();
-    m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});
-    ctx2.stroke();
-    var last=m.history[m.history.length-1];ctx2.fillStyle=colors[ci%colors.length];ctx2.font="bold 9px monospace";
-    ctx2.fillText(m.name.slice(0,6),W-pad-38,H-pad-(last.v-minV)/(maxV-minV)*(H-pad*2)-4);
-  });
-}
-(function(){
-  var params=new URLSearchParams(window.location.search),room=params.get("room");
-  if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}
-  else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}
-})();
+"+getRoomInviteLink()));}
+function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;}
+function renderGroupRanking(members){drawGroupChart(members);var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;el.innerHTML="";list.forEach(function(m,i){var isMe=m.name===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div><div style='flex:1'><div style='font-size:12px;font-weight:700'>"+m.name+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div><div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div><div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";el.appendChild(div);});}
+function drawGroupChart(members){var canvas=document.getElementById("group-chart");if(!canvas)return;var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});if(!allPts.length)return;var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;list.forEach(function(m,ci){if(!m.history||m.history.length<2)return;ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});ctx2.stroke();});}
+(function(){var params=new URLSearchParams(window.location.search),room=params.get("room");if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}})();
 
 //  Ativos:
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
@@ -2557,13 +2485,7 @@ function initApp() {
   }, 8000);
 }
 
-$("tbtn").onclick=function() {
-  var t=$("tinp").value.trim();
-  if (!t) { $("terr").textContent="Cole seu token Brapi PRO"; $("terr").style.display="block"; return; }
-  $("terr").style.display="none"; localStorage.setItem(LS_TOKEN,t); localStorage.setItem("hb_is_owner","1"); token=t;
-  showProfileScreen();
-};
-$("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") $("tbtn").click(); });
+$("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
 
 $("profile-create").onclick = function() {
   var name = $("profile-name").value.trim();
