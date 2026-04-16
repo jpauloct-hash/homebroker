@@ -1123,9 +1123,15 @@ function fetchQ() {
     checkPending();
     render();
   }).catch(function(e) {
+    var msg = e.message || "Erro de rede";
+    // Check if we're in frozen hours - don't show error, just freeze
+    var iv = getRefreshInterval();
+    if (iv === 0) {
+      setSts("frozen");
+      return;
+    }
     setSts("err");
-    $("hupd").textContent = e.message.slice(0,50);
-    notif(e.message.slice(0,40), "err");
+    $("hupd").textContent = "Falha na atualização";
   });
 }
 
@@ -1172,8 +1178,28 @@ function startRefresh() {
       fetchQ();
     }, interval*1000);
   } else {
-    // Already in quiet hours on startup  just show frozen status
+    // Frozen hours - fetch closing prices once then freeze
     setSts("frozen");
+    setTimeout(function(){
+      var iv2 = getRefreshInterval();
+      if (iv2 === 0) {
+        // Still frozen - try to get last known prices
+        var urlA = BRAPI+"/quote/"+TICKERS_A.join(",")+
+          "?fundamental=false&token="+token;
+        fetch(urlA).then(function(r){ return r.json(); })
+          .then(function(data){
+            if(data && data.results) {
+              data.results.forEach(function(q){
+                if(q.symbol && q.regularMarketPrice)
+                  prices[q.symbol]=q.regularMarketPrice;
+              });
+              render();
+            }
+          }).catch(function(){}).finally(function(){
+            setSts("frozen");
+          });
+      }
+    }, 500);
   }
   cdi = setInterval(function(){
     var iv = getRefreshInterval();
