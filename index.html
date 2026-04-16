@@ -502,13 +502,30 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
 <div id="nf"></div>
 <script>
-function doLogin() {
+async function doLogin() {
   var t = document.getElementById("tinp").value.trim();
-  if (!t) { document.getElementById("terr").textContent="Cole seu token Brapi PRO"; document.getElementById("terr").style.display="block"; return; }
-  document.getElementById("terr").style.display="none";
-  localStorage.setItem("hb_token_v6", t);
-  localStorage.setItem("hb_is_owner","1");
-  window.location.reload();
+  var terr = document.getElementById("terr");
+  var btn = document.getElementById("tbtn");
+  if (!t) { terr.textContent="Cole seu token Brapi PRO"; terr.style.display="block"; return; }
+  terr.style.display="none";
+  btn.disabled = true; btn.textContent = "VALIDANDO...";
+  try {
+    var resp = await fetch("https://brapi.dev/api/quote/PETR4", { headers:{ Authorization:"Bearer " + t } });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok) {
+      terr.textContent = data.message || ("Token inválido ou erro HTTP " + resp.status);
+      terr.style.display = "block";
+      btn.disabled = false; btn.textContent = "ENTRAR";
+      return;
+    }
+    localStorage.setItem("hb_token_v6", t);
+    if (localStorage.getItem("hb_is_owner") === null) localStorage.setItem("hb_is_owner","1");
+    window.location.reload();
+  } catch(e) {
+    terr.textContent = "Falha ao validar token.";
+    terr.style.display = "block";
+    btn.disabled = false; btn.textContent = "ENTRAR";
+  }
 }
 
 var fbDb=null;
@@ -519,26 +536,29 @@ try {
   }
 } catch(e){console.log("FB err:",e.message);}
 
-var currentRoomId=localStorage.getItem("hb_room_id")||"",currentRoomData=null,groupUnsubscribe=null;
+var currentRoomId="",currentRoomData=null,groupUnsubscribe=null,pendingInviteRoomId="",pendingInviteRoomData=null;
 function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
-function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
-function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");localStorage.setItem("hb_room_id",id);currentRoomId=id;currentRoomData=s.val();return s.val();});}
-function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:getCurrentProfile(),total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
+function fetchRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");return s.val();});}
+function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){currentRoomId=id;return fetchRoom(id);});}
+function joinRoom(id){return fetchRoom(id).then(function(room){currentRoomId=id;currentRoomData=room;return room;});}
+function memberKeyFromProfileName(name){return String(name||"").replace(/[.#$\[\]\/]/g,"_");}
+function normalizePlayerName(name){return String(name||"").trim().replace(/\s+/g," ");}
+function buildGroupProfileName(roomId, playerName){return "grupo_"+roomId+"_"+normalizePlayerName(playerName).replace(/\s+/g,"_");}
+function ptDateToIso(v){if(!v)return"";if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;var m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);return m?(m[3]+"-"+m[2]+"-"+m[1]):"";}
+function applyRoomState(room){bal=Number(room.initialBal||100000);initialBal=bal;port={};trd=[];pending=[];divs=[];totalDiv=0;checkedDivDate="";equityHistory=[];firstTradeDate="";goal={};var iso=ptDateToIso(room.endDate||"");if(iso)goal.endDate=iso;if(room.targetPct)goal.target=Number(room.targetPct)||0;saveState();saveGoal();saveEquityHistory();}
+function syncRoomFromActiveProfile(){var meta=getProfileMeta(getCurrentProfile());var roomId=meta&&meta.roomId?meta.roomId:"";if(groupUnsubscribe){groupUnsubscribe();groupUnsubscribe=null;}currentRoomId=roomId;currentRoomData=null;if(!roomId){renderGroupRoom();return;}joinRoom(roomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){renderGroupRoom();});}
+function createOrEnterChampionshipProfile(room, playerName){var cleanName=normalizePlayerName(playerName);if(cleanName.length<2){notif("Digite um nome (min. 2 caracteres)","err");return false;}var profileName=buildGroupProfileName(room.id, cleanName);var meta={type:"group",roomId:room.id,roomName:room.name||room.id,playerName:cleanName};setProfileMeta(profileName,meta);saveProfile(profileName);applyRoomState(room);currentRoomId=room.id;currentRoomData=room;pendingInviteRoomId="";pendingInviteRoomData=null;return true;}
+function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var meta=getProfileMeta(getCurrentProfile())||{};var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;fbDb.ref("rooms/"+currentRoomId+"/members/"+memberKeyFromProfileName(getCurrentProfile())).set({profileName:getCurrentProfile(),name:meta.playerName||getCurrentProfile(),total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
 var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
 function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
-function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?t="+btoa(localStorage.getItem("hb_token_v6")||"")+"&room="+currentRoomId;}
-function showCreateRoom(){var n=prompt("Nome do grupo:");if(!n)return;var b=parseFloat(prompt("Saldo inicial (R$):","100000"));if(isNaN(b))return;var d=prompt("Data fim (DD/MM/AAAA):");if(!d)return;var t=parseFloat(prompt("Meta (%):","5"))||0;createRoom(n,b,d,t).then(function(id){notif("Grupo criado! Código: "+id);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(e){notif("Erro: "+e.message,"err");});}
-function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;joinRoom(c.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});}
-function shareRoomInvite(){var r=currentRoomData||{};window.open("https://wa.me/?text="+encodeURIComponent("🎯 *"+(r.name||"Trading TGP")+"*
-Saldo: R$ "+(r.initialBal||100000).toLocaleString("pt-BR")+"
-Prazo: "+(r.endDate||"")+"
-Meta: "+(r.targetPct||0)+"%
-
-"+getRoomInviteLink()));}
-function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;}
-function renderGroupRanking(members){drawGroupChart(members);var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;el.innerHTML="";list.forEach(function(m,i){var isMe=m.name===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div><div style='flex:1'><div style='font-size:12px;font-weight:700'>"+m.name+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div><div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div><div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";el.appendChild(div);});}
+function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
+function showCreateRoom(){var n=prompt("Nome do grupo:");if(!n)return;var b=parseFloat(prompt("Saldo inicial (R$):","100000"));if(isNaN(b)||b<1000){notif("Saldo inicial inválido","err");return;}var d=prompt("Data fim (DD/MM/AAAA):");if(!d)return;var t=parseFloat(prompt("Meta (%):","5"))||0;var playerName=(getProfileMeta(getCurrentProfile())||{}).playerName||getCurrentProfile()||"Jogador";createRoom(n,b,d,t).then(function(room){createOrEnterChampionshipProfile(room,playerName);notif("Grupo criado! Código: "+room.id);if($("ps")&&$("ps").style.display==="flex"){$("ps").style.display="none";initApp();}else{syncRoomFromActiveProfile();render();}}).catch(function(e){notif("Erro: "+e.message,"err");});}
+function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;fetchRoom(c.toUpperCase().trim()).then(function(room){pendingInviteRoomId=room.id;pendingInviteRoomData=room;showProfileScreen();notif("Grupo encontrado: "+room.name);}).catch(function(){notif("Grupo não encontrado","err");});}
+function shareRoomInvite(){var r=currentRoomData||{};var msg="🎯 *"+(r.name||"Trading TGP")+"*\nSaldo inicial: R$ "+Number(r.initialBal||100000).toLocaleString("pt-BR",{minimumFractionDigits:2})+"\nPrazo: "+(r.endDate||"")+"\nMeta: "+(r.targetPct||0)+"%\n\nEntre no grupo por este link:\n"+getRoomInviteLink()+"\n\nAo abrir, digite seu nome e entre no campeonato.";window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");}
+function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=(currentRoomData.name||currentRoomId)+" · "+((getProfileMeta(getCurrentProfile())||{}).playerName||getCurrentProfile()||"");}
+function renderGroupRanking(members){drawGroupChart(members);var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;el.innerHTML="";list.forEach(function(m,i){var isMe=m.profileName===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div><div style='flex:1'><div style='font-size:12px;font-weight:700'>"+(m.name||m.profileName||"Jogador")+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div><div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div><div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";el.appendChild(div);});}
 function drawGroupChart(members){var canvas=document.getElementById("group-chart");if(!canvas)return;var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});if(!allPts.length)return;var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;list.forEach(function(m,ci){if(!m.history||m.history.length<2)return;ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});ctx2.stroke();});}
-(function(){var params=new URLSearchParams(window.location.search),room=params.get("room");if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}})();
+(function(){var params=new URLSearchParams(window.location.search),room=(params.get("room")||"").toUpperCase().trim();if(room){pendingInviteRoomId=room;fetchRoom(room).then(function(r){pendingInviteRoomData=r;}).catch(function(){pendingInviteRoomId="";});}})();
 
 //  Ativos:
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
@@ -670,6 +690,7 @@ function isOwner() {
 var LS_THEME  = "hb_theme_v1";
 var LS_PROFILE = "hb_profile_v1";   // active profile name
 var LS_PROFILES = "hb_profiles_v1"; // list of profiles
+var LS_PROFILE_META = "hb_profile_meta_v1";
 
 function getProfileKey(key) {
   var profile = localStorage.getItem(LS_PROFILE) || "default";
@@ -706,6 +727,24 @@ function getProfiles() {
   catch(e) { return []; }
 }
 
+function getProfileMetaMap() {
+  try { return JSON.parse(localStorage.getItem(LS_PROFILE_META) || "{}"); }
+  catch(e) { return {}; }
+}
+function getProfileMeta(name) {
+  return getProfileMetaMap()[name] || null;
+}
+function setProfileMeta(name, meta) {
+  var map = getProfileMetaMap();
+  map[name] = meta || {};
+  localStorage.setItem(LS_PROFILE_META, JSON.stringify(map));
+}
+function deleteProfileMeta(name) {
+  var map = getProfileMetaMap();
+  delete map[name];
+  localStorage.setItem(LS_PROFILE_META, JSON.stringify(map));
+}
+
 function saveProfile(name) {
   var profiles = getProfiles();
   if (profiles.indexOf(name) === -1) profiles.push(name);
@@ -714,12 +753,15 @@ function saveProfile(name) {
 }
 
 function deleteProfile(name) {
-  // Remove all keys for this profile
+  var meta = getProfileMeta(name);
+  if (meta && meta.roomId && fbDb) {
+    try { fbDb.ref("rooms/"+meta.roomId+"/members/"+memberKeyFromProfileName(name)).remove(); } catch(e) {}
+  }
   var keys = ["hb_state_v3","hb_goal_v1","hb_equity_v1","hb_news_v1","hb_tape_v1"];
   keys.forEach(function(k){ localStorage.removeItem(k+"_"+name); });
+  deleteProfileMeta(name);
   var profiles = getProfiles().filter(function(p){ return p !== name; });
   localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
-  // If deleted active profile, clear it
   if (localStorage.getItem(LS_PROFILE) === name) localStorage.removeItem(LS_PROFILE);
 }
 
@@ -754,12 +796,11 @@ function loadGoal() {
 function saveGoal() { localStorage.setItem(getProfileKey("hb_goal_v1"), JSON.stringify(goal)); }
 
 function loadEquityHistory() {
-  try { return JSON.parse(localStorage.getItem(LS_EQUITY)||"[]"); } catch(e) { return []; }
+  try { return JSON.parse(localStorage.getItem(getProfileKey("hb_equity_v1"))||"[]"); } catch(e) { return []; }
 }
 function saveEquityHistory() {
-  // Mantm ltimos 90 pontos
   if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
-  localStorage.setItem(LS_EQUITY, JSON.stringify(equityHistory));
+  localStorage.setItem(getProfileKey("hb_equity_v1"), JSON.stringify(equityHistory));
 }
 
 var st = loadState();
@@ -2204,10 +2245,28 @@ function buildTapePicker() {
 
 
 // ── Profile system ────────────────────────────────────────────────────────────
+function updateProfileScreenForInvite() {
+  var title = $("ps").querySelector("div[style*='font-size:20px']");
+  var sub = $("ps").querySelector("div[style*='Cada perfil tem carteira']");
+  if (!title || !sub) return;
+  if (pendingInviteRoomData) {
+    title.textContent = "Entrar no Campeonato";
+    sub.textContent = "Grupo: " + (pendingInviteRoomData.name || pendingInviteRoomId) + " · Digite seu nome para criar seu perfil do grupo.";
+    $("profile-create").textContent = "ENTRAR NO GRUPO";
+    $("profile-name").placeholder = "Seu nome no grupo...";
+  } else {
+    title.textContent = "Selecionar Perfil";
+    sub.textContent = "Cada perfil tem carteira e historico independentes";
+    $("profile-create").textContent = "CRIAR E ENTRAR";
+    $("profile-name").placeholder = "Digite seu nome...";
+  }
+}
+
 function showProfileScreen() {
   $("ts").style.display = "none";
   $("ma").style.display = "none";
   $("ps").style.display = "flex";
+  updateProfileScreenForInvite();
   renderProfileList();
 }
 
@@ -2215,25 +2274,40 @@ function renderProfileList() {
   var list = $("profile-list");
   if (!list) return;
   list.innerHTML = "";
+  if (pendingInviteRoomData) {
+    var inviteCard = document.createElement("div");
+    inviteCard.style.cssText = "background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.35);border-radius:12px;padding:14px;margin-bottom:12px";
+    inviteCard.innerHTML = "<div style='font-size:10px;color:var(--bl);letter-spacing:1px;margin-bottom:8px'>CONVITE RECEBIDO</div>"+
+      "<div style='font-size:14px;font-weight:700;margin-bottom:6px'>"+(pendingInviteRoomData.name||pendingInviteRoomId)+"</div>"+
+      "<div style='font-size:10px;color:var(--tx2);line-height:1.7'>Saldo inicial: <b>R$ "+Number(pendingInviteRoomData.initialBal||100000).toLocaleString('pt-BR',{minimumFractionDigits:2})+"</b><br>Prazo: <b>"+(pendingInviteRoomData.endDate||'-')+"</b><br>Meta: <b>"+(pendingInviteRoomData.targetPct||0)+"%</b></div>";
+    list.appendChild(inviteCard);
+  }
   var profiles = getProfiles();
   if (!profiles.length) {
     list.innerHTML = '<div style="text-align:center;color:var(--tx4);font-size:11px;padding:10px">Nenhum perfil ainda. Crie o primeiro!</div>';
     return;
   }
   profiles.forEach(function(name) {
+    var meta = getProfileMeta(name) || {};
     var card = document.createElement("div");
     card.style.cssText = "background:var(--bg2);border-radius:10px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;";
     var left = document.createElement("div");
     var avatar = document.createElement("div");
     avatar.style.cssText = "width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#1e4a80,#2563eb);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;margin-right:10px;vertical-align:middle";
     avatar.textContent = name.charAt(0).toUpperCase();
-    var nameEl = document.createElement("span");
+    var textWrap = document.createElement("div");
+    var nameEl = document.createElement("div");
     nameEl.style.cssText = "font-weight:700;font-size:13px;color:var(--tx);vertical-align:middle";
-    nameEl.textContent = name;
+    nameEl.textContent = (meta.playerName || name);
+    var subEl = document.createElement("div");
+    subEl.style.cssText = "font-size:10px;color:var(--tx3);margin-top:2px";
+    subEl.textContent = meta.type === "group" ? ("Campeonato · " + (meta.roomName || meta.roomId || "Grupo")) : "Simulador individual";
     left.style.display = "flex";
     left.style.alignItems = "center";
+    textWrap.appendChild(nameEl);
+    textWrap.appendChild(subEl);
     left.appendChild(avatar);
-    left.appendChild(nameEl);
+    left.appendChild(textWrap);
     var enterBtn = document.createElement("button");
     enterBtn.style.cssText = "padding:7px 16px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit";
     enterBtn.textContent = "ENTRAR";
@@ -2246,7 +2320,6 @@ function renderProfileList() {
 
 function enterProfile(name) {
   saveProfile(name);
-  // Reload state for this profile
   var st2 = loadState();
   bal = st2.bal; port = st2.port; trd = st2.trd; pending = st2.pending;
   divs = st2.divs; totalDiv = st2.totalDiv; checkedDivDate = st2.checkedDivDate;
@@ -2254,6 +2327,7 @@ function enterProfile(name) {
   goal = loadGoal();
   equityHistory = loadEquityHistory();
   $("ps").style.display = "none";
+  syncRoomFromActiveProfile();
   if (!$("ma").style.display || $("ma").style.display === "none") {
     initApp();
   } else {
@@ -2264,7 +2338,10 @@ function enterProfile(name) {
 
 function updateProfileIndicator() {
   var el = $("profile-indicator");
-  if (el) el.textContent = getCurrentProfile() ? "Perfil: " + getCurrentProfile() : "";
+  if (!el) return;
+  var meta = getProfileMeta(getCurrentProfile()) || {};
+  if (!getCurrentProfile()) { el.textContent = ""; return; }
+  el.textContent = meta.type === "group" ? ("Campeonato: " + (meta.roomName || meta.roomId) + " · Jogador: " + (meta.playerName || getCurrentProfile())) : ("Perfil: " + getCurrentProfile());
 }
 
 function renderSettingsProfiles() {
@@ -2274,11 +2351,12 @@ function renderSettingsProfiles() {
   var current = getCurrentProfile();
   el.innerHTML = "";
   profiles.forEach(function(name) {
+    var meta = getProfileMeta(name) || {};
     var row = document.createElement("div");
     row.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)";
     var nameEl = document.createElement("span");
     nameEl.style.cssText = "font-size:11px;color:" + (name === current ? "var(--bl)" : "var(--tx2)") + ";font-weight:" + (name === current ? "700" : "400");
-    nameEl.textContent = name + (name === current ? " (ativo)" : "");
+    nameEl.textContent = (meta.playerName || name) + (meta.type === "group" ? (" · " + (meta.roomName || meta.roomId || "Grupo")) : "") + (name === current ? " (ativo)" : "");
     var delBtn = document.createElement("button");
     delBtn.style.cssText = "padding:3px 8px;background:transparent;border:1px solid rgba(240,64,96,.4);border-radius:5px;color:var(--r);font-size:9px;font-weight:700;cursor:pointer;font-family:inherit";
     delBtn.textContent = "EXCLUIR";
@@ -2452,18 +2530,11 @@ function initApp() {
   $("fs-down").onclick=function(){ applyFontScale(fontIdx-1); };
   $("switch-profile-btn").onclick = function() { $("sht").classList.remove("on"); showProfileScreen(); };
   $("invite-btn").onclick = function() {
-    if (!token) { notif("Entre no app primeiro","err"); return; }
-    var base = window.location.href.split("?")[0];
-    var enc = encodeToken(token);
-    var url = base + "?t=" + enc;
-    var msg = "Oi! Te convido para simular investimentos na bolsa comigo no Home Broker B3." +
-      " Acesse o link abaixo, crie seu perfil e comece a operar com cotacoes reais da B3:" +
-      " " + url +
-      " Nao precisa criar conta em nenhum lugar. So clicar, criar seu nome e comecar!";
-    window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+    if (!currentRoomId || !currentRoomData) { notif("Crie ou entre em um grupo primeiro","err"); return; }
+    shareRoomInvite();
   };
 
-  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
+  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh(); syncRoomFromActiveProfile();
   // Show/hide invite button based on owner status
   var invBtn = $("invite-btn");
   if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
@@ -2489,21 +2560,28 @@ $("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin();
 $("profile-create").onclick = function() {
   var name = $("profile-name").value.trim();
   if (!name || name.length < 2) { notif("Digite um nome (min. 2 caracteres)","err"); return; }
+  if (pendingInviteRoomData) {
+    if (!createOrEnterChampionshipProfile(pendingInviteRoomData, name)) return;
+    $("profile-name").value = "";
+    $("ps").style.display = "none";
+    initApp();
+    return;
+  }
+  setProfileMeta(name,{type:"solo",playerName:name});
   enterProfile(name);
 };
 $("profile-name").addEventListener("keydown",function(e){ if(e.key==="Enter") $("profile-create").click(); });
 
-// Check if arriving via invite link
+// Check if arriving via legacy invite link with token
 var urlToken = getTokenFromUrl();
 if (urlToken && !token) {
   token = urlToken;
   localStorage.setItem(LS_TOKEN, token);
-  localStorage.setItem("hb_is_owner", "0"); // guest
+  localStorage.setItem("hb_is_owner", "0");
 }
 
 if (token) {
-  $("ts").style.display = "none"; // hide token screen immediately
-  // Auto-mark as owner if no invite param in URL
+  $("ts").style.display = "none";
   if (localStorage.getItem("hb_is_owner") === null) {
     var hasInvite = window.location.search.indexOf("t=") >= 0;
     localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
