@@ -2725,13 +2725,40 @@ function initApp() {
   $("aho-no").onclick=function() { $("aho-modal").style.display="none"; ahoOrder=null; };
   $("aho-yes").onclick=function() {
     if (!ahoOrder) return;
+    // Validate sell: must have position
+    if (ahoOrder.side === "sell") {
+      var pos = port[ahoOrder.tk];
+      if (!pos || pos.qty <= 0) {
+        notif("Você não possui " + ahoOrder.tk + " em carteira", "err");
+        $("aho-modal").classList.remove("on"); ahoOrder=null;
+        return;
+      }
+      if (ahoOrder.qty > pos.qty) {
+        ahoOrder.qty = pos.qty;
+        notif("Quantidade ajustada para " + pos.qty + " (máximo disponível)", "err");
+      }
+    }
+    // Validate buy: must have balance (use last known price)
+    if (ahoOrder.side === "buy" && !ahoOrder.lp) {
+      var p = prices[ahoOrder.tk] || 0;
+      if (p > 0 && p * ahoOrder.qty > bal) {
+        notif("Saldo insuficiente para esta ordem", "err");
+        $("aho-modal").classList.remove("on"); ahoOrder=null;
+        return;
+      }
+    }
     pending.push(ahoOrder);
     saveState(); render();
     var side2=ahoOrder.side==="buy"?"COMPRA":"VENDA";
     var type2=ahoOrder.market?"a mercado":"limitada @ "+R(ahoOrder.lp);
-    playTradeSound("pending");
+    sfxBolt();
     notif("Agendada: "+ahoOrder.qty+" "+ahoOrder.tk+" "+side2+" "+type2);
     $("aho-modal").classList.remove("on"); ahoOrder=null;
+    // Switch to orders tab to show pending
+    document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
+    document.querySelectorAll(".panel").forEach(function(p){p.classList.remove("on");});
+    document.querySelector(".tab[data-t='order']").classList.add("on");
+    $("order-panel").classList.add("on");
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
   $("logb").onclick=function() { localStorage.removeItem(LS_TOKEN); location.reload(); };
