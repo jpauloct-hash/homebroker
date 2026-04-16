@@ -138,7 +138,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <div id="ts">
   <div style="text-align:center">
     <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">TRADING GP</div>
-    <div style="font-size:22px;font-weight:700;letter-spacing:1px">HOME BROKER</div>
+    <div style="font-size:22px;font-weight:700;letter-spacing:1px">HOMEBROKER TGP</div>
     <div style="font-size:10px;color:var(--tx3);margin-top:4px">19 ativos · Dividendos · TradingView</div>
   </div>
   <div class="tcard">
@@ -153,9 +153,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <!-- PROFILE SCREEN -->
 <div id="ps" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;">
   <div style="text-align:center">
-    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER B3</div>
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">TRADING GP</div>
     <div style="font-size:20px;font-weight:700;margin-bottom:4px">Selecionar Perfil</div>
-    <div style="font-size:10px;color:var(--tx3)">Cada perfil tem carteira e historico independentes</div>
+    <div style="font-size:10px;color:var(--tx3)">Cada perfil tem carteira e histórico independentes</div>
   </div>
   <div id="profile-list" style="width:100%;max-width:400px"></div>
   <div style="width:100%;max-width:400px;background:var(--bg2);border-radius:14px;padding:18px;border:1px solid var(--bd)">
@@ -172,7 +172,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div>
         <div style="font-size:9px;letter-spacing:3px;color:var(--tx3);text-transform:uppercase;margin-bottom:2px">Simulador</div>
         <div id="profile-indicator" style="font-size:9px;color:var(--bl);margin-bottom:2px"></div>
-        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER B3</div>
+        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOMEBROKER TGP</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">PATRIMÔNIO</div>
@@ -551,16 +551,68 @@ try {
   }
 } catch(e){console.log("FB err:",e.message);}
 
-var currentRoomId=localStorage.getItem("hb_room_id")||"",currentRoomData=null,groupUnsubscribe=null;
+var currentRoomId="",currentRoomData=null,groupUnsubscribe=null,pendingInviteRoomId="",pendingInviteRoomData=null;
+function getRoomStorageKey(){ var p=localStorage.getItem("hb_profile_v1")||"default"; return "hb_room_id_"+p; }
+function loadCurrentRoomBinding(){ currentRoomId = localStorage.getItem(getRoomStorageKey()) || ""; return currentRoomId; }
+function saveCurrentRoomBinding(id){ currentRoomId = id || ""; if(currentRoomId) localStorage.setItem(getRoomStorageKey(), currentRoomId); else localStorage.removeItem(getRoomStorageKey()); }
 function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
-function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
-function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");localStorage.setItem("hb_room_id",id);currentRoomId=id;currentRoomData=s.val();return s.val();});}
-function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:getCurrentProfile(),total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
+function createRoom(n,b,d,t){
+  if(!fbDb) return Promise.reject(new Error("Firebase indisponível"));
+  var id=genRoomId();
+  var payload={id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}};
+  return fbDb.ref("rooms/"+id).set(payload).then(function(){
+    saveCurrentRoomBinding(id);
+    currentRoomData = payload;
+    var meta=getProfileMeta(getCurrentProfile());
+    if(meta && meta.type==="group"){
+      meta.roomId=id; meta.roomName=n; saveProfileMeta(meta);
+      updateProfileIndicator();
+    }
+    return id;
+  });
+}
+function joinRoom(id){
+  if(!fbDb) return Promise.reject(new Error("Firebase indisponível"));
+  id=(id||"").toUpperCase().trim();
+  return fbDb.ref("rooms/"+id).once("value").then(function(s){
+    if(!s.exists()) throw new Error("Sala não encontrada");
+    saveCurrentRoomBinding(id);
+    currentRoomData=s.val();
+    return s.val();
+  });
+}
+function pushMyStats(){
+  if(!currentRoomId||!getCurrentProfile()||!fbDb) return;
+  var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;
+  var points=(equityHistory||[]).slice(-30).map(function(p){ return {t:p.t,v:p.v}; });
+  if(!points.length) points=[{t:Date.now(),v:total}];
+  fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({
+    profileId:getCurrentProfile(),
+    name:getProfileDisplayName(getCurrentProfile()),
+    total:total,
+    pct:initB?((total-initB)/initB*100):0,
+    updatedAt:Date.now(),
+    history:points
+  });
+}
 var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
 function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
 function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
-function showCreateRoom(){var n=prompt("Nome do grupo:");if(!n)return;var b=parseFloat(prompt("Saldo inicial (R$):","100000"));if(isNaN(b))return;var d=prompt("Data fim (DD/MM/AAAA):");if(!d)return;var t=parseFloat(prompt("Meta (%):","5"))||0;createRoom(n,b,d,t).then(function(id){notif("Grupo criado! Código: "+id);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(e){notif("Erro: "+e.message,"err");});}
-function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;joinRoom(c.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});}
+function showCreateRoom(){
+  var n=prompt("Nome do grupo:"); if(!n) return;
+  var b=parseFloat(prompt("Saldo inicial (R$):","100000")); if(isNaN(b)) return;
+  var d=prompt("Data fim (AAAA-MM-DD ou DD/MM/AAAA):"); if(!d) return;
+  var t=parseFloat(prompt("Meta (%):","5"))||0;
+  createRoom(n,b,d,t).then(function(id){
+    notif("Grupo criado! Código: "+id); renderGroupRoom(); subscribeGroup(renderGroupRanking); pushMyStats(); renderSettingsProfiles();
+  }).catch(function(e){notif("Erro: "+e.message,"err");});
+}
+function showJoinRoom(){
+  var c=prompt("Código do grupo:"); if(!c) return;
+  joinRoom(c.toUpperCase().trim()).then(function(r){
+    notif("Entrou: "+r.name); renderGroupRoom(); subscribeGroup(renderGroupRanking); pushMyStats(); renderSettingsProfiles();
+  }).catch(function(){notif("Grupo não encontrado","err");});
+}
 function shareRoomInvite(){
   var r=currentRoomData||{};
   var msg =
@@ -569,17 +621,67 @@ function shareRoomInvite(){
     "💰 Capital inicial: R$ "+Number(r.initialBal||100000).toLocaleString("pt-BR",{minimumFractionDigits:2})+"\n"+
     "📅 Prazo: "+(r.endDate||"")+"\n"+
     "🎯 Meta: "+(r.targetPct||0)+"%\n\n"+
-    "📊 Simulador realista\n"+
-    "🏆 Ranking ao vivo\n"+
-    "🔥 Competição entre jogadores\n\n"+
-    "👉 Entre agora e mostre quem é o melhor trader:\n"+
-    getRoomInviteLink();
+    "📊 Simulador realista\n🏆 Ranking ao vivo\n🔥 Competição entre jogadores\n\n"+
+    "👉 Entre agora e mostre quem é o melhor trader:\n"+ getRoomInviteLink();
   window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
 }
-function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;}
-function renderGroupRanking(members){drawGroupChart(members);var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;el.innerHTML="";list.forEach(function(m,i){var isMe=m.name===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div><div style='flex:1'><div style='font-size:12px;font-weight:700'>"+m.name+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div><div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div><div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";el.appendChild(div);});}
-function drawGroupChart(members){var canvas=document.getElementById("group-chart");if(!canvas)return;var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});if(!allPts.length)return;var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;list.forEach(function(m,ci){if(!m.history||m.history.length<2)return;ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});ctx2.stroke();});}
-(function(){var params=new URLSearchParams(window.location.search),room=params.get("room");if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}})();
+function renderGroupRoom(){
+  if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}
+  document.getElementById("group-noroom").style.display="none";
+  document.getElementById("group-room").style.display="block";
+  document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;
+}
+function renderGroupRanking(members){
+  drawGroupChart(members);
+  var list=Object.values(members).sort(function(a,b){return (b.pct||0)-(a.pct||0);}),el=document.getElementById("group-ranking");
+  if(!el) return;
+  el.innerHTML="";
+  if(!list.length){ el.innerHTML='<div class="empty" style="padding:18px 10px">Nenhum participante ainda.</div>'; return; }
+  list.forEach(function(m,i){
+    var isMe=(m.profileId&&m.profileId===getCurrentProfile()) || m.name===getProfileDisplayName(getCurrentProfile());
+    var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=(m.pct||0)>=0?"var(--g)":"var(--r)",div=document.createElement("div");
+    div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";
+    div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div><div style='flex:1'><div style='font-size:12px;font-weight:700'>"+(m.name||m.profileId||"Jogador")+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div><div style='font-size:9px;color:var(--tx4)'>Patrimônio: R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div><div style='font-size:14px;font-weight:700;color:"+color+"'>"+((m.pct||0)>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";
+    el.appendChild(div);
+  });
+}
+function drawGroupChart(members){
+  var canvas=document.getElementById("group-chart"); if(!canvas) return;
+  var ctx2=canvas.getContext("2d");
+  canvas.width=canvas.offsetWidth||320; var W=canvas.width,H=160; ctx2.clearRect(0,0,W,H);
+  var list=Object.values(members).filter(function(m){ return m && m.history && m.history.length; });
+  if(!list.length){
+    ctx2.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--tx4')||'#5a7a9a';
+    ctx2.font='11px JetBrains Mono'; ctx2.textAlign='center';
+    ctx2.fillText('Sem dados ainda', W/2, H/2);
+    return;
+  }
+  var colors=['#00d8a0','#60a5fa','#fbbf24','#ff4466','#a78bfa','#34d399'];
+  var allPts=[]; list.forEach(function(m){ allPts=allPts.concat(m.history.map(function(p){ return Number(p.v)||0; })); });
+  var minV=Math.min.apply(null,allPts), maxV=Math.max.apply(null,allPts);
+  if(minV===maxV){ minV*=0.995; maxV*=1.005; if(minV===maxV){ minV-=100; maxV+=100; } }
+  var leftPad=48,rightPad=10,topPad=12,bottomPad=20;
+  function xAt(i,count){ return leftPad + (count<=1?0:(i/(count-1)))*(W-leftPad-rightPad); }
+  function yAt(v){ return topPad + (1-((v-minV)/(maxV-minV)))*(H-topPad-bottomPad); }
+  ctx2.strokeStyle='rgba(90,122,154,.25)'; ctx2.lineWidth=1;
+  [minV,(minV+maxV)/2,maxV].forEach(function(v){ var y=yAt(v); ctx2.beginPath(); ctx2.moveTo(leftPad,y); ctx2.lineTo(W-rightPad,y); ctx2.stroke(); ctx2.fillStyle='#7a9ab8'; ctx2.font='10px JetBrains Mono'; ctx2.textAlign='left'; ctx2.fillText('R$ '+Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0}),4,y+3); });
+  list.forEach(function(m,ci){
+    var pts=m.history.map(function(p){ return Number(p.v)||0; });
+    ctx2.strokeStyle=colors[ci%colors.length]; ctx2.fillStyle=colors[ci%colors.length]; ctx2.lineWidth=2; ctx2.beginPath();
+    pts.forEach(function(v,i){ var x=xAt(i,pts.length), y=yAt(v); if(i===0) ctx2.moveTo(x,y); else ctx2.lineTo(x,y); });
+    if(pts.length===1){ var x=xAt(0,1), y=yAt(pts[0]); ctx2.arc(x,y,3,0,Math.PI*2); }
+    ctx2.stroke();
+    var lx=xAt(pts.length-1,pts.length), ly=yAt(pts[pts.length-1]);
+    ctx2.beginPath(); ctx2.arc(lx,ly,3,0,Math.PI*2); ctx2.fill();
+  });
+}
+(function(){
+  var params=new URLSearchParams(window.location.search),room=params.get("room");
+  pendingInviteRoomId = room ? room.toUpperCase().trim() : "";
+  loadCurrentRoomBinding();
+  if(currentRoomId){ joinRoom(currentRoomId).then(function(){ renderGroupRoom(); subscribeGroup(renderGroupRanking); }).catch(function(){ saveCurrentRoomBinding(""); renderGroupRoom(); }); }
+  else if(pendingInviteRoomId && fbDb){ fbDb.ref("rooms/"+pendingInviteRoomId).once("value").then(function(s){ if(s.exists()) pendingInviteRoomData=s.val(); }).catch(function(){}); }
+})();
 
 //  Ativos:
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
@@ -709,12 +811,63 @@ function isOwner() {
   return localStorage.getItem("hb_is_owner") === "1";
 }
 var LS_THEME  = "hb_theme_v1";
-var LS_PROFILE = "hb_profile_v1";   // active profile name
-var LS_PROFILES = "hb_profiles_v1"; // list of profiles
+var LS_PROFILE = "hb_profile_v1";   // active profile name (technical id)
+var LS_PROFILES = "hb_profiles_v1"; // list of profile ids
+var LS_PROFILE_META_PREFIX = "hb_profile_meta_";
 
+function slugifyName(n){ return (n||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-zA-Z0-9]+/g,"_").replace(/^_+|_+$/g,"").toUpperCase() || "PLAYER"; }
 function getProfileKey(key) {
   var profile = localStorage.getItem(LS_PROFILE) || "default";
   return key + "_" + profile;
+}
+function defaultProfileMeta(profileId){
+  if(!profileId) return {id:"",displayName:"",type:"solo",roomId:"",roomName:""};
+  if(/^grupo_[A-Z0-9]+_/i.test(profileId)){
+    var m = profileId.match(/^grupo_([A-Z0-9]+)_(.+)$/i);
+    var display = m && m[2] ? m[2].replace(/_/g,' ') : profileId;
+    return {id:profileId,displayName:display,type:"group",roomId:m?m[1].toUpperCase():"",roomName:""};
+  }
+  return {id:profileId,displayName:profileId,type:"solo",roomId:"",roomName:""};
+}
+function getProfileMeta(profileId){
+  profileId = profileId || getCurrentProfile();
+  if(!profileId) return defaultProfileMeta("");
+  try {
+    var meta = JSON.parse(localStorage.getItem(LS_PROFILE_META_PREFIX + profileId) || "null");
+    if(meta && meta.id) return Object.assign(defaultProfileMeta(profileId), meta);
+  } catch(e){}
+  return defaultProfileMeta(profileId);
+}
+function saveProfileMeta(meta){ if(meta && meta.id) localStorage.setItem(LS_PROFILE_META_PREFIX + meta.id, JSON.stringify(meta)); }
+function getProfileDisplayName(profileId){ return getProfileMeta(profileId).displayName || profileId || ""; }
+function getProfileTypeLabel(profileId){ var m=getProfileMeta(profileId); return m.type==="group" ? ("Campeonato" + (m.roomName?" · "+m.roomName:(m.roomId?" · "+m.roomId:""))) : "Solo"; }
+function buildGroupProfileId(roomId, displayName){ return "grupo_" + (roomId||"").toUpperCase() + "_" + slugifyName(displayName); }
+function createSoloProfile(displayName){ var id=(displayName||"").trim(); var meta={id:id,displayName:id,type:"solo",roomId:"",roomName:""}; saveProfile(meta); return meta; }
+function createGroupProfile(displayName, roomId, roomName){ var id=buildGroupProfileId(roomId, displayName); var meta={id:id,displayName:(displayName||"").trim(),type:"group",roomId:(roomId||"").toUpperCase(),roomName:roomName||""}; saveProfile(meta); return meta; }
+function getProfiles() {
+  try { return JSON.parse(localStorage.getItem(LS_PROFILES) || "[]"); }
+  catch(e) { return []; }
+}
+function saveProfile(profileOrName) {
+  var meta = (typeof profileOrName === 'string') ? defaultProfileMeta(profileOrName) : profileOrName;
+  if(!meta || !meta.id) return;
+  var profiles = getProfiles();
+  if (profiles.indexOf(meta.id) === -1) profiles.push(meta.id);
+  localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
+  localStorage.setItem(LS_PROFILE, meta.id);
+  saveProfileMeta(meta);
+}
+function deleteProfile(name) {
+  if(name===getCurrentProfile()){ notif("Troque de perfil antes de excluir este.","err"); return false; }
+  var keys = ["hb_state_v3","hb_goal_v1","hb_equity_v1","hb_news_v1","hb_tape_v1","hb_room_id"];
+  keys.forEach(function(k){ localStorage.removeItem(k+"_"+name); });
+  localStorage.removeItem(LS_PROFILE_META_PREFIX + name);
+  var profiles = getProfiles().filter(function(p){ return p !== name; });
+  localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
+  return true;
+}
+function getCurrentProfile() {
+  return localStorage.getItem(LS_PROFILE) || "";
 }
 
 function loadStateForProfile() {
@@ -742,31 +895,6 @@ function saveStateForProfile() {
   }));
 }
 
-function getProfiles() {
-  try { return JSON.parse(localStorage.getItem(LS_PROFILES) || "[]"); }
-  catch(e) { return []; }
-}
-
-function saveProfile(name) {
-  var profiles = getProfiles();
-  if (profiles.indexOf(name) === -1) profiles.push(name);
-  localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
-  localStorage.setItem(LS_PROFILE, name);
-}
-
-function deleteProfile(name) {
-  // Remove all keys for this profile
-  var keys = ["hb_state_v3","hb_goal_v1","hb_equity_v1","hb_news_v1","hb_tape_v1"];
-  keys.forEach(function(k){ localStorage.removeItem(k+"_"+name); });
-  var profiles = getProfiles().filter(function(p){ return p !== name; });
-  localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
-  // If deleted active profile, clear it
-  if (localStorage.getItem(LS_PROFILE) === name) localStorage.removeItem(LS_PROFILE);
-}
-
-function getCurrentProfile() {
-  return localStorage.getItem(LS_PROFILE) || "";
-}
 
 function applyTheme(t) {
   if (t === "light") document.documentElement.classList.add("light");
@@ -795,12 +923,11 @@ function loadGoal() {
 function saveGoal() { localStorage.setItem(getProfileKey("hb_goal_v1"), JSON.stringify(goal)); }
 
 function loadEquityHistory() {
-  try { return JSON.parse(localStorage.getItem(LS_EQUITY)||"[]"); } catch(e) { return []; }
+  try { return JSON.parse(localStorage.getItem(getProfileKey("hb_equity_v1"))||"[]"); } catch(e) { return []; }
 }
 function saveEquityHistory() {
-  // Mantm ltimos 90 pontos
   if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
-  localStorage.setItem(LS_EQUITY, JSON.stringify(equityHistory));
+  localStorage.setItem(getProfileKey("hb_equity_v1"), JSON.stringify(equityHistory));
 }
 
 var st = loadState();
@@ -2307,51 +2434,77 @@ function renderProfileList() {
     list.innerHTML = '<div style="text-align:center;color:var(--tx4);font-size:11px;padding:10px">Nenhum perfil ainda. Crie o primeiro!</div>';
     return;
   }
-  profiles.forEach(function(name) {
+  profiles.forEach(function(id) {
+    var meta = getProfileMeta(id);
     var card = document.createElement("div");
-    card.style.cssText = "background:var(--bg2);border-radius:10px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;";
-    var left = document.createElement("div");
+    card.style.cssText = "background:var(--bg2);border-radius:10px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:10px;";
+    var left = document.createElement("div"); left.style.cssText = "display:flex;align-items:center;gap:10px;min-width:0;flex:1;";
     var avatar = document.createElement("div");
-    avatar.style.cssText = "width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#1e4a80,#2563eb);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;margin-right:10px;vertical-align:middle";
-    avatar.textContent = name.charAt(0).toUpperCase();
-    var nameEl = document.createElement("span");
-    nameEl.style.cssText = "font-weight:700;font-size:13px;color:var(--tx);vertical-align:middle";
-    nameEl.textContent = name;
-    left.style.display = "flex";
-    left.style.alignItems = "center";
-    left.appendChild(avatar);
-    left.appendChild(nameEl);
-    var enterBtn = document.createElement("button");
-    enterBtn.style.cssText = "padding:7px 16px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit";
-    enterBtn.textContent = "ENTRAR";
-    (function(n){ enterBtn.onclick = function(){ enterProfile(n); }; })(name);
-    card.appendChild(left);
-    card.appendChild(enterBtn);
-    list.appendChild(card);
+    avatar.style.cssText = "width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#1e4a80,#2563eb);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0;";
+    avatar.textContent = (meta.displayName||id).charAt(0).toUpperCase();
+    var txt = document.createElement("div"); txt.style.cssText="min-width:0;";
+    var nameEl = document.createElement("div"); nameEl.style.cssText="font-weight:700;font-size:13px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"; nameEl.textContent = meta.displayName || id;
+    var subEl = document.createElement("div"); subEl.style.cssText="font-size:9px;color:var(--tx4);margin-top:3px;"; subEl.textContent = getProfileTypeLabel(id);
+    txt.appendChild(nameEl); txt.appendChild(subEl);
+    left.appendChild(avatar); left.appendChild(txt);
+    var actions = document.createElement("div"); actions.style.cssText="display:flex;gap:8px;align-items:center;";
+    var enterBtn = document.createElement("button"); enterBtn.className = "tbtn"; enterBtn.style.cssText="width:auto;margin-top:0;padding:10px 18px;font-size:11px;"; enterBtn.textContent="ENTRAR";
+    enterBtn.onclick=(function(pid){ return function(){ enterProfile(pid, true); }; })(id);
+    actions.appendChild(enterBtn);
+    if (profiles.length > 1 && id !== getCurrentProfile()) {
+      var delBtn = document.createElement("button");
+      delBtn.textContent = "×"; delBtn.title = "Excluir perfil";
+      delBtn.style.cssText = "width:30px;height:30px;border-radius:8px;border:1px solid rgba(240,64,96,.35);background:rgba(240,64,96,.10);color:var(--r);font-size:18px;font-weight:700;line-height:1;";
+      delBtn.onclick=(function(pid){ return function(){ if (deleteProfile(pid)) { renderProfileList(); renderSettingsProfiles(); notif("Perfil excluído"); } }; })(id);
+      actions.appendChild(delBtn);
+    }
+    card.appendChild(left); card.appendChild(actions); list.appendChild(card);
   });
 }
 
-function enterProfile(name) {
-  saveProfile(name);
-  // Reload state for this profile
+function enterProfile(nameOrId, isExisting) {
+  var chosenId = nameOrId;
+  if (!isExisting) {
+    var rawName = (nameOrId||"").trim();
+    if (pendingInviteRoomId) {
+      var roomName = (pendingInviteRoomData && pendingInviteRoomData.name) ? pendingInviteRoomData.name : pendingInviteRoomId;
+      var meta = createGroupProfile(rawName, pendingInviteRoomId, roomName);
+      chosenId = meta.id;
+      saveCurrentRoomBinding(meta.roomId);
+      if (pendingInviteRoomData && pendingInviteRoomData.initialBal) {
+        bal = pendingInviteRoomData.initialBal; initialBal = pendingInviteRoomData.initialBal; port={}; trd=[]; pending=[]; divs=[]; totalDiv=0; checkedDivDate=""; firstTradeDate=""; goal={}; equityHistory=[{t:Date.now(),v:bal}];
+        saveState(); saveGoal(); saveEquityHistory();
+      }
+    } else {
+      chosenId = createSoloProfile(rawName).id;
+      saveCurrentRoomBinding("");
+    }
+  } else {
+    saveProfile(chosenId);
+  }
+  loadCurrentRoomBinding();
   var st2 = loadState();
   bal = st2.bal; port = st2.port; trd = st2.trd; pending = st2.pending;
   divs = st2.divs; totalDiv = st2.totalDiv; checkedDivDate = st2.checkedDivDate;
   initialBal = st2.initialBal; firstTradeDate = st2.firstTradeDate;
-  goal = loadGoal();
-  equityHistory = loadEquityHistory();
+  goal = loadGoal(); equityHistory = loadEquityHistory();
   $("ps").style.display = "none";
-  if (!$("ma").style.display || $("ma").style.display === "none") {
-    initApp();
-  } else {
-    updateProfileIndicator();
-    render();
-  }
+  var finish = function(){
+    if (!$("ma").style.display || $("ma").style.display === "none") initApp();
+    else { updateProfileIndicator(); renderSettingsProfiles(); render(); renderGroupRoom(); }
+  };
+  if (currentRoomId) {
+    joinRoom(currentRoomId).then(function(){ renderGroupRoom(); subscribeGroup(renderGroupRanking); pushMyStats(); finish(); }).catch(function(){ finish(); });
+  } else finish();
 }
 
 function updateProfileIndicator() {
   var el = $("profile-indicator");
-  if (el) el.textContent = getCurrentProfile() ? "Perfil: " + getCurrentProfile() : "";
+  if (!el) return;
+  var current = getCurrentProfile();
+  if (!current) { el.textContent = ""; return; }
+  var meta = getProfileMeta(current);
+  el.textContent = "Perfil: " + (meta.displayName || current) + (meta.type === 'group' ? (meta.roomName ? ' · ' + meta.roomName : ' · Campeonato') : '');
 }
 
 function renderSettingsProfiles() {
@@ -2360,27 +2513,32 @@ function renderSettingsProfiles() {
   var profiles = getProfiles();
   var current = getCurrentProfile();
   el.innerHTML = "";
-  profiles.forEach(function(name) {
+  profiles.forEach(function(id) {
+    var meta = getProfileMeta(id);
     var row = document.createElement("div");
-    row.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)";
-    var nameEl = document.createElement("span");
-    nameEl.style.cssText = "font-size:11px;color:" + (name === current ? "var(--bl)" : "var(--tx2)") + ";font-weight:" + (name === current ? "700" : "400");
-    nameEl.textContent = name + (name === current ? " (ativo)" : "");
-    var delBtn = document.createElement("button");
-    delBtn.style.cssText = "padding:3px 8px;background:transparent;border:1px solid rgba(240,64,96,.4);border-radius:5px;color:var(--r);font-size:9px;font-weight:700;cursor:pointer;font-family:inherit";
-    delBtn.textContent = "EXCLUIR";
-    (function(n){
-      delBtn.onclick = function(){
-        if (n === current) { notif("Nao pode excluir o perfil ativo","err"); return; }
-        if (!confirm("Excluir perfil " + n + "? Todos os dados serao apagados.")) return;
-        deleteProfile(n);
-        renderSettingsProfiles();
-        notif("Perfil " + n + " excluido");
-      };
-    })(name);
-    row.appendChild(nameEl);
-    if (name !== current) row.appendChild(delBtn);
-    el.appendChild(row);
+    row.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd);gap:10px";
+    var left = document.createElement("div"); left.style.cssText = "min-width:0;flex:1;";
+    var nameEl = document.createElement("div");
+    nameEl.style.cssText = "font-size:11px;color:" + (id === current ? "var(--bl)" : "var(--tx2)") + ";font-weight:" + (id === current ? "700" : "400");
+    nameEl.textContent = (meta.displayName || id) + (id === current ? " (ativo)" : "");
+    var subEl = document.createElement("div"); subEl.style.cssText = "font-size:9px;color:var(--tx4);margin-top:3px;"; subEl.textContent = getProfileTypeLabel(id);
+    left.appendChild(nameEl); left.appendChild(subEl);
+    var actions = document.createElement("div"); actions.style.cssText = "display:flex;gap:6px;align-items:center;";
+    if (id !== current) {
+      var enterBtn = document.createElement("button");
+      enterBtn.style.cssText = "padding:4px 8px;background:transparent;border:1px solid var(--bd2);border-radius:5px;color:var(--tx2);font-size:9px;font-weight:700;cursor:pointer;font-family:inherit";
+      enterBtn.textContent = "ENTRAR";
+      enterBtn.onclick = function(){ $("sht").classList.remove("on"); enterProfile(id, true); };
+      actions.appendChild(enterBtn);
+    }
+    if (profiles.length > 1 && id !== current) {
+      var delBtn = document.createElement("button");
+      delBtn.style.cssText = "width:26px;height:26px;background:transparent;border:1px solid rgba(240,64,96,.4);border-radius:6px;color:var(--r);font-size:16px;font-weight:700;cursor:pointer;font-family:inherit";
+      delBtn.textContent = "×";
+      delBtn.onclick = function(){ if(deleteProfile(id)){ renderProfileList(); renderSettingsProfiles(); notif("Perfil excluído"); } };
+      actions.appendChild(delBtn);
+    }
+    row.appendChild(left); row.appendChild(actions); el.appendChild(row);
   });
 }
 
@@ -2540,21 +2698,13 @@ function initApp() {
   $("fs-down").onclick=function(){ applyFontScale(fontIdx-1); };
   $("switch-profile-btn").onclick = function() { $("sht").classList.remove("on"); showProfileScreen(); };
   $("invite-btn").onclick = function() {
-    if (!token) { notif("Entre no app primeiro","err"); return; }
-    var base = window.location.href.split("?")[0];
-    var enc = encodeToken(token);
-    var url = base + "?t=" + enc;
-    var msg = "Oi! Te convido para simular investimentos na bolsa comigo no Trading GP." +
-      " Acesse o link abaixo, crie seu perfil e comece a operar com cotacoes reais da B3:" +
-      " " + url +
-      " Nao precisa criar conta em nenhum lugar. So clicar, criar seu nome e comecar!";
-    window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+    if (!currentRoomId) { notif("Crie ou entre em um grupo primeiro","err"); return; }
+    shareRoomInvite();
   };
 
-  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
-  // Show/hide invite button based on owner status
+  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); renderSettingsProfiles(); render(); loadTV(); startRefresh();
   var invBtn = $("invite-btn");
-  if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
+  if (invBtn) invBtn.style.display = currentRoomId ? "flex" : "none";
   initTickerSearch();
   initNewsTape();
   // If cached news exist, build tape immediately
@@ -2577,25 +2727,16 @@ $("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin();
 $("profile-create").onclick = function() {
   var name = $("profile-name").value.trim();
   if (!name || name.length < 2) { notif("Digite um nome (min. 2 caracteres)","err"); return; }
-  enterProfile(name);
+  enterProfile(name, false);
 };
 $("profile-name").addEventListener("keydown",function(e){ if(e.key==="Enter") $("profile-create").click(); });
 
-// Check if arriving via invite link
-var urlToken = getTokenFromUrl();
-if (urlToken && !token) {
-  token = urlToken;
-  localStorage.setItem(LS_TOKEN, token);
-  localStorage.setItem("hb_is_owner", "0"); // guest
-}
-
 if (token) {
   $("ts").style.display = "none"; // hide token screen immediately
-  // Auto-mark as owner if no invite param in URL
   if (localStorage.getItem("hb_is_owner") === null) {
-    var hasInvite = window.location.search.indexOf("t=") >= 0;
-    localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
+    localStorage.setItem("hb_is_owner", pendingInviteRoomId ? "0" : "1");
   }
+  loadCurrentRoomBinding();
   try {
     if (getCurrentProfile()) {
       var st2 = loadState();
