@@ -1,0 +1,2596 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Home Broker B3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{--bg:#0d1117;--bg2:#0a0e16;--bg3:#131c2a;--bd:#1e2d42;--bd2:#243550;
+  --tx:#f0f6ff;--tx2:#a8c4e0;--tx3:#5a7a9a;--tx4:#2a4060;
+  --g:#00d8a0;--r:#ff4466;--a:#fbbf24;--bl:#60a5fa;}
+.light{--bg:#f0f4f8;--bg2:#ffffff;--bg3:#e8edf2;--bd:#d0dae4;--bd2:#b8c8d8;
+  --tx:#1a2a3a;--tx2:#3a5878;--tx3:#7a9ab8;--tx4:#a0b8cc;
+  --g:#00a878;--r:#d03050;--a:#d07800;--bl:#1a70c8;}
+.light html,.light body{background:var(--bg);color:var(--tx);}
+.light .news-tape-item{color:#1a2a3a !important;}
+.light #news-tape-wrap{background:#dde6f0 !important;}
+.light #pregao-bar{background:#e8f0f8 !important;border-bottom:1px solid #c8d8e8 !important;}
+.light #pregao-bar .pregao-open{color:#007a50 !important;}
+.light #pregao-bar .pregao-closed{color:#c02040 !important;}
+.light #pregao-bar #pregao-cd{color:#3a5878 !important;}
+.light #pregao-bar button{background:rgba(245,158,11,.2) !important;border-color:rgba(245,158,11,.5) !important;color:#b06000 !important;}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:'JetBrains Mono',monospace;overflow:hidden;}
+#app{font-size:var(--fs,13px);}
+button,input{font-family:inherit;cursor:pointer;}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+::-webkit-scrollbar{width:2px;height:2px;}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.15}}.dot{animation:pulse 1.8s infinite}
+@keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin .8s linear infinite}
+@keyframes fadein{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+#app{display:flex;flex-direction:column;height:100dvh;max-width:480px;margin:0 auto;}
+#ts{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;}
+.tcard{width:100%;max-width:400px;background:var(--bg2);border-radius:14px;padding:22px;border:1px solid var(--bd);}
+.tinp{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--bd2);border-radius:8px;color:var(--tx);font-size:13px;outline:none;font-family:inherit;}
+.tbtn{width:100%;padding:13px;margin-top:10px;border-radius:8px;background:linear-gradient(135deg,#1e4a80,#2563eb);color:#fff;font-weight:700;font-size:13px;letter-spacing:1px;border:none;}
+#hdr{background:var(--bg2);padding:10px 14px 8px;border-bottom:1px solid var(--bd);flex-shrink:0;}
+.hr{display:flex;justify-content:space-between;align-items:flex-start;}
+.hs2{display:flex;gap:10px;margin-top:6px;font-size:11px;align-items:center;}
+.hf{margin-top:4px;font-size:9px;color:var(--tx4);display:flex;justify-content:space-between;align-items:center;}
+.lbl{color:var(--tx3);}
+.cfg{background:var(--bg3);border:1px solid var(--bd);border-radius:5px;padding:3px 8px;color:var(--tx3);font-size:11px;}
+#goalbar{background:var(--bg2);padding:8px 14px;border-bottom:1px solid var(--bd);flex-shrink:0;display:none;}
+.gb-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:9px;}
+.prog-track{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:3px;transition:width .5s ease;}
+/* Ticker tape */
+#tks-wrap{overflow:hidden;background:var(--bg2);border-bottom:1px solid var(--bd);flex-shrink:0;cursor:grab;user-select:none;-webkit-user-select:none;position:relative;}
+#tks-wrap:active{cursor:grabbing;}
+#tks{display:flex;gap:5px;padding:7px 14px;width:max-content;will-change:transform;}
+.tk{flex-shrink:0;background:transparent;border:1px solid var(--bd);border-radius:6px;padding:5px 9px;min-width:68px;text-align:center;transition:border-color .15s,background .15s;}
+.tk.on{background:#0d2040;border-color:#1e4a80;}
+.tks{font-size:9px;font-weight:700;color:var(--tx2);}
+.tk.on .tks{color:var(--bl);}
+.tkp{font-size:10px;font-weight:700;color:var(--tx);}
+.tk.on .tkp{color:var(--tx);}
+#sb{padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+#tbr{background:var(--bg2);border-bottom:1px solid var(--bd);flex-shrink:0;position:relative;z-index:20;}
+.tabs{display:flex;}
+.tab{flex:1;padding:9px 2px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--tx3);font-size:9px;font-weight:700;letter-spacing:.8px;transition:all .15s;}
+.tab.on{color:var(--bl);border-bottom-color:#3b82f6;}
+#pb{display:flex;gap:6px;padding:5px 14px 6px;align-items:center;}
+.pbb{padding:3px 10px;border:1px solid var(--bd);border-radius:5px;background:transparent;color:var(--tx3);font-size:9px;font-weight:700;transition:all .15s;}
+.pbb.on{border-color:#1e4a80;background:#0d2040;color:var(--bl);}
+#ct{flex:1;min-height:0;position:relative;}
+.panel{position:absolute;inset:0;display:none;flex-direction:column;}
+.panel.on{display:flex;}
+#chart-panel{overflow:hidden;}
+#tvw{flex:1;min-height:0;}
+.sp{overflow-y:auto;padding:14px 14px 60px;flex:1;}
+.card{background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:14px;border:1px solid var(--bd);}
+.row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;}
+.row:last-child{margin-bottom:0;}
+.dvd{border-top:1px solid var(--bd);padding-top:12px;margin-top:8px;display:flex;justify-content:space-between;}
+.bs{display:flex;gap:8px;margin-bottom:14px;}
+.bsb{flex:1;padding:12px;border-radius:8px;font-weight:700;font-size:13px;border:none;transition:all .15s;}
+.ot-wrap{display:flex;gap:6px;margin-bottom:12px;}
+.ot-btn{flex:1;padding:7px 4px;border:1px solid var(--bd);border-radius:6px;background:transparent;color:var(--tx3);font-size:10px;font-weight:700;transition:all .15s;}
+.ot-btn.on{border-color:#1e4a80;background:#0d2040;color:var(--bl);}
+.qi{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:7px;color:var(--tx);font-size:18px;outline:none;text-align:center;margin-bottom:6px;}
+.prs{display:flex;gap:5px;margin-bottom:12px;}
+.pr{flex:1;padding:5px 0;border:1px solid var(--bd);border-radius:5px;background:transparent;color:var(--tx3);font-size:10px;font-weight:700;transition:all .15s;}
+.pr.on{background:#1e3a5f;border-color:#1e4a80;color:var(--bl);}
+.eb{width:100%;padding:14px;border-radius:10px;color:#fff;font-weight:700;font-size:15px;letter-spacing:1px;border:none;margin-bottom:12px;}
+.pbox{padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--bd);}
+.pend-item{background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;border-left:2px solid var(--a);}
+.cancel-btn{background:rgba(240,64,96,.12);border:1px solid rgba(240,64,96,.3);border-radius:5px;padding:3px 8px;color:var(--r);font-size:9px;font-weight:700;}
+.ac{background:var(--bg3);border-radius:9px;padding:13px;margin-bottom:9px;}
+.ti{background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;}
+.bdg{padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:1px;}
+.div-item{background:rgba(0,200,150,.05);border:1px solid rgba(0,200,150,.2);border-radius:8px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;}
+.empty{text-align:center;padding:40px 20px;color:var(--tx4);font-size:12px;}
+.sinp{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bd2);border-radius:7px;color:var(--tx);font-size:13px;outline:none;font-family:inherit;}
+.srow{margin-bottom:12px;}
+.slbl{font-size:10px;color:var(--tx3);letter-spacing:1px;margin-bottom:5px;}
+/* Canvas chart */
+#equity-chart{width:100%;height:180px;display:block;margin-bottom:14px;}
+#sht{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;align-items:flex-end;}
+#sht.on{display:flex;}
+.si{width:100%;max-width:480px;margin:0 auto;background:#0d1421;border-radius:16px 16px 0 0;padding:24px;border:1px solid var(--bd2);animation:slideup .25s ease;max-height:90dvh;overflow-y:auto;}
+#cfm{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:none;align-items:center;justify-content:center;padding:24px;}
+#cfm.on{display:flex;}
+.cfm-box{width:100%;max-width:360px;background:#0d1421;border-radius:14px;padding:24px;border:1px solid var(--r);animation:slideup .2s ease;}
+.news-item{background:var(--bg3);border-radius:9px;padding:13px 14px;margin-bottom:8px;border:1px solid var(--bd);cursor:pointer;transition:background .15s;}
+.news-item:active{background:var(--bd);}
+.news-tape-item{font-size:9px;color:var(--tx);padding:0 16px;cursor:pointer;white-space:nowrap;letter-spacing:.3px;}
+.news-tape-item .nt-tag{font-weight:700;}
+.ticker-result{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s;}
+.ticker-result:last-child{border-bottom:none;}
+.ticker-result:active{background:var(--bg3);}
+.pr-inc,.pr-set{padding:7px 4px;border:1px solid var(--bd);border-radius:6px;background:transparent;color:var(--tx3);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center;}
+.pr-inc:active,.pr-set:active{background:var(--bd2);color:var(--tx);}
+.pr-set.on{background:#1e3a5f;border-color:#1e4a80;color:var(--bl);}
+#nf{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:999;padding:9px 18px;border-radius:8px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.6);display:none;pointer-events:none;}
+#nf.on{display:block;animation:fadein .2s ease;}
+/* Pregão status */
+#pregao-bar{background:#0a0f1a;border-bottom:1px solid var(--bd);padding:5px 14px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.pregao-open{color:var(--g);font-size:9px;font-weight:700;letter-spacing:1px;}
+.pregao-closed{color:var(--r);font-size:9px;font-weight:700;letter-spacing:1px;}
+#pregao-cd{font-size:9px;color:var(--tx3);}
+/* After-hours order modal */
+
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- TOKEN -->
+<div id="ts">
+  <div style="text-align:center">
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">SIMULADOR B3</div>
+    <div style="font-size:22px;font-weight:700;letter-spacing:1px">HOME BROKER</div>
+    <div style="font-size:10px;color:var(--tx3);margin-top:4px">19 ativos · Dividendos · TradingView</div>
+  </div>
+  <div class="tcard">
+    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:10px">TOKEN BRAPI PRO</div>
+    <div style="font-size:10px;color:var(--tx2);line-height:1.8;margin-bottom:14px">Obtenha em <span style="color:var(--bl)">brapi.dev</span> &rarr; Dashboard &rarr; API Token.</div>
+    <input id="tinp" class="tinp" placeholder="Cole aqui seu token..." type="password" autocomplete="off">
+    <div id="terr" style="font-size:10px;color:var(--r);margin-top:6px;display:none"></div>
+    <button id="tbtn" class="tbtn" onclick="doLogin()">ENTRAR</button>
+  </div>
+</div>
+
+<!-- PROFILE SCREEN -->
+<div id="ps" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;">
+  <div style="text-align:center">
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER B3</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:4px">Selecionar Perfil</div>
+    <div style="font-size:10px;color:var(--tx3)">Cada perfil tem carteira e historico independentes</div>
+  </div>
+  <div id="profile-list" style="width:100%;max-width:400px"></div>
+  <div style="width:100%;max-width:400px;background:var(--bg2);border-radius:14px;padding:18px;border:1px solid var(--bd)">
+    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:10px">NOVO PERFIL</div>
+    <input id="profile-name" class="tinp" placeholder="Digite seu nome..." maxlength="20" autocomplete="off" style="text-transform:capitalize">
+    <button id="profile-create" class="tbtn">CRIAR E ENTRAR</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="ma" style="display:none;flex-direction:column;height:100%;min-height:0">
+  <div id="hdr">
+    <div class="hr">
+      <div>
+        <div style="font-size:9px;letter-spacing:3px;color:var(--tx3);text-transform:uppercase;margin-bottom:2px">Simulador</div>
+        <div id="profile-indicator" style="font-size:9px;color:var(--bl);margin-bottom:2px"></div>
+        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER B3</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">PATRIMÔNIO</div>
+        <div id="hp" style="font-size:17px;font-weight:700;color:var(--a)">R$ 100.000,00</div>
+        <div id="hpnl" style="font-size:10px;font-weight:600;color:var(--g)">R$ 0,00 (+0.00%)</div>
+      </div>
+    </div>
+    <div class="hs2">
+      <span><span style="color:var(--tx3);font-size:11px">SALDO </span><span id="hb" style="color:var(--g);font-weight:600"></span></span>
+      <span><span style="color:var(--tx3);font-size:11px">CART. </span><span id="hpv" style="color:var(--tx2);font-weight:600"></span></span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <div id="sts" style="font-size:9px;color:var(--tx3)">CONECTANDO...</div>
+        <button id="force-refresh" title="Atualizar" onclick="fetchQ()" style="width:34px;height:34px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:5px;color:var(--a);font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">&#8635;</button>
+      </div>
+    </div>
+    <div class="hf">
+      <span id="hupd">Aguardando...</span>
+      <span id="hcd" style="color:var(--tx3)"></span>
+    <div style="font-size:8px;color:var(--a);letter-spacing:1px;margin-top:2px"><span class="dot" style="display:inline-block">&#9650;</span> Delay 5 min</div>
+    </div>
+  </div>
+
+  <div id="pregao-bar">
+    <span id="pregao-sts" class="pregao-closed">&#9679; PREGAO FECHADO</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="pregao-cd"></span>
+      <button class="cfg" id="cfgb" style="width:34px;height:34px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;color:var(--tx2);border-color:var(--bd2);flex-shrink:0">&#9881;</button>
+    </div>
+  </div>
+
+  <div id="goalbar">
+    <div class="gb-row">
+      <span style="color:var(--tx3)">META <span id="gb-pct" style="color:var(--bl);font-weight:700"></span></span>
+      <span id="gb-curr" style="font-weight:700"></span>
+      <span id="gb-days" style="color:var(--a);font-weight:700"></span>
+    </div>
+    <div class="prog-track"><div id="gb-fill" class="prog-fill" style="width:0%;background:var(--g)"></div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:3px;font-size:8px;color:var(--tx4)">
+      <span>0%</span><span id="gb-end"></span>
+    </div>
+  </div>
+
+  <div id="tks-wrap"><div id="tks"></div></div>
+
+  <!-- News tape -->
+  <div id="news-tape-wrap" style="overflow:hidden;background:#060b14;border-bottom:1px solid var(--bd);flex-shrink:0;height:24px;display:flex;align-items:center;">
+    <div id="news-tape" style="display:flex;gap:0;width:max-content;white-space:nowrap;will-change:transform;"></div>
+  </div>
+
+  <div id="sb">
+    <div>
+      <div id="ssym" style="font-size:16px;font-weight:700;color:var(--bl);letter-spacing:1px"></div>
+      <div id="snm" style="font-size:10px;color:var(--tx4)"></div>
+    </div>
+    <div style="text-align:right">
+      <div id="spr" style="font-size:22px;font-weight:700"></div>
+      <div id="sch" style="font-size:11px;font-weight:600"></div>
+    </div>
+  </div>
+
+  <div id="tbr">
+    <div class="tabs">
+      <button class="tab on" data-t="chart">GRÁFICO</button>
+      <button class="tab" data-t="group">GRUPO</button>
+      <button class="tab" data-t="order">ORDENS</button>
+      <button class="tab" data-t="portfolio">CARTEIRA</button>
+      <button class="tab" data-t="history">HISTÓRICO</button>
+      <button class="tab" data-t="news">NOTÍCIAS</button>
+    </div>
+    <div id="pb">
+      <span style="font-size:9px;color:var(--tx4);margin-right:4px">PERÍODO</span>
+      <button class="pbb on" data-p="D">DIÁRIO</button>
+      <button class="pbb" data-p="W">SEMANAL</button>
+      <span style="margin-left:auto;font-size:9px;color:var(--tx4)">TradingView</span>
+    </div>
+  </div>
+
+  <div id="ct">
+    <div id="chart-panel" class="panel on">
+      <div id="tvw" style="width:100%;height:100%"></div>
+    </div>
+
+    <div id="group-panel" class="panel">
+  <div style="padding:12px">
+    <div id="group-noroom" style="text-align:center;padding:30px 0">
+      <div style="font-size:11px;color:var(--tx3);margin-bottom:20px">Nenhum grupo ativo</div>
+      <button onclick="showCreateRoom()" style="width:100%;padding:12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">+ CRIAR GRUPO</button>
+      <button onclick="showJoinRoom()" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--bd2);border-radius:8px;color:var(--tx2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">ENTRAR COM CÓDIGO</button>
+    </div>
+    <div id="group-room" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div id="group-room-name" style="font-size:13px;font-weight:700;color:var(--bl)"></div>
+        <button onclick="shareRoomInvite()" style="padding:5px 12px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);border-radius:6px;color:#25d366;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">&#128279; CONVIDAR</button>
+      </div>
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">EVOLUÇÃO DO PATRIMÔNIO</div>
+      <canvas id="group-chart" height="160" style="width:100%;margin-bottom:16px;border-radius:8px;background:var(--bg3)"></canvas>
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">RANKING</div>
+      <div id="group-ranking"></div>
+    </div>
+  </div>
+</div>
+<div id="order-panel" class="panel">
+      <div class="sp">
+
+        <!-- Ticker search -->
+        <div style="position:relative;margin-bottom:14px">
+          <input type="text" id="ticker-search" placeholder="&#128269;  Buscar ticker... ex: PETR4"
+            autocomplete="off" autocapitalize="characters"
+            style="width:100%;padding:11px 14px;background:var(--bg3);border:1px solid var(--bd);border-radius:10px;color:var(--tx);font-size:13px;outline:none;font-family:inherit;letter-spacing:1px;">
+          <div id="ticker-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--bd2);border-radius:8px;margin-top:3px;z-index:50;overflow:hidden;"></div>
+        </div>
+
+        <!-- Buy / Sell toggle -->
+        <div class="bs" style="margin-bottom:16px">
+          <button class="bsb" id="bbuy" style="background:var(--g);color:#fff;box-shadow:0 0 20px rgba(0,200,150,.35)">&#9650; COMPRAR</button>
+          <button class="bsb" id="bsel" style="background:var(--bg3);color:var(--tx3)">&#9660; VENDER</button>
+        </div>
+
+        <!-- Asset + Price info -->
+        <div style="background:var(--bg3);border-radius:12px;padding:14px;border:1px solid var(--bd);margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:11px;color:var(--tx3);letter-spacing:1px">ATIVO</span>
+            <span id="osym" style="color:var(--bl);font-weight:700;font-size:16px;letter-spacing:1px"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:11px;color:var(--tx3)">Cotacao atual</span>
+            <span id="oprc" style="font-weight:700;font-size:15px"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--bd)">
+            <span style="font-size:11px;color:var(--tx3)">Saldo disponivel</span>
+            <span id="o-bal" style="font-weight:700;font-size:13px;color:var(--g)"></span>
+          </div>
+        </div>
+
+        <!-- Order type -->
+        <div style="margin-bottom:14px">
+          <div style="font-size:10px;color:var(--tx3);letter-spacing:1px;margin-bottom:7px">TIPO DE ORDEM</div>
+          <div class="ot-wrap">
+            <button class="ot-btn on" id="ot-mkt">&#9889; A MERCADO</button>
+            <button class="ot-btn" id="ot-lmt">&#127919; LIMITADA</button>
+          </div>
+        </div>
+
+        <!-- Limit price -->
+        <div id="lmt-wrap" style="display:none;margin-bottom:14px">
+          <div style="font-size:10px;color:var(--tx3);letter-spacing:1px;margin-bottom:7px">PRECO LIMITE (R$)</div>
+          <input type="number" id="lmt-price" class="qi" placeholder="0.00" min="0" step="0.01">
+          <div style="font-size:9px;color:var(--tx3);margin-top:4px">Executa quando o mercado atingir este preco</div>
+        </div>
+
+        <!-- Quantity -->
+        <div style="background:var(--bg3);border-radius:12px;padding:14px;border:1px solid var(--bd);margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-size:10px;color:var(--tx3);letter-spacing:1px">QUANTIDADE</div>
+            <button id="max-btn" style="font-size:9px;font-weight:700;color:var(--a);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:5px;padding:3px 9px;cursor:pointer;font-family:inherit">USAR TUDO</button>
+          </div>
+          <div style="position:relative;margin-bottom:10px">
+            <input type="number" id="qinp" class="qi" value="" min="0" placeholder="0" style="padding-right:40px">
+            <button id="qclear" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--bd2);border:none;border-radius:50%;width:22px;height:22px;color:var(--tx3);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&#215;</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">
+            <button class="pr-inc" data-inc="50">+50</button>
+            <button class="pr-inc" data-inc="100">+100</button>
+            <button class="pr-inc" data-inc="500">+500</button>
+            <button class="pr-inc" data-inc="1000">+1000</button>
+          </div>
+        </div>
+
+        <!-- Total + balance -->
+        <div style="background:var(--bg3);border-radius:12px;padding:14px;border:1px solid var(--bd);margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:11px;color:var(--tx3)">Total estimado</span>
+            <span id="otot" style="color:var(--a);font-weight:700;font-size:17px"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:10px;color:var(--tx3)">Saldo apos operacao</span>
+            <span id="o-after" style="font-size:12px;font-weight:600;color:var(--tx2)"></span>
+          </div>
+        </div>
+
+        <button id="exec" class="eb" style="background:linear-gradient(135deg,var(--g),#00a078);box-shadow:0 4px 24px rgba(0,200,150,.35)">EXECUTAR COMPRA</button>
+
+        <!-- Pending orders -->
+        <div id="pend-sec" style="display:none;margin-bottom:14px">
+          <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">ORDENS PENDENTES</div>
+          <div id="pend-list"></div>
+        </div>
+
+        <!-- Current position -->
+        <div id="pbox" class="pbox" style="display:none">
+          <div id="plbl" style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px"></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span><span class="lbl">Qtd </span><span id="pqty" style="font-weight:600"></span></span>
+            <span><span class="lbl">PM </span><span id="ppm" style="font-weight:600"></span></span>
+            <span><span class="lbl">P&amp;L </span><span id="ppnl" style="font-weight:700"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="portfolio-panel" class="panel">
+      <div class="sp">
+        <!-- Equity curve chart -->
+        <div class="card" style="padding:12px">
+          <div style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:8px">EVOLUÇÃO DO PATRIMÔNIO</div>
+          <canvas id="equity-chart"></canvas>
+          <div style="display:flex;gap:12px;font-size:9px;margin-top:4px">
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:var(--bl);display:inline-block;border-radius:1px"></span>Patrimônio</span>
+            <span id="legend-goal" style="display:none;align-items:center;gap:4px"><span style="width:12px;height:2px;background:var(--a);display:inline-block;border-radius:1px;border-top:1px dashed var(--a)"></span>Meta</span>
+          </div>
+        </div>
+        <!-- Summary -->
+        <div class="card">
+          <div class="row"><span class="lbl">Saldo disponível</span><span id="pbal" style="color:var(--g);font-weight:700"></span></div>
+          <div class="row"><span class="lbl">Total em ativos</span><span id="ppv" style="color:var(--tx2);font-weight:700"></span></div>
+          <div class="row"><span class="lbl">Dividendos recebidos</span><span id="pdiv" style="color:var(--g);font-weight:700"></span></div>
+          <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid var(--bd);font-size:12px">
+            <span class="lbl">Resultado total</span><span id="pres" style="font-weight:700"></span>
+          </div>
+        </div>
+        <button id="liq-btn" style="width:100%;padding:10px;background:rgba(240,64,96,.1);border:1px solid rgba(240,64,96,.3);border-radius:8px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px">ZERAR POSICOES (vender tudo a mercado)</button>
+        <div id="plist"></div>
+      </div>
+    </div>
+
+    <div id="history-panel" class="panel">
+      <div class="sp">
+        <!-- Dividends section -->
+        <div id="div-sec" style="display:none;margin-bottom:14px">
+          <div style="font-size:9px;color:var(--g);letter-spacing:2px;margin-bottom:8px">DIVIDENDOS RECEBIDOS</div>
+          <div id="div-list"></div>
+        </div>
+        <div id="hcnt" style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:12px"></div>
+        <div id="hlist"></div>
+      </div>
+    </div>
+
+    <div id="news-panel" class="panel">
+      <div class="sp">
+        <div id="news-hdr" style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:12px"></div>
+        <div id="news-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="sht">
+  <div class="si">
+    <div style="font-size:11px;font-weight:700;color:var(--bl);margin-bottom:16px">CONFIGURACOES</div>
+    <span id="tdsp" style="display:none"></span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">TEMA</div>
+      <div style="display:flex;gap:6px">
+        <button id="theme-dark" style="padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--bd2);background:#090d16;color:#dde8f5">Escuro</button>
+        <button id="theme-light" style="padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--bd2);background:#ffffff;color:#1a2a3a">Claro</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:1px">TAMANHO DA FONTE</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="fs-down" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);color:var(--tx2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">A-</button>
+        <span id="fs-label" style="font-size:11px;color:var(--tx2);min-width:36px;text-align:center">100%</span>
+        <button id="fs-up" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);color:var(--tx2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">A+</button>
+      </div>
+    </div>
+    <div style="font-size:9px;color:var(--tx4);margin-bottom:16px">Cotacoes Brapi PRO · atualização 1min · delay 5min</div>
+    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:12px">CONFIGURAR SIMULADOR</div>
+    <div class="srow"><div class="slbl">DATA DE ENCERRAMENTO</div><input type="date" id="s-end" class="sinp"></div>
+    <div class="srow"><div class="slbl">META DE RENTABILIDADE (%)</div><input type="number" id="s-tgt" class="sinp" placeholder="Ex: 30" min="0" step="0.1"></div>
+    <button id="s-save" style="width:100%;padding:11px;border:none;border-radius:8px;background:#1e4a80;color:#fff;font-size:12px;font-weight:700;margin-bottom:8px">SALVAR</button>
+    <button id="s-clr" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;background:transparent;color:var(--tx3);font-size:11px;font-weight:600;margin-bottom:16px">Remover meta / prazo</button>
+
+    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:8px">TICKER TAPE</div>
+    <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">Escolha ate 18 tickers adicionais (atual: <span id="tape-count">0</span>)</div>
+    <div id="tape-picker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
+    <button id="tape-save" style="width:100%;padding:9px;border:none;border-radius:7px;background:#1e4a80;color:#fff;font-size:11px;font-weight:700;margin-bottom:16px">SALVAR TAPE</button>
+    <div style="border-top:1px solid var(--bd);padding-top:16px;margin-bottom:16px">
+      <div style="font-size:10px;font-weight:700;color:var(--bl);letter-spacing:1px;margin-bottom:10px">PERFIS</div>
+      <div id="settings-profiles" style="margin-bottom:8px"></div>
+      <button id="switch-profile-btn" style="width:100%;padding:9px;border:1px solid var(--bl);border-radius:8px;color:var(--bl);font-size:11px;font-weight:700;background:transparent;margin-bottom:8px">Trocar / Criar Perfil</button>
+      <button id="invite-btn" style="width:100%;padding:9px;border:none;border-radius:8px;background:#25d366;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:none;align-items:center;justify-content:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Convidar pelo WhatsApp
+      </button>
+    </div>
+
+    <div style="border-top:1px solid var(--bd);padding-top:16px">
+      <div style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
+      <button id="s-rst" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;margin-bottom:8px">RESETAR SIMULADOR</button>
+      <button id="logb" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Trocar Token</button>
+    </div>
+    <button id="csht" style="width:100%;padding:12px;border:none;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:12px;font-weight:700;margin-top:12px">Fechar</button>
+  </div>
+</div>
+
+<div id="cfm">
+  <div class="cfm-box">
+    <div style="font-size:13px;font-weight:700;color:var(--r);margin-bottom:8px">Resetar simulador?</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.7;margin-bottom:12px">
+      Zera saldo, carteira, dividendos, ordens e historico.<br>Defina o saldo inicial:
+    </div>
+    <div style="margin-bottom:6px">
+      <div style="font-size:10px;color:var(--tx3);letter-spacing:1px;margin-bottom:5px">SALDO INICIAL (R$)</div>
+      <input type="number" id="reset-bal" class="sinp" value="100000" min="1000" step="1000" style="font-size:16px;text-align:center;">
+    </div>
+    <div style="font-size:9px;color:var(--tx4);margin-bottom:14px;line-height:1.6">Apos a primeira compra, o saldo inicial nao podera ser alterado.</div>
+    <div style="display:flex;gap:8px">
+      <button id="c-no" style="flex:1;padding:11px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:12px;font-weight:600;background:transparent">Cancelar</button>
+      <button id="c-yes" style="flex:2;padding:11px;border:none;border-radius:8px;background:var(--r);color:#fff;font-size:12px;font-weight:700">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div id="aho-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:none;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:360px;background:#0d1421;border-radius:14px;padding:24px;border:1px solid var(--a);">
+    <div style="font-size:13px;font-weight:700;color:var(--a);margin-bottom:8px">Pregao Fechado</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.7;margin-bottom:12px">O pregao esta fechado. Deseja agendar esta ordem para a abertura do proximo pregao (10:00)?</div>
+    <div id="aho-summary" style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--tx2)"></div>
+    <div style="display:flex;gap:8px">
+      <button id="aho-no" style="flex:1;padding:10px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Cancelar</button>
+      <button id="aho-yes" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:11px;font-weight:700">Agendar para abertura</button>
+    </div>
+  </div>
+</div>
+
+<div id="nf"></div>
+<script>
+function doLogin() {
+  var t = document.getElementById("tinp").value.trim();
+  if (!t) { document.getElementById("terr").textContent="Cole seu token Brapi PRO"; document.getElementById("terr").style.display="block"; return; }
+  document.getElementById("terr").style.display="none";
+  localStorage.setItem("hb_token_v6", t);
+  localStorage.setItem("hb_is_owner","1");
+  window.location.reload();
+}
+
+var fbDb=null;
+try {
+  if(typeof firebase!=="undefined"){
+    if(!firebase.apps.length) firebase.initializeApp({apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"});
+    fbDb=firebase.database();
+  }
+} catch(e){console.log("FB err:",e.message);}
+
+var currentRoomId=localStorage.getItem("hb_room_id")||"",currentRoomData=null,groupUnsubscribe=null;
+function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
+function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
+function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");localStorage.setItem("hb_room_id",id);currentRoomId=id;currentRoomData=s.val();return s.val();});}
+function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:getCurrentProfile(),total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
+var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
+function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
+function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?t="+btoa(localStorage.getItem("hb_token_v6")||"")+"&room="+currentRoomId;}
+function showCreateRoom(){var n=prompt("Nome do grupo:");if(!n)return;var b=parseFloat(prompt("Saldo inicial (R$):","100000"));if(isNaN(b))return;var d=prompt("Data fim (DD/MM/AAAA):");if(!d)return;var t=parseFloat(prompt("Meta (%):","5"))||0;createRoom(n,b,d,t).then(function(id){notif("Grupo criado! Código: "+id);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(e){notif("Erro: "+e.message,"err");});}
+function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;joinRoom(c.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});}
+function shareRoomInvite(){var r=currentRoomData||{};window.open("https://wa.me/?text="+encodeURIComponent("🎯 *"+(r.name||"Trading TGP")+"*
+Saldo: R$ "+(r.initialBal||100000).toLocaleString("pt-BR")+"
+Prazo: "+(r.endDate||"")+"
+Meta: "+(r.targetPct||0)+"%
+
+"+getRoomInviteLink()));}
+function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;}
+function renderGroupRanking(members){drawGroupChart(members);var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;el.innerHTML="";list.forEach(function(m,i){var isMe=m.name===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div><div style='flex:1'><div style='font-size:12px;font-weight:700'>"+m.name+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div><div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div><div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";el.appendChild(div);});}
+function drawGroupChart(members){var canvas=document.getElementById("group-chart");if(!canvas)return;var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});if(!allPts.length)return;var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;list.forEach(function(m,ci){if(!m.history||m.history.length<2)return;ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});ctx2.stroke();});}
+(function(){var params=new URLSearchParams(window.location.search),room=params.get("room");if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}})();
+
+//  Ativos:
+//  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
+var TICKERS = ["PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
+
+// Full universe available for tape customization
+var ALL_TAPE_TICKERS = [
+  // Ibovespa mais negociados
+  "PETR4","PETR3","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3",
+  "B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","ELET3","ELET6",
+  "HAPV3","TOTS3","CPLE6","ENEV3","CSAN3","LREN3","MGLU3","NTCO3","BEEF3","BRFS3",
+  "CYRE3","EVEN3","FLRY3","GGBR4","GOAU4","HYPE3","IRBR3","JBSS3","KLBN11","MRVE3",
+  "MULT3","POMO4","QUAL3","RAIL3","SBSP3","TAEE11","TIMS3","TRPL4","USIM5","YDUQ3",
+  // ETFs populares
+  "BOVA11","SMAL11","IVVB11","DOLA11","BBSD11","GOLD11","HASH11","PIBB11","SPXI11","EURP11",
+  // BDRs mais negociados
+  "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34"
+];
+var ALL_TAPE_NAMES = {
+  PETR4:"Petrobras PN",PETR3:"Petrobras ON",VALE3:"Vale ON",ITUB4:"Itau PN",BBDC4:"Bradesco PN",
+  BBAS3:"Banco Brasil ON",ABEV3:"Ambev ON",WEGE3:"WEG ON",RENT3:"Localiza ON",PRIO3:"PetroReconcavo ON",
+  B3SA3:"B3 ON",EMBR3:"Embraer ON",RADL3:"Raia Drogasil ON",SUZB3:"Suzano ON",VIVT3:"Vivo ON",
+  EQTL3:"Equatorial ON",RDOR3:"Rede DOr ON",UGPA3:"Ultrapar ON",ELET3:"Eletrobras ON",ELET6:"Eletrobras PNB",
+  HAPV3:"Hapvida ON",TOTS3:"Totvs ON",CPLE6:"Copel PNB",ENEV3:"Eneva ON",CSAN3:"Cosan ON",
+  LREN3:"Lojas Renner ON",MGLU3:"Magazine Luiza ON",NTCO3:"Grupo Boticario ON",BEEF3:"Minerva ON",BRFS3:"BRF ON",
+  CYRE3:"Cyrela ON",EVEN3:"Even ON",FLRY3:"Fleury ON",GGBR4:"Gerdau PN",GOAU4:"Metalurgica Gerdau PN",
+  HYPE3:"Hypera ON",IRBR3:"IRB Brasil ON",JBSS3:"JBS ON",KLBN11:"Klabin UNT",MRVE3:"MRV ON",
+  MULT3:"Multiplan ON",POMO4:"Marcopolo PN",QUAL3:"Qualicorp ON",RAIL3:"Rumo ON",SBSP3:"Sabesp ON",
+  TAEE11:"Taesa UNT",TIMS3:"TIM ON",TRPL4:"CTEEP PN",USIM5:"Usiminas PNA",YDUQ3:"Yduqs ON",
+  BOVA11:"ETF Ibovespa",SMAL11:"ETF Small Caps",IVVB11:"ETF S&P500",DOLA11:"ETF Dolar",
+  BBSD11:"ETF BB Dividendos",GOLD11:"ETF Ouro",HASH11:"ETF Cripto",PIBB11:"ETF IBrX50",
+  SPXI11:"ETF S&P500 BRL",EURP11:"ETF Europa",
+  BERK34:"Berkshire BDR",AAPL34:"Apple BDR",AMZO34:"Amazon BDR",GOGL34:"Google BDR",
+  MSFT34:"Microsoft BDR",NVDC34:"Nvidia BDR",TSLA34:"Tesla BDR",META34:"Meta BDR",
+  NFLX34:"Netflix BDR",GOOGL34:"Alphabet BDR"
+};
+
+// Load tape tickers from localStorage or use defaults
+var PINNED_TICKERS = ["IBOV","USDBRL"];
+function loadTapeTickers() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("hb_tape_v1") || "null");
+    if (Array.isArray(saved) && saved.length > 0) {
+      // Always ensure IBOV and USDBRL are first, remove duplicates
+      var filtered = saved.filter(function(t){ return PINNED_TICKERS.indexOf(t) === -1; });
+      return PINNED_TICKERS.concat(filtered);
+    }
+  } catch(e) {}
+  return ["IBOV","USDBRL","PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3"];
+}
+var TAPE_TICKERS = loadTapeTickers();
+var DISPLAY_TICKERS = ["IBOV"].concat(TICKERS);
+var NAMES = {
+  "USDBRL":"Dolar Comercial (USD/BRL)",
+  "IBOV":"Ibovespa Index",
+  IBOV:"Ibovespa Index", PETR4:"Petrobras PN", VALE3:"Vale ON", ITUB4:"Itau Unibanco PN",
+  BBDC4:"Bradesco PN", BBAS3:"Banco do Brasil ON", ABEV3:"Ambev ON", WEGE3:"WEG ON",
+  RENT3:"Localiza ON", PRIO3:"PetroReconcavo ON", BERK34:"Berkshire BDR", B3SA3:"B3 ON",
+  EMBR3:"Embraer ON", RADL3:"Raia Drogasil ON", SUZB3:"Suzano ON", VIVT3:"Telefonica Vivo ON",
+  EQTL3:"Equatorial ON", DOLA11:"Dolar ETF", RDOR3:"Rede DOr ON", UGPA3:"Ultrapar ON"
+};
+var TVSYM = {
+  "USDBRL":"USDBRL",
+  "IBOV":"BMFBOVESPA:IBOV",
+  IBOV:"BMFBOVESPA:IBOV", PETR4:"BMFBOVESPA:PETR4", VALE3:"BMFBOVESPA:VALE3",
+  ITUB4:"BMFBOVESPA:ITUB4", BBDC4:"BMFBOVESPA:BBDC4", BBAS3:"BMFBOVESPA:BBAS3",
+  ABEV3:"BMFBOVESPA:ABEV3", WEGE3:"BMFBOVESPA:WEGE3", RENT3:"BMFBOVESPA:RENT3",
+  PRIO3:"BMFBOVESPA:PRIO3", BERK34:"BMFBOVESPA:BERK34", B3SA3:"BMFBOVESPA:B3SA3",
+  EMBR3:"BMFBOVESPA:EMBR3", RADL3:"BMFBOVESPA:RADL3", SUZB3:"BMFBOVESPA:SUZB3",
+  VIVT3:"BMFBOVESPA:VIVT3", EQTL3:"BMFBOVESPA:EQTL3", DOLA11:"BMFBOVESPA:DOLA11",
+  RDOR3:"BMFBOVESPA:RDOR3", UGPA3:"BMFBOVESPA:UGPA3"
+};
+// Brapi endpoint  busca em lotes de 10 (limite PRO por req)
+var TICKERS_A = TICKERS.slice(0, 10); // batch 1
+var TICKERS_B = TICKERS.slice(10);    // batch 2
+
+var BRAPI   = "https://brapi.dev/api";
+var REFRESH = 60; // 1 minuto
+
+var LS_TOKEN  = "hb_token_v6";
+var LS_FONT   = "hb_font_v1";
+var FONT_SCALES = [0.82, 0.88, 0.94, 1.0, 1.08, 1.16, 1.25];
+var fontIdx = 3; // default = 1.0
+
+function applyFontScale(idx) {
+  fontIdx = Math.max(0, Math.min(FONT_SCALES.length-1, idx));
+  var scale = FONT_SCALES[fontIdx];
+  // Apply to html element so all rem units scale proportionally
+  document.documentElement.style.fontSize = (scale * 16) + "px";
+  localStorage.setItem(LS_FONT, fontIdx);
+  var pct = Math.round(scale * 100);
+  var lbl = document.getElementById("fs-label");
+  if (lbl) lbl.textContent = pct + "%";
+  var up = document.getElementById("fs-up");
+  var dn = document.getElementById("fs-down");
+  if (up) up.style.opacity = fontIdx >= FONT_SCALES.length-1 ? "0.3" : "1";
+  if (dn) dn.style.opacity = fontIdx <= 0 ? "0.3" : "1";
+}
+
+// Load saved font scale
+(function(){
+  var saved = parseInt(localStorage.getItem(LS_FONT));
+  if (!isNaN(saved)) fontIdx = saved;
+  // Apply after DOM ready
+  setTimeout(function(){ applyFontScale(fontIdx); }, 0);
+})();
+var LS_INVITE = "hb_invite_v1"; // invite code set by owner
+
+// Simple obfuscation - not encryption, just avoids plain token in URL
+function encodeToken(t) {
+  return btoa(t.split("").reverse().join("")).replace(/=/g,"");
+}
+function decodeToken(s) {
+  var pad = s.length % 4 === 0 ? s : s + "====".slice(s.length % 4);
+  try { return atob(pad).split("").reverse().join(""); } catch(e) { return ""; }
+}
+
+// Check URL for encoded token (invite link)
+function getTokenFromUrl() {
+  var params = new URLSearchParams(window.location.search);
+  var enc = params.get("t");
+  if (enc) return decodeToken(enc);
+  return "";
+}
+
+function isOwner() {
+  return localStorage.getItem("hb_is_owner") === "1";
+}
+var LS_THEME  = "hb_theme_v1";
+var LS_PROFILE = "hb_profile_v1";   // active profile name
+var LS_PROFILES = "hb_profiles_v1"; // list of profiles
+
+function getProfileKey(key) {
+  var profile = localStorage.getItem(LS_PROFILE) || "default";
+  return key + "_" + profile;
+}
+
+function loadStateForProfile() {
+  try {
+    var s = JSON.parse(localStorage.getItem(getProfileKey("hb_state_v3")) || "{}");
+    return {
+      bal:            s.bal      !== undefined ? s.bal : 100000,
+      port:           s.port     || {},
+      trd:            s.trd      || [],
+      pending:        s.pending  || [],
+      divs:           s.divs     || [],
+      totalDiv:       s.totalDiv || 0,
+      checkedDivDate: s.checkedDivDate || "",
+      initialBal:     s.initialBal || 100000,
+      firstTradeDate: s.firstTradeDate || ""
+    };
+  } catch(e) { return {bal:100000,port:{},trd:[],pending:[],divs:[],totalDiv:0,checkedDivDate:"",initialBal:100000,firstTradeDate:""}; }
+}
+
+function saveStateForProfile() {
+  localStorage.setItem(getProfileKey("hb_state_v3"), JSON.stringify({
+    bal:bal, port:port, trd:trd, pending:pending,
+    divs:divs, totalDiv:totalDiv, checkedDivDate:checkedDivDate,
+    initialBal:initialBal, firstTradeDate:firstTradeDate
+  }));
+}
+
+function getProfiles() {
+  try { return JSON.parse(localStorage.getItem(LS_PROFILES) || "[]"); }
+  catch(e) { return []; }
+}
+
+function saveProfile(name) {
+  var profiles = getProfiles();
+  if (profiles.indexOf(name) === -1) profiles.push(name);
+  localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
+  localStorage.setItem(LS_PROFILE, name);
+}
+
+function deleteProfile(name) {
+  // Remove all keys for this profile
+  var keys = ["hb_state_v3","hb_goal_v1","hb_equity_v1","hb_news_v1","hb_tape_v1"];
+  keys.forEach(function(k){ localStorage.removeItem(k+"_"+name); });
+  var profiles = getProfiles().filter(function(p){ return p !== name; });
+  localStorage.setItem(LS_PROFILES, JSON.stringify(profiles));
+  // If deleted active profile, clear it
+  if (localStorage.getItem(LS_PROFILE) === name) localStorage.removeItem(LS_PROFILE);
+}
+
+function getCurrentProfile() {
+  return localStorage.getItem(LS_PROFILE) || "";
+}
+
+function applyTheme(t) {
+  if (t === "light") document.documentElement.classList.add("light");
+  else document.documentElement.classList.remove("light");
+  localStorage.setItem(LS_THEME, t);
+  var db = document.getElementById("theme-dark");
+  var lb = document.getElementById("theme-light");
+  if (db) db.style.outline = t === "dark"  ? "2px solid #60a5fa" : "none";
+  if (lb) lb.style.outline = t === "light" ? "2px solid #1a70c8" : "none";
+}
+applyTheme(localStorage.getItem(LS_THEME) || "dark");
+var LS_NEWS   = "hb_news_v1";
+var LS_STATE  = "hb_state_v3";
+var LS_GOAL   = "hb_goal_v1";
+var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
+
+//  State 
+var token = localStorage.getItem(LS_TOKEN) || "";
+
+function loadState() { return loadStateForProfile(); }
+function saveState() { saveStateForProfile(); }
+function loadGoal() {
+  try { return JSON.parse(localStorage.getItem(getProfileKey("hb_goal_v1"))||"{}"); }
+  catch(e) { return {}; }
+}
+function saveGoal() { localStorage.setItem(getProfileKey("hb_goal_v1"), JSON.stringify(goal)); }
+
+function loadEquityHistory() {
+  try { return JSON.parse(localStorage.getItem(LS_EQUITY)||"[]"); } catch(e) { return []; }
+}
+function saveEquityHistory() {
+  // Mantm ltimos 90 pontos
+  if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
+  localStorage.setItem(LS_EQUITY, JSON.stringify(equityHistory));
+}
+
+var st = loadState();
+var bal = st.bal, port = st.port, trd = st.trd, pending = st.pending;
+var divs = st.divs, totalDiv = st.totalDiv, checkedDivDate = st.checkedDivDate;
+var initialBal = st.initialBal || 100000;  // saldo inicial do simulador
+var firstTradeDate = st.firstTradeDate || ""; // data da primeira compra
+var goal = loadGoal();
+var equityHistory = loadEquityHistory();
+
+var prices = {}, chg = {}, pct = {};
+var sel = "IBOV", per = "D", side = "buy", qty = 0;
+var orderMode = "market";
+var cd = REFRESH, cdi, rfi, nft;
+var tvWidget = null, tvScriptLoaded = false;
+
+var $ = function(id) { return document.getElementById(id); };
+var fr = function(n) { return n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); };
+var R  = function(n) { return "R$ "+fr(n); };
+var CD = function(s) { return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); };
+
+function notif(msg, t) {
+  t = t || "ok";
+  var e = $("nf");
+  e.textContent = msg;
+  e.style.background = t==="err" ? "var(--r)" : "var(--g)";
+  e.classList.remove("on"); void e.offsetWidth; e.classList.add("on");
+  clearTimeout(nft); nft = setTimeout(function(){ e.classList.remove("on"); }, 3500);
+}
+
+var audioCtx = null;
+var audioUnlocked = false;
+
+function getAudioCtx() {
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!audioCtx) audioCtx = new Ctx();
+    return audioCtx;
+  } catch(e) {
+    return null;
+  }
+}
+
+function unlockAudio() {
+  var ctx = getAudioCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") {
+    ctx.resume().then(function(){ audioUnlocked = true; }).catch(function(){});
+  } else {
+    audioUnlocked = true;
+  }
+}
+
+function playTone(freq, startAt, duration, gain) {
+  var ctx = getAudioCtx();
+  if (!ctx || !audioUnlocked) return;
+  var osc = ctx.createOscillator();
+  var amp = ctx.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(freq, startAt);
+  amp.gain.setValueAtTime(0.0001, startAt);
+  amp.gain.exponentialRampToValueAtTime(gain || 0.035, startAt + 0.01);
+  amp.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+  osc.connect(amp);
+  amp.connect(ctx.destination);
+  osc.start(startAt);
+  osc.stop(startAt + duration + 0.02);
+}
+
+function playOrderSound(kind) {
+  var ctx = getAudioCtx();
+  if (!ctx || !audioUnlocked) return;
+  var now = ctx.currentTime + 0.01;
+  try {
+    if (kind === "buy") {
+      playTone(660, now, 0.08, 0.03);
+      playTone(880, now + 0.07, 0.12, 0.04);
+    } else if (kind === "sell") {
+      playTone(880, now, 0.08, 0.03);
+      playTone(620, now + 0.07, 0.13, 0.04);
+    } else if (kind === "pending") {
+      playTone(740, now, 0.06, 0.025);
+      playTone(740, now + 0.09, 0.06, 0.025);
+    }
+  } catch(e) {}
+}
+
+["click","touchstart","keydown"].forEach(function(evt){
+  document.addEventListener(evt, unlockAudio, {passive:true, once:true});
+});
+
+//  TradingView 
+function loadTV() {
+  var uid = "tv"+Date.now();
+  $("tvw").innerHTML = '<div id="'+uid+'" style="width:100%;height:100%"></div>';
+  function doInit() {
+    tvWidget = new TradingView.widget({
+      container_id:uid, autosize:true, symbol:TVSYM[sel], interval:per,
+      timezone:"America/Sao_Paulo", theme:"dark", style:"1", locale:"br",
+      toolbar_bg:"#090d16", allow_symbol_change:false, save_image:false,
+      overrides:{
+        "paneProperties.background":"#090d16","paneProperties.backgroundType":"solid",
+        "paneProperties.vertGridProperties.color":"#0f1e30","paneProperties.horzGridProperties.color":"#0f1e30",
+        "scalesProperties.textColor":"#3a5878","scalesProperties.backgroundColor":"#060a12",
+        "mainSeriesProperties.candleStyle.upColor":"#00c896","mainSeriesProperties.candleStyle.downColor":"#f04060",
+        "mainSeriesProperties.candleStyle.borderUpColor":"#00c896","mainSeriesProperties.candleStyle.borderDownColor":"#f04060",
+        "mainSeriesProperties.candleStyle.wickUpColor":"#00c896","mainSeriesProperties.candleStyle.wickDownColor":"#f04060"
+      }
+    });
+  }
+  if (window.TradingView) { doInit(); return; }
+  if (tvScriptLoaded) { var c=setInterval(function(){ if(window.TradingView){clearInterval(c);doInit();} },100); return; }
+  tvScriptLoaded = true;
+  var s = document.createElement("script");
+  s.src="https://s3.tradingview.com/tv.js"; s.onload=doInit; document.head.appendChild(s);
+}
+
+//  Brapi: cotaes em 2 batches + IBOV 
+function setSts(s) {
+  var e = $("sts");
+  if (s==="loading") {
+    e.innerHTML='<span class="spin" style="display:inline-block;width:8px;height:8px;border:1.5px solid var(--a);border-top-color:transparent;border-radius:50%;vertical-align:middle;margin-right:4px"></span><span style="color:var(--a)">BUSCANDO</span>';
+  } else if (s==="ok") {
+    var iv = getRefreshInterval();
+    var label = iv===60 ? "REAL 1MIN" : iv===300 ? "REAL 5MIN" : "REAL";
+    e.innerHTML='<span class="dot" style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--g);vertical-align:middle;margin-right:4px"></span><span style="color:var(--g)">'+label+'</span>';
+  } else if (s==="frozen") {
+    e.innerHTML='<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--tx3);vertical-align:middle;margin-right:4px"></span><span style="color:var(--tx3)">CONGELADO</span>';
+  } else {
+    e.innerHTML='<span style="color:var(--r)">ERRO API</span>';
+  }
+}
+
+function fetchQ() {
+  setSts("loading");
+  var urlA    = BRAPI+"/quote/"+TICKERS_A.join(",")+"?fundamental=false&token="+token;
+  var urlB    = BRAPI+"/quote/"+TICKERS_B.join(",")+"?fundamental=false&token="+token;
+  var urlIbov   = BRAPI+"/quote/%5EBVSP?fundamental=false&token="+token;
+  var urlUsdBrl = BRAPI+"/quote/USDBRL=X?fundamental=false&token="+token;
+
+  Promise.all([
+    fetch(urlA).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
+    fetch(urlB).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
+    fetch(urlIbov).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
+    fetch(urlUsdBrl).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+  ]).then(function(results) {
+    var dA = results[0], dB = results[1], dI = results[2], dU = results[3];
+    if (dA.error) throw new Error(dA.message||"Erro Brapi A");
+    if (dB.error) throw new Error(dB.message||"Erro Brapi B");
+
+    function proc(q) {
+      prices[q.symbol] = q.regularMarketPrice;
+      chg[q.symbol]    = q.regularMarketChange || 0;
+      pct[q.symbol]    = q.regularMarketChangePercent || 0;
+    }
+    dA.results.forEach(proc);
+    dB.results.forEach(proc);
+    if (!dI.error && dI.results && dI.results.length) {
+      var ibov = dI.results[0];
+      prices["IBOV"] = ibov.regularMarketPrice;
+      chg["IBOV"]    = ibov.regularMarketChange || 0;
+      pct["IBOV"]    = ibov.regularMarketChangePercent || 0;
+    }
+    if (dU && !dU.error && dU.results && dU.results.length) {
+      var usd = dU.results[0];
+      prices["USDBRL"] = usd.regularMarketPrice;
+      chg["USDBRL"]    = usd.regularMarketChange || 0;
+      pct["USDBRL"]    = usd.regularMarketChangePercent || 0;
+    }
+
+    setSts("ok");
+    $("hupd").textContent = "Atualizado: "+new Date().toLocaleTimeString("pt-BR");
+    cd = REFRESH;
+
+    // Registra ponto no histrico de patrimnio
+    var pv = portValue();
+    var te = bal + pv;
+    var now = new Date();
+    equityHistory.push({ t: now.getTime(), v: te, d: now.toLocaleDateString("pt-BR") });
+    saveEquityHistory();
+
+    // Checa dividendos, ordens e prego
+    checkScheduledOrders();
+    checkDividends();
+    checkPending();
+    render();
+  }).catch(function(e) {
+    setSts("err");
+    $("hupd").textContent = e.message.slice(0,50);
+    notif(e.message.slice(0,40), "err");
+  });
+}
+
+//  Smart refresh: adapts to market hours 
+// 10:00-17:00 BRT   every 1 min  (prego aberto)
+// 17:00-19:00 BRT   every 5 min  (ps-fechamento)
+// 19:00-10:00 BRT   parado        (cotaes congeladas no fechamento)
+function getRefreshInterval() {
+  var brt = getBRTDate();
+  var dow = brt.getDay();
+  if (dow === 0 || dow === 6) return 0; // fim de semana - parado
+  var mins = brt.getHours()*60 + brt.getMinutes();
+  if (mins >= 600 && mins < 1020) return 60;    // pregao: 1 min
+  if (mins >= 1020 && mins < 1140) return 300;  // pos: 5 min
+  return 0; // fora de horario - parado
+}
+
+function isMarketDataActive() {
+  return getRefreshInterval() > 0;
+}
+
+function startRefresh() {
+  clearInterval(cdi); clearInterval(rfi);
+  var interval = getRefreshInterval();
+  if (interval > 0) {
+    cd = interval;
+    fetchQ();
+    rfi = setInterval(function() {
+      var newInterval = getRefreshInterval();
+      if (newInterval === 0) {
+        // Entered quiet hours  stop fetching, freeze prices
+        clearInterval(rfi);
+        setSts("frozen");
+        $("hupd").textContent = "Fechamento: " + new Date().toLocaleTimeString("pt-BR");
+        return;
+      }
+      // Interval may have changed (e.g. prego -> ps)
+      if (newInterval !== interval) {
+        clearInterval(rfi);
+        interval = newInterval;
+        cd = interval;
+        rfi = setInterval(arguments.callee, interval*1000);
+      }
+      fetchQ();
+    }, interval*1000);
+  } else {
+    // Already in quiet hours on startup  just show frozen status
+    setSts("frozen");
+  }
+  cdi = setInterval(function(){
+    var iv = getRefreshInterval();
+    if (iv === 0) {
+      $("hcd").textContent = "";
+    } else {
+      cd = cd<=1 ? iv : cd-1;
+      $("hcd").textContent = "Prox.: "+CD(cd);
+    }
+  }, 1000);
+}
+
+//  Prego B3: 10:00-17:00 BRT, segsex 
+function getBRTDate() {
+  // Returns a Date object in BRT (UTC-3)
+  var now = new Date();
+  var utc = now.getTime() + now.getTimezoneOffset()*60000;
+  return new Date(utc - 3*3600000); // BRT = UTC-3
+}
+
+function isPregaoOpen() {
+  var brt = getBRTDate();
+  var dow = brt.getDay(); // 0=Sun,6=Sat
+  if (dow === 0 || dow === 6) return false;
+  var h = brt.getHours(), m = brt.getMinutes();
+  var mins = h*60+m;
+  return mins >= 600 && mins < 1020; // 10:00-17:00
+}
+
+function nextPregaoOpen() {
+  // Returns ms until next 10:00 BRT on a business day
+  var brt = getBRTDate();
+  var candidate = new Date(brt);
+  candidate.setHours(10,0,0,0);
+  // If already past 10:00 today, move to next day
+  if (brt >= candidate) candidate.setDate(candidate.getDate()+1);
+  // Skip weekends
+  while (candidate.getDay()===0||candidate.getDay()===6) candidate.setDate(candidate.getDate()+1);
+  // Diff in ms
+  var nowUTC = new Date().getTime();
+  var candUTC = candidate.getTime() + 3*3600000; // back to UTC
+  return Math.max(0, candUTC - nowUTC);
+}
+
+function nextPregaoDateStr() {
+  var brt = getBRTDate();
+  var candidate = new Date(brt);
+  candidate.setHours(10,0,0,0);
+  if (brt >= candidate) candidate.setDate(candidate.getDate()+1);
+  while (candidate.getDay()===0||candidate.getDay()===6) candidate.setDate(candidate.getDate()+1);
+  return candidate.toLocaleDateString("pt-BR");
+}
+
+function updatePregaoBar() {
+  var open = isPregaoOpen();
+  var sts = $("pregao-sts"), cd2 = $("pregao-cd");
+  if (open) {
+    sts.className="pregao-open"; sts.textContent="* PREGAO ABERTO";
+    // Time to close
+    var brt=getBRTDate(), closeMs=(17*60-(brt.getHours()*60+brt.getMinutes()))*60000-brt.getSeconds()*1000;
+    var h2=Math.floor(closeMs/3600000), m2=Math.floor((closeMs%3600000)/60000), s2=Math.floor((closeMs%60000)/1000);
+    cd2.textContent="Fecha em "+String(h2).padStart(2,"0")+":"+String(m2).padStart(2,"0")+":"+String(s2).padStart(2,"0");
+  } else {
+    sts.className="pregao-closed";
+    var brt2=getBRTDate(), mins2=brt2.getHours()*60+brt2.getMinutes();
+    var dow2=brt2.getDay();
+    var isPostClose = (dow2>0&&dow2<6) && (mins2>=1020 && mins2<1140);
+    sts.textContent = isPostClose ? "* POS-FECHAMENTO" : "* PREGAO FECHADO";
+    var ms=nextPregaoOpen();
+    var h3=Math.floor(ms/3600000), m3=Math.floor((ms%3600000)/60000), s3=Math.floor((ms%60000)/1000);
+    var frozen = !isMarketDataActive();
+    cd2.textContent=(frozen?"Dados congelados - ":"")+"Abre em "+String(h3).padStart(2,"0")+":"+String(m3).padStart(2,"0")+":"+String(s3).padStart(2,"0");
+  }
+}
+
+// Update prego bar every second
+setInterval(updatePregaoBar, 1000);
+
+// Check if scheduled orders should fire at prego open
+function checkScheduledOrders() {
+  if (!isPregaoOpen()) return;
+  var toActivate=[], keep=[];
+  pending.forEach(function(o) {
+    if (o.scheduled) {
+      // Convert scheduled order to active limit order
+      var activated = JSON.parse(JSON.stringify(o));
+      delete activated.scheduled;
+      toActivate.push(activated);
+    } else keep.push(o);
+  });
+  if (toActivate.length) {
+    pending = keep.concat(toActivate);
+    saveState();
+    notif(toActivate.length+" ordem(s) agendada(s) ativada(s) no pregao!");
+  }
+}
+
+// Pending after-hours order (temp storage before user confirms scheduling)
+var ahoOrder = null;
+
+function showAHO(orderObj) {
+  ahoOrder = orderObj;
+  var side = orderObj.side==="buy"?"COMPRA":"VENDA";
+  var type = orderObj.lp ? "LIMITADA @ "+R(orderObj.lp) : "A MERCADO";
+  $("aho-summary").innerHTML =
+    '<span style="color:'+(orderObj.side==="buy"?"var(--g)":"var(--r)")+';font-weight:700">'+side+'</span> - '+
+    '<span style="color:var(--bl);font-weight:700">'+orderObj.tk+'</span> - '+
+    orderObj.qty+' cotas - '+type+'<br>'+
+    '<span style="color:var(--a);font-size:10px">Agendada para: '+nextPregaoDateStr()+' as 10:00</span>';
+  $("aho-modal").style.display="flex";
+}
+
+//  Dividendos 
+function checkDividends() {
+  var today = new Date().toISOString().split("T")[0];
+  if (checkedDivDate === today) return; // ja checou hoje
+  checkedDivDate = today;
+
+  var held = Object.keys(port);
+  if (!held.length) { saveState(); return; }
+
+  // Busca dividendos de todos os ativos em carteira
+  var promises = held.map(function(ticker) {
+    return fetch(BRAPI+"/quote/"+ticker+"?dividends=true&token="+token)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.error || !d.results || !d.results.length) return null;
+        return { ticker: ticker, data: d.results[0] };
+      })
+      .catch(function(){ return null; });
+  });
+
+  Promise.all(promises).then(function(results) {
+    var credited = false;
+    results.forEach(function(res) {
+      if (!res || !res.data) return;
+      var ticker = res.ticker;
+      var pos = port[ticker];
+      if (!pos) return;
+
+      var divList = res.data.dividendsData && res.data.dividendsData.cashDividends;
+      if (!divList || !divList.length) return;
+
+      divList.forEach(function(d) {
+        // Verifica se a data de pagamento  hoje e se ainda no processamos
+        var payDate = (d.paymentDate || d.approvedOn || "").split("T")[0];
+        if (payDate !== today) return;
+
+        // Verifica se j creditamos este dividendo
+        var divId = ticker+"_"+payDate+"_"+d.rate;
+        var alreadyCredited = divs.some(function(x){ return x.id === divId; });
+        if (alreadyCredited) return;
+
+        var value = pos.qty * (d.rate || 0);
+        if (value <= 0) return;
+
+        bal += value;
+        totalDiv += value;
+        var divRec = {
+          id: divId, ticker: ticker, qty: pos.qty,
+          rate: d.rate, value: value,
+          date: today, tm: new Date().toLocaleTimeString("pt-BR")
+        };
+        divs.unshift(divRec);
+        if (divs.length > 100) divs.pop();
+        notif("Dividendo: +" + R(value) + " (" + ticker + " - R$" + fr(d.rate) + "/cota)");
+        credited = true;
+      });
+    });
+    if (credited) saveState();
+  }).catch(function(){});
+}
+
+//  Ordens pendentes 
+function checkPending() {
+  if (!pending.length) return;
+  if (!isPregaoOpen()) return; // so executa durante pregao
+  var keep = [], changed = false;
+  for (var i=0; i<pending.length; i++) {
+    var o = pending[i];
+    if (o.scheduled) { keep.push(o); continue; } // aguarda ativacao no pregao
+
+    var p = prices[o.tk];
+    if (!p) { keep.push(o); continue; }
+
+    // Market order agendada: executa imediatamente
+    if (o.market) {
+      doMarketOrder(o.tk, o.side, o.qty, true);
+      changed = true; continue;
+    }
+
+    // Limit order: executa quando preo cruzar o limite (qualquer direo)
+    // Compra: executa quando p <= lp (mercado caiu at o alvo)
+    // Venda: executa quando p >= lp (mercado subiu at o alvo)
+    // Se mercado j passou alm do limite, executa no preo de mercado
+    var hit = (o.side==="buy" && p<=o.lp) || (o.side==="sell" && p>=o.lp);
+    if (!hit) { keep.push(o); continue; }
+
+    var execPrice = p; // executa no preco de mercado quando atingir o limite
+    var tot = execPrice * o.qty;
+    if (o.side==="buy") {
+      if (tot>bal) { notif("Ordem cancelada - saldo insuf. ("+o.tk+")", "err"); changed=true; continue; }
+      bal -= tot;
+      if (port[o.tk]) { var x=port[o.tk],nq=x.qty+o.qty; port[o.tk]={qty:nq,avgPrice:(x.qty*x.avgPrice+tot)/nq}; }
+      else port[o.tk] = {qty:o.qty,avgPrice:execPrice};
+      if (!firstTradeDate) firstTradeDate=new Date().toISOString().split("T")[0];
+    } else {
+      var pos2 = port[o.tk]; if (!pos2||pos2.qty<o.qty) { changed=true; continue; }
+      bal += tot;
+      var nq2b=pos2.qty-o.qty; if(nq2b===0) delete port[o.tk]; else port[o.tk]={qty:nq2b,avgPrice:pos2.avgPrice};
+    }
+    trd.unshift({id:Date.now(),tk:o.tk,tp:o.side==="buy"?"C":"V",qty:o.qty,pr:execPrice,tot:tot,
+      tm:new Date().toLocaleTimeString("pt-BR"),note:"Lim @ "+fr(o.lp)});
+    if (trd.length>200) trd.pop();
+    playOrderSound(o.side==="buy" ? "buy" : "sell");
+    notif("Ordem limitada executada: "+o.qty+" "+o.tk+" @ "+R(execPrice));
+    changed=true;
+  }
+  pending = keep;
+  if (changed) saveState();
+}
+
+//  Equity Canvas Chart 
+function drawEquityChart() {
+  var canvas = $("equity-chart");
+  if (!canvas) return;
+  var parent = canvas.parentElement;
+  var W = parent.clientWidth - 28; // padding
+  if (W <= 0) return; // panel hidden, skip
+  var H = 180;
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W+"px"; canvas.style.height = H+"px";
+  var ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+
+  ctx.fillStyle="#090d16"; ctx.fillRect(0,0,W,H);
+
+  if (equityHistory.length < 2) {
+    ctx.fillStyle="#1a3050"; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="center";
+    ctx.fillText("Aguardando dados suficientes...", W/2, H/2);
+    return;
+  }
+
+  var PAD_L=8, PAD_R=52, PAD_T=10, PAD_B=22;
+  var CW=W-PAD_L-PAD_R, CH=H-PAD_T-PAD_B;
+
+  var vals = equityHistory.map(function(p){ return p.v; });
+  var minV = Math.min.apply(null, vals) * 0.998;
+  var maxV = Math.max.apply(null, vals) * 1.002;
+
+  // Include goal line in range if set
+  if (goal.target) {
+    var goalVal = initialBal * (1 + goal.target/100);
+    if (goalVal > maxV) maxV = goalVal * 1.002;
+    if (goalVal < minV) minV = goalVal * 0.998;
+  }
+  var range = maxV - minV || 1;
+
+  function px(v) { return PAD_T + CH * (1 - (v - minV) / range); }
+  function py(i) { return PAD_L + CW * (i / (equityHistory.length - 1)); }
+
+  // Grid
+  ctx.strokeStyle="#0f1e30"; ctx.lineWidth=0.5;
+  for (var i=0; i<=4; i++) {
+    var y = PAD_T + (CH/4)*i;
+    ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(W-PAD_R,y); ctx.stroke();
+    var val = maxV - (range/4)*i;
+    ctx.fillStyle="#2a5070"; ctx.font="8px 'JetBrains Mono',monospace"; ctx.textAlign="left";
+    ctx.fillText(val>=1000?Math.round(val/1000)+"k":Math.round(val), W-PAD_R+4, y+3);
+  }
+
+  // Goal line (dashed)
+  if (goal.target) {
+    var gv = 100000*(1+goal.target/100);
+    var gy = px(gv);
+    ctx.strokeStyle="rgba(245,158,11,.5)"; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(PAD_L,gy); ctx.lineTo(W-PAD_R,gy); ctx.stroke();
+    ctx.setLineDash([]);
+    $("legend-goal").style.display="flex";
+  }
+
+  // Equity area fill
+  var grad = ctx.createLinearGradient(0,PAD_T,0,PAD_T+CH);
+  grad.addColorStop(0,"rgba(0,200,150,.25)");
+  grad.addColorStop(1,"rgba(0,200,150,0)");
+  ctx.beginPath();
+  ctx.moveTo(py(0), px(equityHistory[0].v));
+  for (var j=1; j<equityHistory.length; j++) ctx.lineTo(py(j), px(equityHistory[j].v));
+  ctx.lineTo(py(equityHistory.length-1), PAD_T+CH);
+  ctx.lineTo(py(0), PAD_T+CH);
+  ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+
+  // Equity line
+  ctx.strokeStyle="#00c896"; ctx.lineWidth=1.5; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(py(0), px(equityHistory[0].v));
+  for (var k=1; k<equityHistory.length; k++) ctx.lineTo(py(k), px(equityHistory[k].v));
+  ctx.stroke();
+
+  // Last point dot
+  var lastX=py(equityHistory.length-1), lastY=px(equityHistory[equityHistory.length-1].v);
+  ctx.fillStyle="#00c896";
+  ctx.beginPath(); ctx.arc(lastX,lastY,3,0,Math.PI*2); ctx.fill();
+
+  // Date labels
+  ctx.fillStyle="#2a5070"; ctx.font="8px 'JetBrains Mono',monospace"; ctx.textAlign="center";
+  var labelEvery = Math.max(1, Math.floor(equityHistory.length/5));
+  for (var m=0; m<equityHistory.length; m+=labelEvery) {
+    ctx.fillText(equityHistory[m].d, py(m), H-5);
+  }
+}
+
+//  Render helpers 
+function portValue() {
+  var v=0; Object.keys(port).forEach(function(t){ v+=port[t].qty*(prices[t]||0); }); return v;
+}
+
+function renderGoalBar() {
+  var gb=$("goalbar");
+  if (!goal.endDate && !goal.target) { gb.style.display="none"; return; }
+  gb.style.display="block";
+  var te=bal+portValue(), currPct=((te-initialBal)/initialBal)*100, targetPct=goal.target||0;
+  var progress=targetPct>0?Math.min(100,Math.max(0,(currPct/targetPct)*100)):0;
+  var color=currPct>=targetPct?"var(--g)":currPct>=0?"var(--a)":"var(--r)";
+  $("gb-fill").style.width=progress+"%"; $("gb-fill").style.background=color;
+  $("gb-pct").textContent=targetPct+"%";
+  $("gb-curr").textContent=(currPct>=0?"+":"")+currPct.toFixed(2)+"% atual"; $("gb-curr").style.color=color;
+  if (goal.endDate) {
+    var now=new Date(); now.setHours(0,0,0,0);
+    var end=new Date(goal.endDate+"T00:00:00");
+    var days=Math.ceil((end-now)/86400000);
+    $("gb-days").textContent=days>0?days+"d restantes":"ENCERRADO";
+    $("gb-days").style.color=days<=7?"var(--r)":"var(--a)";
+    $("gb-end").textContent="Meta: "+end.toLocaleDateString("pt-BR");
+  } else { $("gb-days").textContent=""; $("gb-end").textContent=""; }
+}
+
+function makeTkBtn(t) {
+  var p=prices[t]||0, c=pct[t]||0, on=(t===sel);
+  var b=document.createElement("button");
+  b.className="tk"+(on?" on":"");
+  b.dataset.sym=t;
+  b.innerHTML='<div class="tks">'+t+'</div><div class="tkp">'+(p>0?fr(p):"...")+
+    '</div><div style="font-size:9px;font-weight:600;color:'+(c>=0?"var(--g)":"var(--r)")+'">'+(c>=0?"+":"")+c.toFixed(2)+'%</div>';
+  b.onclick=function(){ sel=t; render(); loadTV(); };
+  return b;
+}
+
+function renderTickers() {
+  var el=$("tks"); el.innerHTML="";
+  // Duplicate list x3 for seamless infinite scroll
+  for (var pass=0; pass<3; pass++) {
+    TAPE_TICKERS.forEach(function(t) {
+      el.appendChild(makeTkBtn(t));
+    });
+  }
+  initTickerTape();
+}
+
+function renderSB() {
+  var p=prices[sel]||0,c=chg[sel]||0,cp=pct[sel]||0;
+  $("ssym").textContent=sel; $("snm").textContent=NAMES[sel];
+  $("spr").textContent=p>0?fr(p):"--"; $("spr").style.color=c>=0?"var(--g)":"var(--r)";
+  $("sch").textContent=(c>=0?"+":"")+fr(Math.abs(c))+" ("+(cp>=0?"+":"")+cp.toFixed(2)+"%)";
+  $("sch").style.color=c>=0?"var(--g)":"var(--r)";
+}
+
+function renderHdr() {
+  var pv=portValue(), te=bal+pv, pnl=te-initialBal;
+  $("hp").textContent=R(te);
+  $("hpnl").textContent=(pnl>=0?"+":"")+R(Math.abs(pnl))+" ("+(pnl>=0?"+":"")+((pnl/initialBal)*100).toFixed(2)+"%)";
+  $("hpnl").style.color=pnl>=0?"var(--g)":"var(--r)";
+  $("hb").textContent=R(bal); $("hpv").textContent=R(pv);
+}
+
+function renderOrders() {
+  var p=prices[sel]||0, isIndex=(sel==="IBOV");
+  var open=isPregaoOpen();
+  $("osym").textContent=sel;
+  $("oprc").textContent=p>0?R(p):"Aguardando...";
+  $("oprc").style.color=p>0?(chg[sel]>=0?"var(--g)":"var(--r)"):"var(--tx2)";
+  var usePrice=(orderMode==="limit")?(parseFloat($("lmt-price").value)||0):p;
+  var total = usePrice>0 ? usePrice*qty : 0;
+  $("otot").textContent=total>0?R(total):"--";
+  // Balance fields
+  if ($("o-bal")) $("o-bal").textContent = R(bal);
+  if ($("o-after")) {
+    var after = side==="buy" ? bal-total : bal+total;
+    $("o-after").textContent = total>0 ? R(after) : "--";
+    $("o-after").style.color = (side==="buy" && after<0) ? "var(--r)" : "var(--tx2)";
+  }
+
+
+  // Update exec button text for after-hours
+  var execEl=$("exec");
+  if (!open && !isIndex) {
+    if (side==="buy") {
+      execEl.textContent=orderMode==="limit"?"AGENDAR COMPRA LIMITADA":"AGENDAR COMPRA";
+    } else {
+      execEl.textContent=orderMode==="limit"?"AGENDAR VENDA LIMITADA":"AGENDAR VENDA";
+    }
+    execEl.style.opacity="0.75";
+  } else {
+    updateExecBtn();
+    execEl.style.opacity="1";
+  }
+
+  // IBOV is index only
+  var orderCard=$("order-panel").querySelector(".card");
+  if(isIndex){ orderCard.style.opacity="0.4"; execEl.disabled=true; }
+  else { orderCard.style.opacity="1"; execEl.disabled=false; }
+
+  var pos=port[sel];
+  if (pos&&p>0&&!isIndex) {
+    var pnl=(p-pos.avgPrice)*pos.qty,pp=((p-pos.avgPrice)/pos.avgPrice)*100;
+    $("pbox").style.display="block"; $("plbl").textContent="SUA POSICAO EM "+sel;
+    $("pqty").textContent=pos.qty; $("ppm").textContent=R(pos.avgPrice);
+    $("ppnl").textContent=(pnl>=0?"+":"")+R(pnl)+" ("+(pp>=0?"+":"")+pp.toFixed(2)+"%)";
+    $("ppnl").style.color=pnl>=0?"var(--g)":"var(--r)";
+  } else {
+    $("pbox").style.display="none";
+  }
+
+  // Disable sell / cap quantity if no position or insufficient
+  var hasSel = !!port[sel];
+  var maxSell = hasSel ? port[sel].qty : 0;
+
+  if (side==="sell" && !isIndex) {
+    if (!hasSel) {
+      execEl.disabled = true;
+      execEl.style.opacity = "0.35";
+      execEl.textContent = "SEM POSICAO EM "+sel;
+    } else {
+      // Cap qty to max owned
+      if (qty > maxSell) {
+        qty = maxSell;
+        $("qinp").value = qty;
+        document.querySelectorAll(".pr").forEach(function(b){
+          b.classList.toggle("on", +b.dataset.q===qty);
+        });
+      }
+      $("qinp").max = maxSell;
+      // Show max available
+      var maxHint = $("sell-max-hint");
+      if (!maxHint) {
+        maxHint = document.createElement("div");
+        maxHint.id = "sell-max-hint";
+        maxHint.style.cssText = "font-size:9px;color:var(--tx3);margin-top:-8px;margin-bottom:8px;text-align:right;";
+        var qinpEl = $("qinp");
+        qinpEl.parentNode.insertBefore(maxHint, qinpEl.nextSibling);
+      }
+      maxHint.textContent = "Max. disponivel: " + maxSell + " cotas";
+    }
+    $("bsel").style.opacity = !hasSel ? "0.4" : "1";
+  } else {
+    // Buy side  remove cap and hint
+    $("qinp").removeAttribute("max");
+    var hint = $("sell-max-hint");
+    if (hint) hint.textContent = "";
+    $("bsel").style.opacity = "1";
+  }
+}
+
+function renderPending() {
+  var sec=$("pend-sec"),list=$("pend-list");
+  if (!pending.length) { sec.style.display="none"; return; }
+  sec.style.display="block"; list.innerHTML="";
+  pending.forEach(function(o) {
+    var e=document.createElement("div"); e.className="pend-item";
+    var col=o.side==="buy"?"var(--g)":"var(--r)";
+    var bgc=o.side==="buy"?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)";
+    e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
+      '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(o.side==="buy"?"COMPRA":"VENDA")+'</span>'+
+      '<span style="color:var(--bl);font-weight:700;font-size:12px">'+o.tk+'</span></div>'+
+      '<div style="font-size:9px;color:var(--tx4)">'+o.qty+' cotas - limite '+R(o.lp)+'</div></div>'+
+      '<button class="cancel-btn" onclick="cancelPending('+o.id+')">CANCELAR</button>';
+    list.appendChild(e);
+  });
+}
+
+function cancelPending(id) {
+  pending=pending.filter(function(o){ return o.id!==id; });
+  saveState(); renderPending(); notif("Ordem cancelada");
+}
+
+function renderPort() {
+  var pv=portValue(), pnl=bal+pv-100000;
+  $("pbal").textContent=R(bal); $("ppv").textContent=R(pv);
+  $("pdiv").textContent=R(totalDiv);
+  $("pres").textContent=(pnl>=0?"+":"")+R(pnl); $("pres").style.color=pnl>=0?"var(--g)":"var(--r)";
+  try { drawEquityChart(); } catch(e) {}
+  var l=$("plist"); l.innerHTML="";
+  if (!Object.keys(port).length) { l.innerHTML='<div class="empty"><div style="font-size:36px;margin-bottom:10px">&#128235;</div>Carteira vazia.</div>'; return; }
+  Object.keys(port).forEach(function(t) {
+    var pos=port[t],p=prices[t]||0,pnl2=(p-pos.avgPrice)*pos.qty,pp=((p-pos.avgPrice)/pos.avgPrice)*100,dc=pct[t]||0;
+    var e=document.createElement("div"); e.className="ac";
+    e.style.border="1px solid "+(pnl2>=0?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)");
+    e.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:8px">'+
+      '<div><span style="color:var(--bl);font-weight:700;font-size:14px">'+t+'</span>'+
+      '<span style="color:var(--tx4);font-size:10px;margin-left:7px">'+pos.qty+' cotas</span></div>'+
+      '<div style="text-align:right"><div style="font-weight:700;font-size:13px">'+R(p*pos.qty)+'</div>'+
+      '<div style="font-size:10px;color:'+(pnl2>=0?"var(--g)":"var(--r)")+';font-weight:700">'+(pnl2>=0?"+":"")+R(pnl2)+' ('+(pp>=0?"+":"")+pp.toFixed(2)+'%)</div></div></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--tx4)">'+
+      '<span>PM:<span style="color:var(--tx3);margin-left:3px">'+R(pos.avgPrice)+'</span></span>'+
+      '<span>Atual:<span style="color:'+(dc>=0?"var(--g)":"var(--r)")+';margin-left:3px">'+R(p)+'</span></span>'+
+      '<span>Dia:<span style="color:'+(dc>=0?"var(--g)":"var(--r)")+';margin-left:3px">'+(dc>=0?"+":"")+dc.toFixed(2)+'%</span></span></div>';
+    // Sell button
+    var sb2 = document.createElement("button");
+    sb2.style.cssText = "width:100%;padding:7px;background:rgba(240,64,96,.1);border:1px solid rgba(240,64,96,.35);border-radius:6px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px";
+    sb2.textContent = "VENDER " + t;
+    (function(tk, qty2){
+      sb2.onclick = function(){
+        sel = tk; side = "sell"; qty = qty2;
+        document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
+        document.querySelectorAll(".panel").forEach(function(p2){ p2.classList.remove("on"); });
+        if(b.dataset.t==="group"){renderGroupRoom();if(currentRoomId)subscribeGroup(renderGroupRanking);}
+        document.querySelector(".tab[data-t='order']").classList.add("on");
+        $("order-panel").classList.add("on");
+        $("pb").style.display = "none";
+        $("bsel").style.cssText = "background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
+        $("bbuy").style.cssText = "background:var(--bg3);color:var(--tx3);";
+        $("qinp").value = qty2;
+        updateExecBtn(); render();
+      };
+    })(t, pos.qty);
+    e.appendChild(sb2);
+    l.appendChild(e);
+  });
+}
+
+function renderHist() {
+  // Dividends
+  var ds=$("div-sec"),dl=$("div-list");
+  if (divs.length) {
+    ds.style.display="block"; dl.innerHTML="";
+    divs.forEach(function(d) {
+      var e=document.createElement("div"); e.className="div-item";
+      e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
+        '<span class="bdg" style="background:rgba(0,200,150,.15);color:var(--g)">DIVIDENDO</span>'+
+        '<span style="color:var(--bl);font-weight:700;font-size:12px">'+d.ticker+'</span></div>'+
+        '<div style="font-size:9px;color:var(--tx4)">'+d.qty+' cotas x R$'+fr(d.rate)+'</div></div>'+
+        '<div style="text-align:right"><div style="font-weight:700;font-size:12px;color:var(--g)">+'+R(d.value)+'</div>'+
+        '<div style="font-size:9px;color:var(--tx4)">'+d.date+'</div></div>';
+      dl.appendChild(e);
+    });
+  } else ds.style.display="none";
+
+  // Trades
+  $("hcnt").textContent=trd.length+" OPERAC"+(trd.length===1?"AO":"OES");
+  var l=$("hlist"); l.innerHTML="";
+  if (!trd.length) { l.innerHTML='<div class="empty"><div style="font-size:36px;margin-bottom:10px">&#128203;</div>Nenhuma operacao.</div>'; return; }
+  trd.forEach(function(t) {
+    var col=t.tp==="C"?"var(--g)":"var(--r)", bgc=t.tp==="C"?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)";
+    var e=document.createElement("div"); e.className="ti";
+    e.style.borderLeft="2px solid "+col;
+    e.innerHTML='<div><div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">'+
+      '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(t.tp==="C"?"COMPRA":"VENDA")+'</span>'+
+      '<span style="color:var(--bl);font-weight:700;font-size:12px">'+t.tk+'</span>'+
+      (t.note?'<span style="font-size:8px;color:var(--a)">&#127919;</span>':'')+
+      '</div><div style="font-size:10px;color:var(--tx4)">'+t.qty+' cotas @ '+R(t.pr)+(t.note?' - '+t.note:'')+'</div></div>'+
+      '<div style="text-align:right"><div style="font-weight:700;font-size:12px">'+R(t.tot)+'</div>'+
+      '<div style="font-size:9px;color:var(--tx4)">'+t.tm+'</div></div>';
+    l.appendChild(e);
+  });
+}
+
+function render() {
+  try { renderHdr(); } catch(e) {}
+  try { maybePushStats(); } catch(e) {}
+  try { renderTickers(); } catch(e) {}
+  try { renderSB(); } catch(e) {}
+  try { renderOrders(); } catch(e) {}
+  try { renderPending(); } catch(e) {}
+  try { renderPort(); } catch(e) {}
+  try { renderHist(); } catch(e) {}
+  try { renderGoalBar(); } catch(e) {}
+}
+
+//  Trading 
+function doMarketOrder(tk, sd, q, isScheduled) {
+  var p = prices[tk]; if (!p) { notif("Sem cotacao","err"); return; }
+  var tot = p*q;
+  if (sd==="buy") {
+    if (tot>bal) { notif("Saldo insuficiente","err"); return; }
+    bal-=tot;
+    if (port[tk]) { var x=port[tk],nq=x.qty+q; port[tk]={qty:nq,avgPrice:(x.qty*x.avgPrice+tot)/nq}; }
+    else port[tk]={qty:q,avgPrice:p};
+    trd.unshift({id:Date.now(),tk:tk,tp:"C",qty:q,pr:p,tot:tot,
+      tm:new Date().toLocaleTimeString("pt-BR"),
+      note:isScheduled?"Agendada":""});
+    if (!firstTradeDate) { firstTradeDate=new Date().toISOString().split("T")[0]; }
+    playOrderSound("buy");
+    notif("Compra executada: "+q+" "+tk+" @ "+R(p));
+  } else {
+    var pos=port[tk]; if(!pos||pos.qty<q){notif("Posicao insuficiente","err");return;}
+    bal+=tot;
+    var nq2=pos.qty-q; if(nq2===0) delete port[tk]; else port[tk]={qty:nq2,avgPrice:pos.avgPrice};
+    trd.unshift({id:Date.now(),tk:tk,tp:"V",qty:q,pr:p,tot:tot,
+      tm:new Date().toLocaleTimeString("pt-BR"),
+      note:isScheduled?"Agendada":""});
+    playOrderSound("sell");
+    notif("Venda executada: "+q+" "+tk+" @ "+R(p));
+  }
+  if (trd.length>200) trd.pop();
+  saveState(); render();
+}
+
+function execOrder() {
+  if (sel==="IBOV") { notif("IBOV e indice - nao e possivel operar","err"); return; }
+  var p=prices[sel]; if (!p) { notif("Sem cotacao disponivel","err"); return; }
+
+  var open = isPregaoOpen();
+
+  //  Limit order 
+  if (orderMode==="limit") {
+    var lp=parseFloat($("lmt-price").value);
+    if (!lp||lp<=0) { notif("Informe o preco limite","err"); return; }
+    if (side==="buy"&&lp*qty>bal) { notif("Saldo insuficiente","err"); return; }
+    if (side==="sell") {
+      var sp=port[sel]; if(!sp){notif("Voce nao possui "+sel+" em carteira","err");return;}
+      if(qty>sp.qty){notif("Quantidade excede posicao (max: "+sp.qty+")","err");qty=sp.qty;$("qinp").value=qty;renderOrders();return;}
+    }
+    var orderObj = {id:Date.now(),tk:sel,side:side,qty:qty,lp:lp};
+    if (!open) {
+      // Show after-hours modal for scheduling
+      orderObj.scheduled=true;
+      showAHO(orderObj);
+      return;
+    }
+    pending.push(orderObj);
+    saveState(); render();
+    playOrderSound("pending");
+    notif("Ordem limitada enviada: "+qty+" "+sel+" @ "+R(lp)); return;
+  }
+
+  //  Market order 
+  if (!open) {
+    // Offer to schedule as market order at next open
+    showAHO({id:Date.now(),tk:sel,side:side,qty:qty,lp:null,scheduled:true,market:true});
+    return;
+  }
+  doMarketOrder(sel,side,qty,false);
+}
+
+//  UI wiring 
+//  Ticker tape auto-scroll 
+var tapeX = 0;
+var tapeSpeed = 1.2;     // px per frame
+var tapePaused = false;
+var tapeDragging = false;
+var tapeDragStartX = 0;
+var tapeDragStartTapeX = 0;
+var tapeRAF = null;
+var tapeOneSetW = 0;     // width of one full set of tickers
+
+function initTickerTape() {
+  var wrap = $("tks-wrap");
+  var el   = $("tks");
+  if (!wrap || !el) return;
+
+  // Wait for layout
+  setTimeout(function() {
+    // One set = total items / 3
+    var items = el.querySelectorAll(".tk");
+    var count = items.length;
+    var oneSet = count / 3;
+    tapeOneSetW = 0;
+    for (var i=0; i<oneSet; i++) {
+      tapeOneSetW += items[i].offsetWidth + 5; // 5 = gap
+    }
+    // Start from middle set so we can scroll both ways
+    tapeX = -tapeOneSetW;
+    el.style.transform = "translateX("+tapeX+"px)";
+    cancelAnimationFrame(tapeRAF);
+    tapeLoop();
+  }, 100);
+
+  // Touch events
+  wrap.addEventListener("touchstart", function(e) {
+    tapePaused   = true;
+    tapeDragging = true;
+    tapeDragStartX     = e.touches[0].clientX;
+    tapeDragStartTapeX = tapeX;
+  }, {passive:true});
+
+  wrap.addEventListener("touchmove", function(e) {
+    if (!tapeDragging) return;
+    var dx = e.touches[0].clientX - tapeDragStartX;
+    tapeX = tapeDragStartTapeX + dx;
+    $("tks").style.transform = "translateX("+tapeX+"px)";
+  }, {passive:true});
+
+  wrap.addEventListener("touchend", function() {
+    tapeDragging = false;
+    tapePaused   = false; // resume auto-scroll
+  }, {passive:true});
+}
+
+function tapeLoop() {
+  if (!tapePaused) {
+    tapeX -= tapeSpeed;
+    var el = $("tks");
+    if (!el) return;
+    // Seamless loop: when scrolled past one full set, jump back
+    if (tapeX < -(tapeOneSetW * 2)) tapeX += tapeOneSetW;
+    if (tapeX > 0) tapeX -= tapeOneSetW;
+    el.style.transform = "translateX("+tapeX+"px)";
+  }
+  tapeRAF = requestAnimationFrame(tapeLoop);
+}
+
+function updateExecBtn() {
+  var e=$("exec");
+  if (side==="buy") {
+    e.style.cssText="width:100%;padding:14px;border-radius:10px;background:linear-gradient(135deg,var(--g),#00a078);color:#fff;font-weight:700;font-size:15px;letter-spacing:1px;box-shadow:0 4px 24px rgba(0,200,150,.35);border:none;margin-bottom:12px;";
+    e.textContent=orderMode==="limit"?"ENVIAR COMPRA LIMITADA":"EXECUTAR COMPRA";
+  } else {
+    e.style.cssText="width:100%;padding:14px;border-radius:10px;background:linear-gradient(135deg,var(--r),#cc2233);color:#fff;font-weight:700;font-size:15px;letter-spacing:1px;box-shadow:0 4px 24px rgba(240,64,96,.35);border:none;margin-bottom:12px;";
+    e.textContent=orderMode==="limit"?"ENVIAR VENDA LIMITADA":"EXECUTAR VENDA";
+  }
+}
+
+//  News system 
+var newsCache = (function(){
+  try { var n=JSON.parse(localStorage.getItem("hb_news_v1")||"[]"); return Array.isArray(n)?n:[]; }
+  catch(e){ return []; }
+})();
+var newsTapeItems = [];
+var newsTapeX = 0;
+var newsTapeOneW = 0;
+var newsTapeRAF = null;
+var newsTapePaused = false;
+var newsTapeDragging = false;
+var newsTapeDragStartX = 0;
+var newsTapeDragStartTapeX = 0;
+var newsLastFetch = 0;
+var NEWS_REFRESH = 15 * 60 * 1000; // 15 min during pregao
+var focusNewsId = null;
+var autoExpandId = null; // auto-expand summary when coming from tape // news to scroll to when opening tab
+
+// RSS feeds via Claude proxy (CORS bypass)
+var NEWS_SOURCES = [
+  // Macro
+  {url:"https://www.bcb.gov.br/api/feed/pt-br/noticias", label:"BC", type:"macro"},
+  {url:"https://www.gov.br/fazenda/pt-br/assuntos/noticias/RSS", label:"FAZENDA", type:"macro"},
+  {url:"https://www.cvm.gov.br/noticias/rss.html", label:"CVM", type:"macro"},
+  // Empresas / B3
+  {url:"https://www.infomoney.com.br/feed/", label:"INFOMONEY", type:"company"},
+  {url:"https://valoreconomico.globo.com/rss/mercados/", label:"VALOR", type:"company"}
+];
+
+var TICKER_KEYS = TICKERS.concat(["IBOVESPA","IBOV","B3","BOVESPA"]);
+
+function fetchNews() {
+  var now = Date.now();
+  if (now - newsLastFetch < NEWS_REFRESH) return;
+  newsLastFetch = now;
+
+  // rss2json.com converts RSS to JSON - reliable and free
+  var RSS2JSON = "https://api.rss2json.com/v1/api.json?rss_url=";
+
+  var feeds = [
+    // Brasil
+    {url:"https://www.infomoney.com.br/feed/",                          label:"InfoMoney",  type:"company", lang:"pt"},
+    {url:"https://valoreconomico.globo.com/rss/financas/",              label:"Valor",      type:"company", lang:"pt"},
+    {url:"https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",      label:"Ag.Brasil",  type:"macro",   lang:"pt"},
+    {url:"https://exame.com/invest/feed/",                              label:"Exame",      type:"company", lang:"pt"},
+    {url:"https://www.moneytimes.com.br/feed/",                         label:"MoneyTimes", type:"macro",   lang:"pt"},
+    // Internacional
+    {url:"https://www.cnbc.com/id/10000664/device/rss/rss.html",        label:"CNBC",       type:"macro",   lang:"en"},
+    {url:"https://feeds.bbci.co.uk/news/business/rss.xml",              label:"BBC",        type:"macro",   lang:"en"},
+    {url:"https://feeds.reuters.com/reuters/businessNews",              label:"Reuters",    type:"macro",   lang:"en"},
+    {url:"https://rss.dw.com/rdf/rss-en-bus",                          label:"DW",         type:"macro",   lang:"en"},
+    {url:"https://rss.cnn.com/rss/money_news_international.rss",        label:"CNN",        type:"macro",   lang:"en"}
+  ];
+
+  var allNews = [];
+  var completed = 0;
+  var total = feeds.length;
+
+  function tryDone() {
+    completed++;
+    if (completed < total) return;
+    allNews.sort(function(a,b){ return b.ts - a.ts; });
+    var seen = {};
+    newsCache = allNews.filter(function(n) {
+      var key = n.title.slice(0,40);
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    }).slice(0, 30);
+    newsCache.forEach(function(n, i){ n.id = i+1; });
+    try { localStorage.setItem("hb_news_v1", JSON.stringify(newsCache)); } catch(e){}
+
+    var loading = $("news-loading");
+    if (loading) loading.style.display = "none";
+
+    if (!newsCache.length) {
+      var emptyEl = $("news-empty");
+      if (emptyEl) emptyEl.style.display = "block";
+      return;
+    }
+    buildNewsTape();
+    renderNewsTab();
+    // Restart tape animation
+    cancelAnimationFrame(newsTapeRAF);
+    newsTapeLoop();
+  }
+
+  feeds.forEach(function(feed) {
+    fetch(RSS2JSON + encodeURIComponent(feed.url) + "&count=10")
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        var items = (data.items || []);
+        items.forEach(function(item) {
+          var title = (item.title || "").trim();
+          var link  = item.link || item.guid || "";
+          var pubDate = item.pubDate || "";
+          if (!title || title.length < 10) return;
+
+          // Relevance filter
+          var lower = title.toLowerCase();
+          var isIntl = feed.lang === "en";
+
+          // BLOCK: marketing, lifestyle
+          var blocked = /iphone|swarovski|bracelete|vinho|celular|notebook|desconto|oferta|promocao|black friday|cupom/.test(lower);
+          if (blocked) return;
+
+          var relevant;
+          if (isIntl) {
+            // International: finance, economy, geopolitics
+            relevant = /market|stock|economy|gdp|inflation|fed|rate|bank|trade|tariff|bond|oil|gold|dollar|euro|china|dollar|recession|growth|debt|deficit|war|conflict|sanction|geopolit|ukraine|middle east|opec|crude|treasury|nasdaq|dow|s&p|wall street|interest|central bank|imf|world bank|emerging/.test(lower);
+          } else {
+            // Brazil: financial keywords
+            relevant = /bolsa|ibovespa|selic|banco central|juros|cvm|acoes|acao|mercado|b3|petrobras|vale|itau|bradesco|ambev|weg|embraer|dividendo|resultado|lucro|receita|economia|inflacao|cambio|dolar|credito|bovespa|investimento|fiscal|fazenda|pib|copom|tesouro|fundo|fii|etf|commodities|petroleo|exportacao/.test(lower);
+          }
+          if (!relevant) return;
+
+          // Detect ticker mention
+          var ticker = "";
+          TICKERS.forEach(function(t) {
+            if (title.toUpperCase().indexOf(t) >= 0) ticker = t;
+          });
+
+          var ts = pubDate ? new Date(pubDate).getTime() : (Date.now() - allNews.length*60000);
+          var mins = Math.floor((Date.now() - ts) / 60000);
+          var timeStr = mins < 1 ? "agora" :
+                        mins < 60 ? "ha " + mins + "min" :
+                        mins < 1440 ? "ha " + Math.floor(mins/60) + "h" :
+                        "ha " + Math.floor(mins/1440) + "d";
+
+          var desc = (item.description || item.content || item.summary || "").replace(/<[^>]+>/g,"").trim();
+          if (desc.length > 800) desc = desc.slice(0, 800) + "...";
+          allNews.push({
+            title: title, source: feed.label,
+            type: ticker ? "company" : feed.type,
+            ticker: ticker, time: timeStr, url: link, ts: ts,
+            desc: desc, lang: feed.lang || "pt"
+          });
+        });
+        tryDone();
+      })
+      .catch(function(){ tryDone(); });
+  });
+}
+
+
+// ── News summary ─────────────────────────────────────────────────────────────
+function showSummaryInCard(cardEl, item) {
+  var btn = cardEl.querySelector(".news-expand-btn");
+  var box = cardEl.querySelector(".news-summary-box");
+  if (!btn || !box) return;
+  box.style.display = "block";
+  box.innerHTML = "";
+
+  function renderSummary(text) {
+    var p = document.createElement("p");
+    p.style.cssText = "font-size:11px;color:var(--tx2);line-height:1.8;margin-bottom:10px;white-space:pre-line";
+    p.textContent = text;
+    box.appendChild(p);
+    if (item.url) {
+      var a = document.createElement("a");
+      a.href = item.url;
+      a.target = "_blank";
+      a.style.cssText = "font-size:10px;color:var(--bl);font-weight:700;text-decoration:none;display:block;margin-top:4px";
+      a.textContent = "Ler noticia completa";
+      box.appendChild(a);
+    }
+    btn.textContent = "Fechar";
+    btn.disabled = false;
+  }
+
+  // If RSS already gave us description, use it
+  if (item.desc && item.desc.length > 80 && item.desc !== item.title) {
+    renderSummary(item.desc);
+    return;
+  }
+
+  // Otherwise fetch article via proxy
+  btn.textContent = "Carregando...";
+  btn.disabled = true;
+  var loading = document.createElement("span");
+  loading.style.cssText = "font-size:11px;color:var(--tx3)";
+  loading.textContent = "Buscando conteudo...";
+  box.appendChild(loading);
+
+  if (!item.url) { box.innerHTML = ""; renderSummary(item.title); return; }
+
+  fetch("https://api.allorigins.win/get?url=" + encodeURIComponent(item.url))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var html = data.contents || "";
+      box.innerHTML = "";
+      if (!html) { renderSummary(item.title); return; }
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, "text/html");
+      ["script","style","nav","header","footer","aside","figure","iframe"].forEach(function(tag) {
+        var els = doc.querySelectorAll(tag);
+        for (var i = els.length - 1; i >= 0; i--) els[i].parentNode.removeChild(els[i]);
+      });
+      var paras = doc.querySelectorAll("p, article p, .content p, .article-body p");
+      var texts = [];
+      for (var i = 0; i < paras.length; i++) {
+        var t = paras[i].textContent.trim();
+        if (t.length > 80 && texts.indexOf(t) === -1) texts.push(t);
+        if (texts.length >= 5) break;
+      }
+      if (!texts.length) { renderSummary(item.title); return; }
+      var summary = texts.join("\n\n");
+      if (summary.length > 900) summary = summary.slice(0, 900) + "...";
+      renderSummary(summary);
+    })
+    .catch(function() { box.innerHTML = ""; renderSummary(item.title); });
+}
+
+function fetchSummary(item, cardEl) {
+  var btn = cardEl.querySelector(".news-expand-btn");
+  var box = cardEl.querySelector(".news-summary-box");
+  if (!btn || !box) return;
+  // Toggle
+  if (box.style.display === "block") {
+    box.style.display = "none";
+    btn.textContent = "Ver resumo";
+    return;
+  }
+  showSummaryInCard(cardEl, item);
+}
+
+
+function renderNewsTab() {
+  var hdr  = document.getElementById("news-hdr");
+  var list = document.getElementById("news-list");
+  if (!list) return;
+
+  var n = newsCache.length;
+  if (hdr) hdr.textContent = n + " NOTICIAS";
+  list.innerHTML = "";
+
+  if (!n) {
+    list.innerHTML = '<div class="empty">Buscando noticias...</div>';
+    return;
+  }
+
+  var savedAutoExpand = autoExpandId;
+  var savedFocus = focusNewsId;
+
+  newsCache.forEach(function(item) {
+    var e = document.createElement("div");
+    e.className = "ti";
+    e.id = "ni-" + item.id;
+    var tc = item.type === "macro" ? "var(--a)" : "var(--bl)";
+    e.style.cssText = "border-left:2px solid "+tc+";flex-direction:column;align-items:flex-start;cursor:default;margin-bottom:8px;";
+
+    // Top row
+    var top = document.createElement("div");
+    top.style.cssText = "display:flex;justify-content:space-between;width:100%;margin-bottom:5px";
+    var badge = document.createElement("span");
+    badge.className = "bdg";
+    badge.style.cssText = "background:rgba(255,255,255,.06);color:"+tc;
+    badge.textContent = item.ticker || item.source || "?";
+    var time = document.createElement("span");
+    time.style.cssText = "font-size:9px;color:var(--tx4)";
+    time.textContent = item.time || "";
+    top.appendChild(badge);
+    top.appendChild(time);
+
+    // Title
+    var title = document.createElement("div");
+    title.style.cssText = "font-size:12px;color:var(--tx);font-weight:600;line-height:1.5;margin-bottom:6px";
+    title.textContent = item.title || "";
+
+    // Expand button
+    var btn = document.createElement("button");
+    btn.className = "news-expand-btn";
+    btn.style.cssText = "background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);border-radius:5px;color:var(--bl);font-size:10px;font-weight:700;padding:3px 10px;cursor:pointer;margin-bottom:4px;font-family:inherit";
+    btn.textContent = "Ver resumo";
+
+    // Summary box
+    var box = document.createElement("div");
+    box.className = "news-summary-box";
+    box.style.cssText = "display:none;background:var(--bg);border-radius:6px;padding:10px;margin-top:4px;width:100%;border:1px solid var(--bd2)";
+
+    e.appendChild(top);
+    e.appendChild(title);
+    e.appendChild(btn);
+    e.appendChild(box);
+
+    (function(it, card, b){ 
+      b.onclick = function(){ fetchSummary(it, card); }; 
+    })(item, e, btn);
+
+    list.appendChild(e);
+  });
+
+  // Scroll to focused item
+  if (savedFocus || savedAutoExpand) {
+    var targetId = savedAutoExpand || savedFocus;
+    focusNewsId = null;
+    autoExpandId = null;
+    setTimeout(function() {
+      var el = document.getElementById("ni-" + targetId);
+      if (!el) return;
+      el.scrollIntoView({behavior:"smooth", block:"start"});
+      // Auto-expand summary if coming from tape
+      if (savedAutoExpand) {
+        var targetItem = null;
+        for (var i = 0; i < newsCache.length; i++) {
+          if (newsCache[i].id === savedAutoExpand) { targetItem = newsCache[i]; break; }
+        }
+        if (targetItem) showSummaryInCard(el, targetItem);
+      }
+    }, 150);
+  }
+}
+
+
+function openNewsUrl(url) {
+  if (url && url.indexOf("http") === 0) window.open(url, "_blank");
+}
+
+
+function buildNewsTape() {
+  var el = $("news-tape");
+  if (!el || !newsCache.length) return;
+
+  var items = newsCache.slice(0, 10); // 10 in tape
+  newsTapeItems = items;
+  el.innerHTML = "";
+
+  // Build 3x for seamless loop
+  for (var pass=0; pass<3; pass++) {
+    items.forEach(function(n) {
+      var span = document.createElement("span");
+      span.className = "news-tape-item";
+      var tagColor = n.type==="macro" ? "#f59e0b" : "#60a5fa";
+      var isEN = (n.lang === "en");
+      var tag = n.ticker || n.source;
+      if (isEN) tag = "[EN] " + tag;
+      span.textContent = '[' + tag + '] ' + n.title + '  -  ';
+      span.dataset.newsId = n.id;
+      span.onclick = function() {
+        var nid = parseInt(span.dataset.newsId);
+        focusNewsId = nid;
+        autoExpandId = nid; // auto-expand this news summary
+        document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
+        document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("on"); });
+        $("news-panel").classList.add("on");
+        var newsTab = document.querySelector(".tab[data-t='news']");
+        if (newsTab) newsTab.classList.add("on");
+        $("pb").style.display = "none";
+        setTimeout(function(){ renderNewsTab(); }, 50);
+      };
+      el.appendChild(span);
+    });
+  }
+
+  // Init tape scroll
+  setTimeout(function() {
+    var children = el.querySelectorAll(".news-tape-item");
+    var oneSet = Math.floor(children.length / 3);
+    newsTapeOneW = 0;
+    for (var i=0; i<oneSet; i++) newsTapeOneW += children[i].offsetWidth;
+    newsTapeX = -newsTapeOneW;
+    el.style.transform = "translateX("+newsTapeX+"px)";
+    cancelAnimationFrame(newsTapeRAF);
+    newsTapeLoop();
+  }, 200);
+}
+
+function newsTapeLoop() {
+  if (!newsTapePaused) {
+    newsTapeX -= 0.8;
+    var el = $("news-tape");
+    if (el) {
+      if (newsTapeX < -(newsTapeOneW*2)) newsTapeX += newsTapeOneW;
+      if (newsTapeX > 0) newsTapeX -= newsTapeOneW;
+      el.style.transform = "translateX("+newsTapeX+"px)";
+    }
+  }
+  newsTapeRAF = requestAnimationFrame(newsTapeLoop);
+}
+
+function initNewsTape() {
+  var wrap = $("news-tape-wrap");
+  if (!wrap) return;
+  wrap.addEventListener("touchstart", function(e) {
+    newsTapePaused = true;
+    newsTapeDragging = true;
+    newsTapeDragStartX = e.touches[0].clientX;
+    newsTapeDragStartTapeX = newsTapeX;
+  }, {passive:true});
+  wrap.addEventListener("touchmove", function(e) {
+    if (!newsTapeDragging) return;
+    newsTapeX = newsTapeDragStartTapeX + (e.touches[0].clientX - newsTapeDragStartX);
+    var el = $("news-tape");
+    if (el) el.style.transform = "translateX("+newsTapeX+"px)";
+  }, {passive:true});
+  wrap.addEventListener("touchend", function() {
+    newsTapeDragging = false;
+    newsTapePaused = false;
+  }, {passive:true});
+}
+
+//  Ticker quick search 
+function initTickerSearch() {
+  var input = $("ticker-search");
+  var results = $("ticker-results");
+  if (!input) return;
+
+  input.addEventListener("input", function() {
+    var q = input.value.trim().toUpperCase();
+    results.innerHTML = "";
+    if (q.length < 1) { results.style.display="none"; return; }
+
+    var matches = DISPLAY_TICKERS.filter(function(t) {
+      return t.indexOf(q) === 0 || NAMES[t].toUpperCase().indexOf(q) >= 0;
+    }).slice(0, 6);
+
+    if (!matches.length) { results.style.display="none"; return; }
+
+    matches.forEach(function(t) {
+      var p = prices[t] || 0;
+      var c = pct[t] || 0;
+      var el = document.createElement("div");
+      el.className = "ticker-result";
+      el.innerHTML =
+        '<div>' +
+          '<span style="color:var(--bl);font-weight:700;font-size:13px;letter-spacing:1px">' + t + '</span>' +
+          '<span style="color:var(--tx4);font-size:10px;margin-left:8px">' + NAMES[t] + '</span>' +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div style="font-weight:700;font-size:12px;color:' + (p>0?(c>=0?"var(--g)":"var(--r)"):"var(--tx3)") + '">' + (p>0?fr(p):"--") + '</div>' +
+          (p>0?'<div style="font-size:9px;color:' + (c>=0?"var(--g)":"var(--r)") + '">' + (c>=0?"+":"") + c.toFixed(2) + '%</div>':'') +
+        '</div>';
+      el.onclick = function() {
+        sel = t;
+        input.value = "";
+        results.style.display = "none";
+        render();
+        loadTV();
+        // Switch to order tab if not already there
+        document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
+        document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("on"); });
+        $("order-panel").classList.add("on");
+        document.querySelector(".tab[data-t='order']").classList.add("on");
+        $("pb").style.display = "none";
+      };
+      results.appendChild(el);
+    });
+    results.style.display = "block";
+  });
+
+  // Close results when tapping outside
+  document.addEventListener("touchstart", function(e) {
+    if (!input.contains(e.target) && !results.contains(e.target)) {
+      results.style.display = "none";
+    }
+  }, {passive:true});
+
+  // Auto uppercase
+  input.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && results.children.length > 0) {
+      results.children[0].click();
+    }
+  });
+}
+
+function buildTapePicker() {
+  var picker = document.getElementById("tape-picker");
+  var countEl = document.getElementById("tape-count");
+  if (!picker) return;
+  picker.innerHTML = "";
+
+  // Note about pinned tickers
+  var note = document.createElement("div");
+  note.style.cssText = "font-size:9px;color:var(--g);margin-bottom:8px;padding:5px 8px;background:rgba(0,200,150,.08);border-radius:5px;border:1px solid rgba(0,200,150,.2)";
+  note.textContent = "IBOV e USD/BRL sao fixos e sempre aparecem no tape.";
+  picker.appendChild(note);
+
+  var segments = [
+    { label: "ACOES IBOVESPA", color: "var(--bl)", tickers: [
+      "PETR4","PETR3","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3",
+      "B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","ELET3","ELET6",
+      "HAPV3","TOTS3","CPLE6","ENEV3","CSAN3","LREN3","MGLU3","BEEF3","BRFS3","CYRE3",
+      "FLRY3","GGBR4","GOAU4","HYPE3","JBSS3","KLBN11","MRVE3","MULT3","RAIL3","SBSP3",
+      "TAEE11","TIMS3","TRPL4","USIM5","YDUQ3","NTCO3","POMO4"
+    ]},
+    { label: "ETFs", color: "var(--a)", tickers: [
+      "BOVA11","SMAL11","IVVB11","DOLA11","GOLD11","HASH11","PIBB11","SPXI11","BBSD11","EURP11"
+    ]},
+    { label: "BDRs", color: "#a78bfa", tickers: [
+      "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34"
+    ]}
+  ];
+
+  // Non-pinned already selected
+  var alreadySelected = TAPE_TICKERS.filter(function(t){
+    return PINNED_TICKERS.indexOf(t) === -1;
+  });
+
+  var updateCount = function() {
+    var n = picker.querySelectorAll("input[type=checkbox]:checked").length;
+    if (countEl) countEl.textContent = n;
+  };
+
+  segments.forEach(function(seg) {
+    var hdr = document.createElement("div");
+    hdr.style.cssText = "font-size:9px;font-weight:700;color:"+seg.color+";letter-spacing:2px;margin:10px 0 6px;width:100%";
+    hdr.textContent = seg.label;
+    picker.appendChild(hdr);
+
+    seg.tickers.forEach(function(t) {
+      // Skip pinned - they are always in tape
+      if (PINNED_TICKERS.indexOf(t) >= 0) return;
+      var isOn = alreadySelected.indexOf(t) >= 0;
+
+      var chip = document.createElement("div");
+      chip.style.cssText = "display:inline-flex;align-items:center;padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;margin:2px;border:1px solid "+(isOn?"#1e4a80":"var(--bd)")+";background:"+(isOn?"#0d2040":"transparent")+";color:"+(isOn?"var(--bl)":"var(--tx3)")+";";
+
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = t;
+      cb.checked = isOn;
+      cb.style.display = "none";
+      chip.appendChild(cb);
+      chip.appendChild(document.createTextNode(t));
+
+      chip.onclick = function() {
+        var total = picker.querySelectorAll("input[type=checkbox]:checked").length;
+        if (!cb.checked && total >= 18) {
+          notif("Maximo 18 (+ IBOV e USD/BRL fixos)","err");
+          return;
+        }
+        cb.checked = !cb.checked;
+        chip.style.border = cb.checked ? "1px solid #1e4a80" : "1px solid var(--bd)";
+        chip.style.background = cb.checked ? "#0d2040" : "transparent";
+        chip.style.color = cb.checked ? "var(--bl)" : "var(--tx3)";
+        updateCount();
+      };
+
+      picker.appendChild(chip);
+    });
+  });
+
+  updateCount();
+}
+
+
+// ── Profile system ────────────────────────────────────────────────────────────
+function showProfileScreen() {
+  $("ts").style.display = "none";
+  $("ma").style.display = "none";
+  $("ps").style.display = "flex";
+  renderProfileList();
+}
+
+function renderProfileList() {
+  var list = $("profile-list");
+  if (!list) return;
+  list.innerHTML = "";
+  var profiles = getProfiles();
+  if (!profiles.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--tx4);font-size:11px;padding:10px">Nenhum perfil ainda. Crie o primeiro!</div>';
+    return;
+  }
+  profiles.forEach(function(name) {
+    var card = document.createElement("div");
+    card.style.cssText = "background:var(--bg2);border-radius:10px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;";
+    var left = document.createElement("div");
+    var avatar = document.createElement("div");
+    avatar.style.cssText = "width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#1e4a80,#2563eb);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;margin-right:10px;vertical-align:middle";
+    avatar.textContent = name.charAt(0).toUpperCase();
+    var nameEl = document.createElement("span");
+    nameEl.style.cssText = "font-weight:700;font-size:13px;color:var(--tx);vertical-align:middle";
+    nameEl.textContent = name;
+    left.style.display = "flex";
+    left.style.alignItems = "center";
+    left.appendChild(avatar);
+    left.appendChild(nameEl);
+    var enterBtn = document.createElement("button");
+    enterBtn.style.cssText = "padding:7px 16px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit";
+    enterBtn.textContent = "ENTRAR";
+    (function(n){ enterBtn.onclick = function(){ enterProfile(n); }; })(name);
+    card.appendChild(left);
+    card.appendChild(enterBtn);
+    list.appendChild(card);
+  });
+}
+
+function enterProfile(name) {
+  saveProfile(name);
+  // Reload state for this profile
+  var st2 = loadState();
+  bal = st2.bal; port = st2.port; trd = st2.trd; pending = st2.pending;
+  divs = st2.divs; totalDiv = st2.totalDiv; checkedDivDate = st2.checkedDivDate;
+  initialBal = st2.initialBal; firstTradeDate = st2.firstTradeDate;
+  goal = loadGoal();
+  equityHistory = loadEquityHistory();
+  $("ps").style.display = "none";
+  if (!$("ma").style.display || $("ma").style.display === "none") {
+    initApp();
+  } else {
+    updateProfileIndicator();
+    render();
+  }
+}
+
+function updateProfileIndicator() {
+  var el = $("profile-indicator");
+  if (el) el.textContent = getCurrentProfile() ? "Perfil: " + getCurrentProfile() : "";
+}
+
+function renderSettingsProfiles() {
+  var el = $("settings-profiles");
+  if (!el) return;
+  var profiles = getProfiles();
+  var current = getCurrentProfile();
+  el.innerHTML = "";
+  profiles.forEach(function(name) {
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)";
+    var nameEl = document.createElement("span");
+    nameEl.style.cssText = "font-size:11px;color:" + (name === current ? "var(--bl)" : "var(--tx2)") + ";font-weight:" + (name === current ? "700" : "400");
+    nameEl.textContent = name + (name === current ? " (ativo)" : "");
+    var delBtn = document.createElement("button");
+    delBtn.style.cssText = "padding:3px 8px;background:transparent;border:1px solid rgba(240,64,96,.4);border-radius:5px;color:var(--r);font-size:9px;font-weight:700;cursor:pointer;font-family:inherit";
+    delBtn.textContent = "EXCLUIR";
+    (function(n){
+      delBtn.onclick = function(){
+        if (n === current) { notif("Nao pode excluir o perfil ativo","err"); return; }
+        if (!confirm("Excluir perfil " + n + "? Todos os dados serao apagados.")) return;
+        deleteProfile(n);
+        renderSettingsProfiles();
+        notif("Perfil " + n + " excluido");
+      };
+    })(name);
+    row.appendChild(nameEl);
+    if (name !== current) row.appendChild(delBtn);
+    el.appendChild(row);
+  });
+}
+
+function initApp() {
+  $("ts").style.display="none"; $("ma").style.display="flex";
+
+  document.querySelectorAll(".tab").forEach(function(b) {
+    b.onclick=function() {
+      document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("on");});
+      document.querySelectorAll(".panel").forEach(function(x){x.classList.remove("on");});
+      b.classList.add("on"); $(b.dataset.t+"-panel").classList.add("on");
+      $("pb").style.display=b.dataset.t==="chart"?"flex":"none";
+      if (b.dataset.t==="portfolio") drawEquityChart();
+      if (b.dataset.t==="news") {
+        renderNewsTab();
+        if (!newsCache.length) { newsLastFetch=0; fetchNews(); }
+      }
+    };
+  });
+
+  document.querySelectorAll(".pbb").forEach(function(b) {
+    b.onclick=function() {
+      document.querySelectorAll(".pbb").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); per=b.dataset.p; loadTV();
+    };
+  });
+
+  $("ot-mkt").onclick=function() { orderMode="market"; $("ot-mkt").classList.add("on"); $("ot-lmt").classList.remove("on"); $("lmt-wrap").style.display="none"; updateExecBtn(); };
+  $("ot-lmt").onclick=function() { orderMode="limit"; $("ot-lmt").classList.add("on"); $("ot-mkt").classList.remove("on"); $("lmt-wrap").style.display="block"; var p=prices[sel]; if(p&&!$("lmt-price").value) $("lmt-price").value=p.toFixed(2); updateExecBtn(); };
+  $("lmt-price").oninput=function(){ renderOrders(); };
+
+  $("bbuy").onclick=function() { side="buy"; $("bbuy").style.cssText="background:var(--g);color:#fff;box-shadow:0 0 20px rgba(0,200,150,.35);"; $("bsel").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
+  $("bsel").onclick=function() { side="sell"; $("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);"; $("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
+
+  $("qinp").oninput=function(e){
+    qty=parseInt(e.target.value)||0;
+    if(qty<0) qty=0;
+    renderOrders();
+  };
+  $("qclear").onclick=function(){
+    qty=0; $("qinp").value=""; $("qinp").focus(); renderOrders();
+  };
+  // Increment buttons (+50, +100, +500, +1000)
+  document.querySelectorAll(".pr-inc").forEach(function(b){
+    b.onclick=function(){
+      var inc=+b.dataset.inc;
+      qty=Math.max(1, qty+inc);
+      $("qinp").value=qty;
+      renderOrders();
+    };
+  });
+
+  // Max button - use all available balance
+  $("max-btn").onclick=function(){
+    var p=prices[sel]||0;
+    if(!p){notif("Sem cotacao para calcular","err");return;}
+    if(side==="sell"){
+      var pos=port[sel];
+      if(!pos){notif("Sem posicao para vender","err");return;}
+      qty=pos.qty;
+    } else {
+      var useP=(orderMode==="limit")?(parseFloat($("lmt-price").value)||p):p;
+      qty=Math.max(1,Math.floor(bal/useP));
+    }
+    $("qinp").value=qty;
+    renderOrders();
+    notif("Quantidade maxima: "+qty+" cotas");
+  };
+
+  $("exec").onclick=execOrder;
+
+  $("theme-dark").onclick = function(){ applyTheme("dark"); };
+  $("theme-light").onclick = function(){ applyTheme("light"); };
+  $("cfgb").onclick=function() {
+    applyTheme(localStorage.getItem(LS_THEME)||"dark");
+    $("tdsp").textContent=token.slice(0,8)+"..."+token.slice(-4); $("s-end").value=goal.endDate||""; $("s-tgt").value=goal.target||""; buildTapePicker(); $("sht").classList.add("on");
+  };
+  $("csht").onclick=function(){ $("sht").classList.remove("on"); };
+  $("sht").onclick=function(e){ if(e.target===$("sht")) $("sht").classList.remove("on"); };
+
+  $("tape-save").onclick = function() {
+    var picker = document.getElementById("tape-picker");
+    if (!picker) return;
+    var selected = [];
+    var checks = picker.querySelectorAll("input[type=checkbox]:checked");
+    for (var i=0; i<checks.length; i++) selected.push(checks[i].value);
+    if (!selected.length) { notif("Selecione ao menos 1 ticker","err"); return; }
+    // Always pin IBOV and USDBRL at start
+    var final = PINNED_TICKERS.concat(selected.filter(function(t){
+      return PINNED_TICKERS.indexOf(t) === -1;
+    }));
+    TAPE_TICKERS = final;
+    localStorage.setItem("hb_tape_v1", JSON.stringify(final));
+    $("sht").classList.remove("on");
+    renderTickers();
+    notif("Tape: " + final.length + " tickers salvos!");
+  };
+
+  $("s-save").onclick=function() {
+    var d=$("s-end").value, t=parseFloat($("s-tgt").value);
+    goal={}; if(d) goal.endDate=d; if(!isNaN(t)&&t>0) goal.target=t;
+    saveGoal(); $("sht").classList.remove("on"); render(); notif("Configuracoes salvas!");
+  };
+  $("s-clr").onclick=function() { goal={}; saveGoal(); $("s-end").value=""; $("s-tgt").value=""; render(); notif("Meta removida"); };
+  $("s-rst").onclick=function() {
+    // Only allow reset if no first trade yet OR show warning
+    if (firstTradeDate && (!goal.endDate || new Date() < new Date(goal.endDate+"T00:00:00"))) {
+      // Still show reset but warn
+    }
+    $("sht").classList.remove("on");
+    $("reset-bal").value = initialBal;
+    $("cfm").classList.add("on");
+  };
+  $("c-no").onclick=function() { $("cfm").classList.remove("on"); };
+  $("liq-btn").onclick = function(){
+    if (!isPregaoOpen()){ notif("Pregao fechado","err"); return; }
+    var tks = Object.keys(port);
+    if (!tks.length){ notif("Carteira vazia","err"); return; }
+    tks.forEach(function(tk){
+      var p=prices[tk], pos2=port[tk];
+      if (!p||!pos2) return;
+      var tot=p*pos2.qty; bal+=tot;
+      trd.unshift({id:Date.now(),tk:tk,tp:"V",qty:pos2.qty,pr:p,tot:tot,
+        tm:new Date().toLocaleTimeString("pt-BR"),note:"Liquidacao"});
+      delete port[tk];
+    });
+    if (trd.length>200) trd=trd.slice(0,200);
+    saveState(); render(); notif("Posicoes liquidadas!");
+  };
+
+  $("c-yes").onclick=function() {
+    var newBal = parseFloat($("reset-bal").value);
+    if (!newBal||newBal<1000) { notif("Saldo minimo: R$ 1.000,00","err"); return; }
+    bal=newBal; initialBal=newBal; port={}; trd=[]; pending=[];
+    divs=[]; totalDiv=0; checkedDivDate=""; equityHistory=[];
+    firstTradeDate="";
+    saveState(); saveEquityHistory();
+    $("cfm").classList.remove("on"); render();
+    notif("Simulador resetado! Saldo: "+R(newBal));
+  };
+  $("cfm").onclick=function(e){ if(e.target===$("cfm")) $("cfm").classList.remove("on"); };
+
+  // After-hours order modal
+  $("aho-no").onclick=function() { $("aho-modal").style.display="none"; ahoOrder=null; };
+  $("aho-yes").onclick=function() {
+    if (!ahoOrder) return;
+    pending.push(ahoOrder);
+    saveState(); render();
+    var side2=ahoOrder.side==="buy"?"COMPRA":"VENDA";
+    var type2=ahoOrder.market?"a mercado":"limitada @ "+R(ahoOrder.lp);
+    playOrderSound("pending");
+    notif("Agendada: "+ahoOrder.qty+" "+ahoOrder.tk+" "+side2+" "+type2);
+    $("aho-modal").classList.remove("on"); ahoOrder=null;
+  };
+  $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
+  $("logb").onclick=function() { localStorage.removeItem(LS_TOKEN); location.reload(); };
+  $("fs-up").onclick=function(){ applyFontScale(fontIdx+1); };
+  $("fs-down").onclick=function(){ applyFontScale(fontIdx-1); };
+  $("switch-profile-btn").onclick = function() { $("sht").classList.remove("on"); showProfileScreen(); };
+  $("invite-btn").onclick = function() {
+    if (!token) { notif("Entre no app primeiro","err"); return; }
+    var base = window.location.href.split("?")[0];
+    var enc = encodeToken(token);
+    var url = base + "?t=" + enc;
+    var msg = "Oi! Te convido para simular investimentos na bolsa comigo no Home Broker B3." +
+      " Acesse o link abaixo, crie seu perfil e comece a operar com cotacoes reais da B3:" +
+      " " + url +
+      " Nao precisa criar conta em nenhum lugar. So clicar, criar seu nome e comecar!";
+    window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+  };
+
+  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
+  // Show/hide invite button based on owner status
+  var invBtn = $("invite-btn");
+  if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
+  initTickerSearch();
+  initNewsTape();
+  // If cached news exist, build tape immediately
+  if (newsCache.length) { buildNewsTape(); }
+  // Fetch fresh news after 2s
+  setTimeout(function(){ fetchNews(); }, 2000);
+  // Refresh news every 15 min
+  setInterval(function(){ fetchNews(); }, 15*60*1000);
+  // Tape watchdog: restart animation if it stopped
+  setInterval(function(){
+    if (newsTapeOneW > 0) {
+      cancelAnimationFrame(newsTapeRAF);
+      newsTapeLoop();
+    }
+  }, 8000);
+}
+
+$("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+
+$("profile-create").onclick = function() {
+  var name = $("profile-name").value.trim();
+  if (!name || name.length < 2) { notif("Digite um nome (min. 2 caracteres)","err"); return; }
+  enterProfile(name);
+};
+$("profile-name").addEventListener("keydown",function(e){ if(e.key==="Enter") $("profile-create").click(); });
+
+// Check if arriving via invite link
+var urlToken = getTokenFromUrl();
+if (urlToken && !token) {
+  token = urlToken;
+  localStorage.setItem(LS_TOKEN, token);
+  localStorage.setItem("hb_is_owner", "0"); // guest
+}
+
+if (token) {
+  $("ts").style.display = "none"; // hide token screen immediately
+  // Auto-mark as owner if no invite param in URL
+  if (localStorage.getItem("hb_is_owner") === null) {
+    var hasInvite = window.location.search.indexOf("t=") >= 0;
+    localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
+  }
+  try {
+    if (getCurrentProfile()) {
+      var st2 = loadState();
+      bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+      divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+      initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+      goal=loadGoal(); equityHistory=loadEquityHistory();
+      initApp();
+    } else {
+      showProfileScreen();
+    }
+  } catch(e) {
+    document.title = "TGP ERROR: " + e.message;
+    document.getElementById("ts").style.display = "flex";
+  }
+}
+</script>
+</body>
+</html>
