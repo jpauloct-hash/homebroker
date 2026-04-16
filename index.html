@@ -2,12 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Home Broker B3</title>
 <style>
@@ -28,7 +29,6 @@
 .light #pregao-bar #pregao-cd{color:#3a5878 !important;}
 .light #pregao-bar button{background:rgba(245,158,11,.2) !important;border-color:rgba(245,158,11,.5) !important;color:#b06000 !important;}
 html,body{height:100%;background:var(--bg);color:var(--tx);font-family:'JetBrains Mono',monospace;overflow:hidden;}
-#app{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
 #app{font-size:var(--fs,13px);}
 button,input{font-family:inherit;cursor:pointer;}
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
@@ -59,9 +59,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 #tks{display:flex;gap:5px;padding:7px 14px;width:max-content;will-change:transform;}
 .tk{flex-shrink:0;background:transparent;border:1px solid var(--bd);border-radius:6px;padding:5px 9px;min-width:68px;text-align:center;transition:border-color .15s,background .15s;}
 .tk.on{background:#0d2040;border-color:#1e4a80;}
-.tks{font-size:11px;font-weight:700;color:var(--tx2);}
+.tks{font-size:9px;font-weight:700;color:var(--tx2);}
 .tk.on .tks{color:var(--bl);}
-.tkp{font-size:11px;font-weight:700;color:var(--tx);}
+.tkp{font-size:10px;font-weight:700;color:var(--tx);}
 .tk.on .tkp{color:var(--tx);}
 #sb{padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 #tbr{background:var(--bg2);border-bottom:1px solid var(--bd);flex-shrink:0;position:relative;z-index:20;}
@@ -112,7 +112,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .cfm-box{width:100%;max-width:360px;background:#0d1421;border-radius:14px;padding:24px;border:1px solid var(--r);animation:slideup .2s ease;}
 .news-item{background:var(--bg3);border-radius:9px;padding:13px 14px;margin-bottom:8px;border:1px solid var(--bd);cursor:pointer;transition:background .15s;}
 .news-item:active{background:var(--bd);}
-.news-tape-item{font-size:12px;color:var(--tx);padding:0 16px;cursor:pointer;white-space:nowrap;letter-spacing:.3px;}
+.news-tape-item{font-size:9px;color:var(--tx);padding:0 16px;cursor:pointer;white-space:nowrap;letter-spacing:.3px;}
 .news-tape-item .nt-tag{font-weight:700;}
 .ticker-result{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s;}
 .ticker-result:last-child{border-bottom:none;}
@@ -139,7 +139,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   <div style="text-align:center">
     <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">SIMULADOR B3</div>
     <div style="font-size:22px;font-weight:700;letter-spacing:1px">HOME BROKER</div>
-    <div style="font-size:10px;color:var(--tx3);margin-top:4px">19 ativos · Dividendos · TradingView · v20260416-0127</div>
+    <div style="font-size:10px;color:var(--tx3);margin-top:4px">19 ativos · Dividendos · TradingView</div>
   </div>
   <div class="tcard">
     <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:10px">TOKEN BRAPI PRO</div>
@@ -153,7 +153,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <!-- PROFILE SCREEN -->
 <div id="ps" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;">
   <div style="text-align:center">
-    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER TGP</div>
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER B3</div>
     <div style="font-size:20px;font-weight:700;margin-bottom:4px">Selecionar Perfil</div>
     <div style="font-size:10px;color:var(--tx3)">Cada perfil tem carteira e historico independentes</div>
   </div>
@@ -172,7 +172,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div>
         <div style="font-size:9px;letter-spacing:3px;color:var(--tx3);text-transform:uppercase;margin-bottom:2px">Simulador</div>
         <div id="profile-indicator" style="font-size:9px;color:var(--bl);margin-bottom:2px"></div>
-        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER TGP</div>
+        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER B3</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">PATRIMÔNIO</div>
@@ -185,7 +185,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <span><span style="color:var(--tx3);font-size:11px">CART. </span><span id="hpv" style="color:var(--tx2);font-weight:600"></span></span>
       <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
         <div id="sts" style="font-size:9px;color:var(--tx3)">CONECTANDO...</div>
-        <button id="force-refresh" title="Atualizar" onclick="fetchQ()" style="width:40px;height:40px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:7px;color:var(--a);font-size:20px;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">&#8635;</button>
+        <button id="force-refresh" title="Atualizar" onclick="fetchQ()" style="width:34px;height:34px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:5px;color:var(--a);font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">&#8635;</button>
       </div>
     </div>
     <div class="hf">
@@ -199,7 +199,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <span id="pregao-sts" class="pregao-closed">&#9679; PREGAO FECHADO</span>
     <div style="display:flex;align-items:center;gap:8px">
       <span id="pregao-cd"></span>
-      <button class="cfg" id="cfgb" style="width:40px;height:40px;font-size:20px;padding:0;display:flex;align-items:center;justify-content:center;color:var(--tx2);border-color:var(--bd2);flex-shrink:0">&#9881;</button>
+      <button class="cfg" id="cfgb" style="width:34px;height:34px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center;color:var(--tx2);border-color:var(--bd2);flex-shrink:0">&#9881;</button>
     </div>
   </div>
 
@@ -256,23 +256,19 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     </div>
 
     <div id="group-panel" class="panel">
-  <div id="group-content" style="padding:12px">
-    <!-- No room joined yet -->
+  <div style="padding:12px">
     <div id="group-noroom" style="text-align:center;padding:30px 0">
       <div style="font-size:11px;color:var(--tx3);margin-bottom:20px">Nenhum grupo ativo</div>
       <button onclick="showCreateRoom()" style="width:100%;padding:12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">+ CRIAR GRUPO</button>
       <button onclick="showJoinRoom()" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--bd2);border-radius:8px;color:var(--tx2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">ENTRAR COM CÓDIGO</button>
     </div>
-    <!-- Room active -->
     <div id="group-room" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div id="group-room-name" style="font-size:13px;font-weight:700;color:var(--bl)"></div>
         <button onclick="shareRoomInvite()" style="padding:5px 12px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);border-radius:6px;color:#25d366;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">&#128279; CONVIDAR</button>
       </div>
-      <!-- Chart -->
-      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">EVOLUÇÃO DO PATRIMÔNIO</div>
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">EVOLUÇÃO</div>
       <canvas id="group-chart" height="160" style="width:100%;margin-bottom:16px;border-radius:8px;background:var(--bg3)"></canvas>
-      <!-- Ranking -->
       <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">RANKING</div>
       <div id="group-ranking"></div>
     </div>
@@ -444,10 +440,6 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <button id="fs-up" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);color:var(--tx2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">A+</button>
       </div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:9px;color:var(--tx3);letter-spacing:1px">EFEITOS SONOROS</div>
-      <button id="sfx-btn" onclick="SFX_ENABLED=!SFX_ENABLED;localStorage.setItem('hb_sfx',SFX_ENABLED?'1':'0');this.textContent=SFX_ENABLED?'ON':'OFF';this.style.color=SFX_ENABLED?'var(--g)':'var(--r)'" style="padding:5px 16px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--g)">ON</button>
-    </div>
     <div style="font-size:9px;color:var(--tx4);margin-bottom:16px">Cotacoes Brapi PRO · atualização 1min · delay 5min</div>
     <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:12px">CONFIGURAR SIMULADOR</div>
     <div class="srow"><div class="slbl">DATA DE ENCERRAMENTO</div><input type="date" id="s-end" class="sinp"></div>
@@ -503,8 +495,124 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div id="aho-summary" style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--tx2)"></div>
     <div style="display:flex;gap:8px">
       <button id="aho-no" style="flex:1;padding:10px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Cancelar</button>
-      <button id="aho-yes" style="flex:2;padding:10px;border:none;borde
+      <button id="aho-yes" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:11px;font-weight:700">Agendar para abertura</button>
+    </div>
+  </div>
+</div>
+
+<div id="nf"></div>
 <script>
+function doLogin() {
+  var t = document.getElementById("tinp").value.trim();
+  if (!t) { document.getElementById("terr").textContent="Cole seu token Brapi PRO"; document.getElementById("terr").style.display="block"; return; }
+  document.getElementById("terr").style.display="none";
+  localStorage.setItem("hb_token_v6", t); localStorage.setItem("hb_is_owner","1");
+  token = t;
+  document.getElementById("ts").style.display="none";
+  showProfileScreen();
+}
+
+var fbDb=null;
+try {
+  if(typeof firebase!=="undefined"){
+    var _FBC={apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"};
+    if(!firebase.apps.length) firebase.initializeApp(_FBC);
+    fbDb=firebase.database();
+  }
+} catch(e){console.log("FB err:",e.message);}
+
+var currentRoomId=localStorage.getItem("hb_room_id")||"";
+var currentRoomData=null, groupUnsubscribe=null;
+
+function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
+function createRoom(name,initBal,endDate,tgt){
+  if(!fbDb) return Promise.reject(new Error("Firebase indisponível"));
+  var id=genRoomId();
+  return fbDb.ref("rooms/"+id).set({id:id,name:name,initialBal:initBal,endDate:endDate,targetPct:tgt,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){
+    localStorage.setItem("hb_room_id",id); currentRoomId=id; return id;
+  });
+}
+function joinRoom(id){
+  if(!fbDb) return Promise.reject(new Error("Firebase indisponível"));
+  return fbDb.ref("rooms/"+id).once("value").then(function(s){
+    if(!s.exists()) throw new Error("Sala não encontrada");
+    localStorage.setItem("hb_room_id",id); currentRoomId=id; currentRoomData=s.val(); return s.val();
+  });
+}
+function pushMyStats(){
+  if(!currentRoomId||!getCurrentProfile()||!fbDb) return;
+  var total=bal+portValue(), initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;
+  fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:getCurrentProfile(),total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});
+}
+var _lastPush=0;
+function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lastPush>60000){_lastPush=n;pushMyStats();}}
+function subscribeGroup(cb){
+  if(!currentRoomId||!fbDb)return;
+  if(groupUnsubscribe)groupUnsubscribe();
+  var ref=fbDb.ref("rooms/"+currentRoomId+"/members");
+  ref.on("value",function(s){cb(s.val()||{});});
+  groupUnsubscribe=function(){ref.off();};
+}
+function getRoomInviteLink(){var b=window.location.origin+window.location.pathname,enc=btoa(localStorage.getItem("hb_token_v6")||"");return b+"?t="+enc+"&room="+currentRoomId;}
+function showCreateRoom(){
+  var name=prompt("Nome do grupo:");if(!name)return;
+  var initB=parseFloat(prompt("Saldo inicial (R$):","100000"));if(isNaN(initB))return;
+  var endD=prompt("Data fim (DD/MM/AAAA):");if(!endD)return;
+  var tgt=parseFloat(prompt("Meta (%):","5"))||0;
+  createRoom(name,initB,endD,tgt).then(function(id){notif("Grupo criado! Código: "+id);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(e){notif("Erro: "+e.message,"err");});
+}
+function showJoinRoom(){
+  var code=prompt("Código do grupo:");if(!code)return;
+  joinRoom(code.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});
+}
+function shareRoomInvite(){
+  var r=currentRoomData||{};
+  window.open("https://wa.me/?text="+encodeURIComponent("🎯 *"+(r.name||"Trading TGP")+"*
+Saldo: R$ "+(r.initialBal||100000).toLocaleString("pt-BR")+"
+Prazo: "+(r.endDate||"")+"
+Meta: "+(r.targetPct||0)+"%
+
+"+getRoomInviteLink()));
+}
+function renderGroupRoom(){
+  if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}
+  document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";
+  document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;
+}
+function renderGroupRanking(members){
+  drawGroupChart(members);
+  var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;
+  el.innerHTML="";
+  list.forEach(function(m,i){
+    var isMe=m.name===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");
+    div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";
+    div.innerHTML='<div style="font-size:16px;min-width:24px">'+medal+'</div><div style="flex:1"><div style="font-size:12px;font-weight:700">'+m.name+(isMe?' <span style="font-size:9px;color:var(--bl)">(você)</span>':'')+'</div><div style="font-size:9px;color:var(--tx4)">R$ '+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div></div><div style="font-size:14px;font-weight:700;color:'+color+'">'+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+'%</div>';
+    el.appendChild(div);
+  });
+}
+function drawGroupChart(members){
+  var canvas=document.getElementById("group-chart");if(!canvas)return;
+  var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;
+  var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);
+  var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];
+  list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});
+  if(!allPts.length)return;
+  var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;
+  list.forEach(function(m,ci){
+    if(!m.history||m.history.length<2)return;
+    ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();
+    m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});
+    ctx2.stroke();
+    var last=m.history[m.history.length-1];ctx2.fillStyle=colors[ci%colors.length];ctx2.font="bold 9px monospace";
+    ctx2.fillText(m.name.slice(0,6),W-pad-38,H-pad-(last.v-minV)/(maxV-minV)*(H-pad*2)-4);
+  });
+}
+(function(){
+  var params=new URLSearchParams(window.location.search),room=params.get("room");
+  if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}
+  else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}
+})();
+
 //  Ativos:
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
 var TICKERS = ["PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBR3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
@@ -591,10 +699,8 @@ var fontIdx = 3; // default = 1.0
 function applyFontScale(idx) {
   fontIdx = Math.max(0, Math.min(FONT_SCALES.length-1, idx));
   var scale = FONT_SCALES[fontIdx];
-  // Set both html font-size AND --fs CSS variable
+  // Apply to html element so all rem units scale proportionally
   document.documentElement.style.fontSize = (scale * 16) + "px";
-  var app = document.getElementById("app");
-  if (app) app.style.setProperty("--fs", (scale * 13) + "px");
   localStorage.setItem(LS_FONT, fontIdx);
   var pct = Math.round(scale * 100);
   var lbl = document.getElementById("fs-label");
@@ -744,423 +850,6 @@ var cd = REFRESH, cdi, rfi, nft;
 var tvWidget = null, tvScriptLoaded = false;
 
 var $ = function(id) { return document.getElementById(id); };
-
-function doLogin() {
-  var t = document.getElementById("tinp").value.trim();
-  if (!t) {
-    document.getElementById("terr").textContent = "Cole seu token Brapi PRO";
-    document.getElementById("terr").style.display = "block";
-    return;
-  }
-  document.getElementById("terr").style.display = "none";
-  localStorage.setItem("hb_token_v6", t);
-  localStorage.setItem("hb_is_owner", "1");
-  token = t;
-  document.getElementById("ts").style.display = "none";
-  showProfileScreen();
-}
-
-// ── FIREBASE ──────────────────────────────────────────────────────────────────
-var FB_CONFIG = {
-  apiKey: "AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",
-  authDomain: "trading-gp.firebaseapp.com",
-  databaseURL: "https://trading-gp-default-rtdb.firebaseio.com",
-  projectId: "trading-gp",
-  storageBucket: "trading-gp.firebasestorage.app",
-  messagingSenderId: "603398180172",
-  appId: "1:603398180172:web:d2b66ae0bb884bd625d3e9"
-};
-if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-var fbDb = firebase.database();
-
-var currentRoomId = localStorage.getItem("hb_room_id") || "";
-var currentRoomData = null;
-var groupUnsubscribe = null;
-
-// ── ROOM FUNCTIONS ────────────────────────────────────────────────────────────
-function genRoomId() {
-  return Math.random().toString(36).substr(2,6).toUpperCase();
-}
-
-function createRoom(name, initialBal, endDate, targetPct) {
-  var roomId = genRoomId();
-  var room = {
-    id: roomId,
-    name: name,
-    initialBal: initialBal,
-    endDate: endDate,
-    targetPct: targetPct,
-    createdBy: getCurrentProfile(),
-    createdAt: Date.now(),
-    members: {}
-  };
-  return fbDb.ref("rooms/" + roomId).set(room).then(function() {
-    localStorage.setItem("hb_room_id", roomId);
-    currentRoomId = roomId;
-    return roomId;
-  });
-}
-
-function joinRoom(roomId) {
-  return fbDb.ref("rooms/" + roomId).once("value").then(function(snap) {
-    if (!snap.exists()) throw new Error("Sala não encontrada");
-    var room = snap.val();
-    localStorage.setItem("hb_room_id", roomId);
-    currentRoomId = roomId;
-    currentRoomData = room;
-    return room;
-  });
-}
-
-function pushMyStats() {
-  if (!currentRoomId || !getCurrentProfile()) return;
-  var pv = portValue();
-  var total = bal + pv;
-  var initBal = currentRoomData ? currentRoomData.initialBal : initialBal;
-  var pct = ((total - initBal) / initBal * 100);
-  var member = {
-    name: getCurrentProfile(),
-    total: total,
-    pct: pct,
-    updatedAt: Date.now(),
-    history: getEquitySnap()
-  };
-  fbDb.ref("rooms/" + currentRoomId + "/members/" + getCurrentProfile()).set(member);
-}
-
-function getEquitySnap() {
-  // Last 30 equity points
-  var eq = equityHistory || [];
-  return eq.slice(-30).map(function(p) { return {t: p.t, v: p.v}; });
-}
-
-function subscribeGroup(callback) {
-  if (!currentRoomId) return;
-  if (groupUnsubscribe) groupUnsubscribe();
-  var ref = fbDb.ref("rooms/" + currentRoomId + "/members");
-  ref.on("value", function(snap) { callback(snap.val() || {}); });
-  groupUnsubscribe = function() { ref.off(); };
-}
-
-function getRoomInviteLink() {
-  var base = window.location.origin + window.location.pathname;
-  var enc = btoa(localStorage.getItem("hb_token_v6") || "");
-  return base + "?t=" + enc + "&room=" + currentRoomId;
-}
-
-// Push stats every time render is called (throttled)
-var lastPush = 0;
-function maybePushStats() {
-
-// ── GROUP UI ──────────────────────────────────────────────────────────────────
-function showCreateRoom() {
-  var name = prompt("Nome do grupo (ex: Familia TGP):");
-  if (!name) return;
-  var initBalStr = prompt("Saldo inicial para todos (R$):", "100000");
-  if (!initBalStr) return;
-  var initB = parseFloat(initBalStr.replace(",","."));
-  if (isNaN(initB) || initB <= 0) { notif("Saldo inválido","err"); return; }
-  var endD = prompt("Data de encerramento (DD/MM/AAAA):");
-  if (!endD) return;
-  var targetStr = prompt("Meta de rentabilidade (%):", "5");
-  var tgt = parseFloat(targetStr) || 0;
-  createRoom(name, initB, endD, tgt).then(function(roomId) {
-    notif("Grupo criado! Código: " + roomId);
-    currentRoomData = {name:name, initialBal:initB, endDate:endD, targetPct:tgt};
-    renderGroupRoom();
-    subscribeGroup(renderGroupRanking);
-    pushMyStats();
-  }).catch(function(e) { notif("Erro: "+e.message,"err"); });
-}
-
-function showJoinRoom() {
-  var code = prompt("Digite o código do grupo:");
-  if (!code) return;
-  joinRoom(code.toUpperCase().trim()).then(function(room) {
-    notif("Entrou no grupo: " + room.name);
-    currentRoomData = room;
-    renderGroupRoom();
-    subscribeGroup(renderGroupRanking);
-    pushMyStats();
-  }).catch(function(e) { notif("Grupo não encontrado","err"); });
-}
-
-function renderGroupRoom() {
-  if (!currentRoomId || !currentRoomData) {
-    $("group-noroom").style.display = "block";
-    $("group-room").style.display = "none";
-    return;
-  }
-  $("group-noroom").style.display = "none";
-  $("group-room").style.display = "block";
-  $("group-room-name").textContent = currentRoomData.name || currentRoomId;
-}
-
-function shareRoomInvite() {
-  var link = getRoomInviteLink();
-  var room = currentRoomData || {};
-  var msg = "🎯 *" + (room.name||"Trading TGP") + "*
-" +
-    "Saldo inicial: R$ " + (room.initialBal||100000).toLocaleString("pt-BR") + "
-" +
-    "Prazo: " + (room.endDate||"") + "
-" +
-    "Meta: " + (room.targetPct||0) + "%
-
-" +
-    "Entre aqui: " + link;
-  window.open("https://wa.me/?text=" + encodeURIComponent(msg));
-}
-
-function renderGroupRanking(members) {
-  // Draw chart
-  drawGroupChart(members);
-  // Build ranking
-  var list = Object.values(members).sort(function(a,b){ return b.pct - a.pct; });
-  var el = $("group-ranking"); if (!el) return;
-  el.innerHTML = "";
-  list.forEach(function(m, idx) {
-    var isMe = m.name === getCurrentProfile();
-    var pos = idx+1;
-    var medal = pos===1?"🥇":pos===2?"🥈":pos===3?"🥉":"";
-    var color = m.pct >= 0 ? "var(--g)" : "var(--r)";
-    var sign = m.pct >= 0 ? "+" : "";
-    var div = document.createElement("div");
-    div.style.cssText = "display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:" + 
-      (isMe?"rgba(96,165,250,.12)":"var(--bg3)") + ";border-radius:8px;border:1px solid " +
-      (isMe?"rgba(96,165,250,.3)":"var(--bd2)") + ";gap:10px";
-    div.innerHTML = '<div style="font-size:16px;min-width:24px">' + (medal||("#"+pos)) + '</div>' +
-      '<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--tx)">' + m.name + 
-      (isMe?' <span style="font-size:9px;color:var(--bl)">(você)</span>':'') + '</div>' +
-      '<div style="font-size:9px;color:var(--tx4)">R$ ' + (m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2}) + '</div></div>' +
-      '<div style="font-size:14px;font-weight:700;color:' + color + '">' + sign + m.pct.toFixed(2) + '%</div>';
-    el.appendChild(div);
-  });
-}
-
-function drawGroupChart(members) {
-  var canvas = $("group-chart"); if (!canvas) return;
-  var ctx2 = canvas.getContext("2d");
-  canvas.width = canvas.offsetWidth || 320;
-  var W = canvas.width, H = 160;
-  ctx2.clearRect(0,0,W,H);
-  var list = Object.values(members);
-  if (!list.length) return;
-  var colors = ["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa","#34d399"];
-  var allPts = [];
-  list.forEach(function(m){ if(m.history) allPts = allPts.concat(m.history.map(function(p){return p.v;})); });
-  if (!allPts.length) return;
-  var minV = Math.min.apply(null,allPts)*0.999;
-  var maxV = Math.max.apply(null,allPts)*1.001;
-  var pad = 8;
-  function px(v){ return H - pad - (v-minV)/(maxV-minV)*(H-pad*2); }
-  list.forEach(function(m, ci) {
-    if (!m.history || m.history.length < 2) return;
-    var pts = m.history;
-    ctx2.strokeStyle = colors[ci % colors.length];
-    ctx2.lineWidth = 2;
-    ctx2.beginPath();
-    pts.forEach(function(p,i){
-      var x = pad + (i/(pts.length-1))*(W-pad*2);
-      var y = px(p.v);
-      if(i===0) ctx2.moveTo(x,y); else ctx2.lineTo(x,y);
-    });
-    ctx2.stroke();
-    // Label at end
-    var last = pts[pts.length-1];
-    var lx = W - pad - 2;
-    var ly = px(last.v);
-    ctx2.fillStyle = colors[ci % colors.length];
-    ctx2.font = "bold 9px monospace";
-    ctx2.fillText(m.name.slice(0,6), lx - 36, ly - 4);
-  });
-}
-
-// Check if joining from invite with room param
-(function(){
-  var params = new URLSearchParams(window.location.search);
-  var roomParam = params.get("room");
-  if (roomParam && !currentRoomId) {
-    joinRoom(roomParam.toUpperCase()).then(function(room) {
-      currentRoomData = room;
-    }).catch(function(){});
-  } else if (currentRoomId) {
-    joinRoom(currentRoomId).then(function(room) {
-      currentRoomData = room;
-      renderGroupRoom();
-      subscribeGroup(renderGroupRanking);
-    }).catch(function(){});
-  }
-})();
-  if (!currentRoomId) return;
-  var now = Date.now();
-  if (now - lastPush > 60000) { // max 1x per minute
-    lastPush = now;
-    pushMyStats();
-  }
-}
-
-
-// ── SOUND ENGINE ──────────────────────────────────────────────────────────────
-var SFX_ENABLED = localStorage.getItem("hb_sfx") !== "0";
-
-function sfxCtx() { return new (window.AudioContext || window.webkitAudioContext)(); }
-function sfxNoise(c, dur) {
-  var b = c.createBuffer(1, c.sampleRate*dur, c.sampleRate);
-  var d = b.getChannelData(0);
-  for (var i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-  var s=c.createBufferSource(); s.buffer=b; return s;
-}
-function sfxOsc(c,f,t){ var o=c.createOscillator(); o.type=t||"sine"; o.frequency.value=f; return o; }
-function sfxGain(c,v){ var g=c.createGain(); g.gain.value=v; return g; }
-function sfxLP(c,f){ var x=c.createBiquadFilter(); x.type="lowpass"; x.frequency.value=f; return x; }
-function sfxHP(c,f){ var x=c.createBiquadFilter(); x.type="highpass"; x.frequency.value=f; return x; }
-function sfxBP(c,f,q){ var x=c.createBiquadFilter(); x.type="bandpass"; x.frequency.value=f; x.Q.value=q||1; return x; }
-
-// Ferrolho
-function sfxBolt() {
-  if (!SFX_ENABLED) return;
-  var c=sfxCtx(), t=c.currentTime;
-  (function(st){
-    var n=sfxNoise(c,0.07); var h=sfxHP(c,1500); var l=sfxLP(c,4000); var g=sfxGain(c,0);
-    g.gain.setValueAtTime(0,st); g.gain.linearRampToValueAtTime(2.5,st+0.003); g.gain.exponentialRampToValueAtTime(0.001,st+0.065);
-    n.connect(h);h.connect(l);l.connect(g);g.connect(c.destination);n.start(st);
-    var o=sfxOsc(c,180,"triangle"); var g2=sfxGain(c,0.8);
-    g2.gain.setValueAtTime(0.8,st);g2.gain.exponentialRampToValueAtTime(0.001,st+0.04);
-    o.connect(g2);g2.connect(c.destination);o.start(st);o.stop(st+0.05);
-  })(t);
-  setTimeout(function(){
-    var c2=sfxCtx(),t2=c2.currentTime;
-    var o=sfxOsc(c2,2800,"sine"); var g=sfxGain(c2,0.15);
-    o.frequency.exponentialRampToValueAtTime(1200,t2+0.08);
-    g.gain.setValueAtTime(0.15,t2);g.gain.exponentialRampToValueAtTime(0.001,t2+0.12);
-    o.connect(g);g.connect(c2.destination);o.start(t2);o.stop(t2+0.15);
-  },90);
-  setTimeout(function(){
-    var c3=sfxCtx(),t3=c3.currentTime;
-    var n=sfxNoise(c3,0.09);var h=sfxHP(c3,800);var l=sfxLP(c3,3500);var g=sfxGain(c3,0);
-    g.gain.setValueAtTime(0,t3);g.gain.linearRampToValueAtTime(3.0,t3+0.004);g.gain.exponentialRampToValueAtTime(0.001,t3+0.08);
-    n.connect(h);h.connect(l);l.connect(g);g.connect(c3.destination);n.start(t3);
-    var o=sfxOsc(c3,140,"triangle");var g2=sfxGain(c3,1.0);
-    g2.gain.setValueAtTime(1.0,t3);g2.gain.exponentialRampToValueAtTime(0.001,t3+0.06);
-    o.connect(g2);g2.connect(c3.destination);o.start(t3);o.stop(t3+0.07);
-  },200);
-}
-
-// Disparo
-function sfxShot() {
-  if (!SFX_ENABLED) return;
-  var c=sfxCtx(),t=c.currentTime;
-  (function(){
-    var n=sfxNoise(c,0.6);var l=sfxLP(c,3000);
-    l.frequency.exponentialRampToValueAtTime(400,t+0.4);
-    var g=sfxGain(c,0);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(4.5,t+0.002);
-    g.gain.exponentialRampToValueAtTime(0.8,t+0.05);g.gain.exponentialRampToValueAtTime(0.001,t+0.5);
-    n.connect(l);l.connect(g);g.connect(c.destination);n.start(t);
-  })();
-  (function(){
-    var o=sfxOsc(c,55,"sine");var g=sfxGain(c,0);
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(1.8,t+0.008);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);
-    o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+0.3);
-    var o2=sfxOsc(c,80,"sine");var g2=sfxGain(c,0);
-    g2.gain.setValueAtTime(0,t);g2.gain.linearRampToValueAtTime(1.2,t+0.005);g2.gain.exponentialRampToValueAtTime(0.001,t+0.2);
-    o2.connect(g2);g2.connect(c.destination);o2.start(t);o2.stop(t+0.25);
-  })();
-  setTimeout(function(){
-    var c2=sfxCtx(),t2=c2.currentTime;
-    var n=sfxNoise(c2,0.08);var h=sfxHP(c2,3000);var g=sfxGain(c2,0);
-    g.gain.setValueAtTime(0,t2);g.gain.linearRampToValueAtTime(1.5,t2+0.002);g.gain.exponentialRampToValueAtTime(0.001,t2+0.07);
-    n.connect(h);h.connect(g);g.connect(c2.destination);n.start(t2);
-  },60);
-  setTimeout(function(){
-    var c3=sfxCtx(),t3=c3.currentTime;
-    var n=sfxNoise(c3,0.4);var l=sfxLP(c3,600);var g=sfxGain(c3,0);
-    g.gain.setValueAtTime(0,t3);g.gain.linearRampToValueAtTime(0.4,t3+0.01);g.gain.exponentialRampToValueAtTime(0.001,t3+0.35);
-    n.connect(l);l.connect(g);g.connect(c3.destination);n.start(t3);
-  },350);
-}
-
-// Ferrolho + Disparo (mercado)
-function sfxBoltShot() { sfxBolt(); setTimeout(sfxShot,420); }
-
-// Prato metalico (lucro)
-function sfxHitPlate() {
-  if (!SFX_ENABLED) return;
-  sfxShot();
-  setTimeout(function(){
-    var c=sfxCtx(),t=c.currentTime;
-    var n=sfxNoise(c,0.05);var l=sfxLP(c,2500);var g=sfxGain(c,0);
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(3.5,t+0.002);g.gain.exponentialRampToValueAtTime(0.001,t+0.04);
-    n.connect(l);l.connect(g);g.connect(c.destination);n.start(t);
-    [[420,1.0],[680,0.8],[1100,0.6],[1750,0.4],[2800,0.25],[3600,0.15]].forEach(function(p){
-      var o=sfxOsc(c,p[0],"sine");var g2=sfxGain(c,0);var dec=0.6+(p[0]>1000?0.3:0);
-      g2.gain.setValueAtTime(0,t);g2.gain.linearRampToValueAtTime(p[1]*0.5,t+0.003);g2.gain.exponentialRampToValueAtTime(0.001,t+dec);
-      o.connect(g2);g2.connect(c.destination);o.start(t);o.stop(t+dec+0.1);
-      var o2=sfxOsc(c,p[0]*1.003,"sine");var g3=sfxGain(c,0);
-      g3.gain.setValueAtTime(0,t+0.001);g3.gain.linearRampToValueAtTime(p[1]*0.3,t+0.004);g3.gain.exponentialRampToValueAtTime(0.001,t+dec*0.8);
-      o2.connect(g3);g3.connect(c.destination);o2.start(t);o2.stop(t+dec+0.1);
-    });
-  },220);
-}
-
-// Terra (prejuizo)
-function sfxHitDirt() {
-  if (!SFX_ENABLED) return;
-  sfxShot();
-  setTimeout(function(){
-    var c=sfxCtx(),t=c.currentTime;
-    var n=sfxNoise(c,0.25);var l=sfxLP(c,250);var g=sfxGain(c,0);
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(2.8,t+0.003);
-    g.gain.exponentialRampToValueAtTime(0.3,t+0.03);g.gain.exponentialRampToValueAtTime(0.001,t+0.2);
-    n.connect(l);l.connect(g);g.connect(c.destination);n.start(t);
-    var o=sfxOsc(c,60,"sine");var g2=sfxGain(c,0);
-    g2.gain.setValueAtTime(0,t);g2.gain.linearRampToValueAtTime(1.5,t+0.005);g2.gain.exponentialRampToValueAtTime(0.001,t+0.15);
-    o.connect(g2);g2.connect(c.destination);o.start(t);o.stop(t+0.2);
-  },300);
-}
-
-// Contagem de notas (dividendo)
-function sfxDividend() {
-  if (!SFX_ENABLED) return;
-  var c=sfxCtx();
-  for (var i=0;i<16;i++) {
-    (function(idx){
-      var spd = idx<4 ? 130-idx*15 : 75;
-      var cum = 0;
-      for(var k=0;k<idx;k++) cum += k<4 ? 130-k*15 : 75;
-      setTimeout(function(){
-        var t=c.currentTime;
-        var n=c.createBuffer(1,c.sampleRate*0.05,c.sampleRate);
-        var d=n.getChannelData(0);
-        for(var j=0;j<d.length;j++){
-          var env=j<n.length*0.1?j/(n.length*0.1):Math.exp(-(j-n.length*0.1)/(n.length*0.15));
-          d[j]=(Math.random()*2-1)*env;
-        }
-        var src=c.createBufferSource();src.buffer=n;
-        var f=c.createBiquadFilter();f.type="bandpass";f.frequency.value=2500+Math.random()*1000;f.Q.value=0.8;
-        var g=sfxGain(c,0.35+Math.random()*0.2);
-        src.connect(f);f.connect(g);g.connect(c.destination);src.start(t);
-        var n2=c.createBuffer(1,c.sampleRate*0.012,c.sampleRate);
-        var d2=n2.getChannelData(0);
-        for(var j=0;j<d2.length;j++) d2[j]=(Math.random()*2-1)*Math.exp(-j/(c.sampleRate*0.003));
-        var src2=c.createBufferSource();src2.buffer=n2;
-        var f2=c.createBiquadFilter();f2.type="highpass";f2.frequency.value=5000;
-        var g2=sfxGain(c,0.5);
-        src2.connect(f2);f2.connect(g2);g2.connect(c.destination);src2.start(t);
-      }, cum);
-    })(i);
-  }
-  setTimeout(function(){
-    var t=c.currentTime;
-    [1000,1250].forEach(function(f,i){
-      var o=c.createOscillator();o.frequency.value=f;
-      var g=sfxGain(c,0.2);g.gain.setValueAtTime(0.2,t+i*0.18);
-      g.gain.exponentialRampToValueAtTime(0.001,t+i*0.18+0.14);
-      o.connect(g);g.connect(c.destination);o.start(t+i*0.18);o.stop(t+i*0.18+0.15);
-    });
-  }, 1300);
-}
-
 var fr = function(n) { return n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); };
 var R  = function(n) { return "R$ "+fr(n); };
 var CD = function(s) { return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); };
@@ -1535,7 +1224,7 @@ function checkPending() {
     trd.unshift({id:Date.now(),tk:o.tk,tp:o.side==="buy"?"C":"V",qty:o.qty,pr:execPrice,tot:tot,
       tm:new Date().toLocaleTimeString("pt-BR"),note:"Lim @ "+fr(o.lp)});
     if (trd.length>200) trd.pop();
-    sfxShot(); notif("Ordem limitada executada: "+o.qty+" "+o.tk+" @ "+R(execPrice));
+    notif("Ordem limitada executada: "+o.qty+" "+o.tk+" @ "+R(execPrice));
     changed=true;
   }
   pending = keep;
@@ -1793,11 +1482,10 @@ function renderPending() {
     var e=document.createElement("div"); e.className="pend-item";
     var col=o.side==="buy"?"var(--g)":"var(--r)";
     var bgc=o.side==="buy"?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)";
-    var typeLabel = o.scheduled ? (o.market ? "AGENDADA - MERCADO" : "AGENDADA - LIMITE @ "+R(o.lp)) : "LIMITADA @ "+R(o.lp);
     e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
       '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(o.side==="buy"?"COMPRA":"VENDA")+'</span>'+
       '<span style="color:var(--bl);font-weight:700;font-size:12px">'+o.tk+'</span></div>'+
-      '<div style="font-size:9px;color:var(--tx4)">'+o.qty+' cotas - '+typeLabel+'</div></div>'+
+      '<div style="font-size:9px;color:var(--tx4)">'+o.qty+' cotas - limite '+R(o.lp)+'</div></div>'+
       '<button class="cancel-btn" onclick="cancelPending('+o.id+')">CANCELAR</button>';
     list.appendChild(e);
   });
@@ -1838,7 +1526,7 @@ function renderPort() {
         sel = tk; side = "sell"; qty = qty2;
         document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
         document.querySelectorAll(".panel").forEach(function(p2){ p2.classList.remove("on"); });
-        if (b.dataset.t === "group") { renderGroupRoom(); if(currentRoomId) subscribeGroup(renderGroupRanking); }
+        if(b.dataset.t==="group"){renderGroupRoom();if(currentRoomId)subscribeGroup(renderGroupRanking);}
         document.querySelector(".tab[data-t='order']").classList.add("on");
         $("order-panel").classList.add("on");
         $("pb").style.display = "none";
@@ -1914,7 +1602,7 @@ function doMarketOrder(tk, sd, q, isScheduled) {
       tm:new Date().toLocaleTimeString("pt-BR"),
       note:isScheduled?"Agendada":""});
     if (!firstTradeDate) { firstTradeDate=new Date().toISOString().split("T")[0]; }
-    sfxBoltShot(); notif("Compra executada: "+q+" "+tk+" @ "+R(p));
+    notif("Compra executada: "+q+" "+tk+" @ "+R(p));
   } else {
     var pos=port[tk]; if(!pos||pos.qty<q){notif("Posicao insuficiente","err");return;}
     bal+=tot;
@@ -1922,12 +1610,7 @@ function doMarketOrder(tk, sd, q, isScheduled) {
     trd.unshift({id:Date.now(),tk:tk,tp:"V",qty:q,pr:p,tot:tot,
       tm:new Date().toLocaleTimeString("pt-BR"),
       note:isScheduled?"Agendada":""});
-    (function(){
-    var pos2=port[tk]||{avgPrice:p};
-    var profit=(p-pos2.avgPrice)*q;
-    if(profit>=0) sfxHitPlate(); else sfxHitDirt();
-  })();
-  notif("Venda executada: "+q+" "+tk+" @ "+R(p));
+    notif("Venda executada: "+q+" "+tk+" @ "+R(p));
   }
   if (trd.length>200) trd.pop();
   saveState(); render();
@@ -1957,13 +1640,13 @@ function execOrder() {
     }
     pending.push(orderObj);
     saveState(); render();
-    sfxBolt(); notif("Ordem limitada enviada: "+qty+" "+sel+" @ "+R(lp)); return;
+    notif("Ordem limitada enviada: "+qty+" "+sel+" @ "+R(lp)); return;
   }
 
   //  Market order 
   if (!open) {
     // Offer to schedule as market order at next open
-    sfxBolt(); showAHO({id:Date.now(),tk:sel,side:side,qty:qty,lp:null,scheduled:true,market:true});
+    showAHO({id:Date.now(),tk:sel,side:side,qty:qty,lp:null,scheduled:true,market:true});
     return;
   }
   doMarketOrder(sel,side,qty,false);
@@ -2628,25 +2311,8 @@ function renderProfileList() {
     enterBtn.style.cssText = "padding:7px 16px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit";
     enterBtn.textContent = "ENTRAR";
     (function(n){ enterBtn.onclick = function(){ enterProfile(n); }; })(name);
-
-    var delBtn = document.createElement("button");
-    delBtn.style.cssText = "padding:7px 10px;background:transparent;border:1px solid rgba(240,64,96,.4);border-radius:7px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:6px";
-    delBtn.textContent = "X";
-    (function(n){
-      delBtn.onclick = function(e){
-        e.stopPropagation();
-        if (!confirm("Excluir perfil " + n + "? Todos os dados serao apagados.")) return;
-        deleteProfile(n);
-        renderProfileList();
-      };
-    })(name);
-
-    var btns = document.createElement("div");
-    btns.style.display = "flex";
-    btns.appendChild(enterBtn);
-    btns.appendChild(delBtn);
     card.appendChild(left);
-    card.appendChild(btns);
+    card.appendChild(enterBtn);
     list.appendChild(card);
   });
 }
@@ -2852,12 +2518,6 @@ function initApp() {
     var type2=ahoOrder.market?"a mercado":"limitada @ "+R(ahoOrder.lp);
     notif("Agendada: "+ahoOrder.qty+" "+ahoOrder.tk+" "+side2+" "+type2);
     $("aho-modal").classList.remove("on"); ahoOrder=null;
-    // Switch to orders tab to show pending list
-    document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
-    document.querySelectorAll(".panel").forEach(function(p){p.classList.remove("on");});
-    document.querySelector(".tab[data-t='order']").classList.add("on");
-    $("order-panel").classList.add("on");
-    $("pb").style.display="none";
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
   $("logb").onclick=function() { localStorage.removeItem(LS_TOKEN); location.reload(); };
@@ -2930,16 +2590,12 @@ if (token) {
   if (getCurrentProfile()) {
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDa
-te;
+    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
     initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
     goal=loadGoal(); equityHistory=loadEquityHistory();
     initApp();
   } else {
     showProfileScreen();
-  }
-}
-fileScreen();
   }
 }
 </script>
