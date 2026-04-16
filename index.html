@@ -506,10 +506,9 @@ function doLogin() {
   var t = document.getElementById("tinp").value.trim();
   if (!t) { document.getElementById("terr").textContent="Cole seu token Brapi PRO"; document.getElementById("terr").style.display="block"; return; }
   document.getElementById("terr").style.display="none";
-  localStorage.setItem("hb_token_v6", t); localStorage.setItem("hb_is_owner","1");
-  token = t;
-  document.getElementById("ts").style.display="none";
-  showProfileScreen();
+  localStorage.setItem("hb_token_v6", t);
+  localStorage.setItem("hb_is_owner","1");
+  window.location.reload();
 }
 
 var fbDb=null;
@@ -2509,15 +2508,20 @@ if (token) {
     var hasInvite = window.location.search.indexOf("t=") >= 0;
     localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
   }
-  if (getCurrentProfile()) {
-    var st2 = loadState();
-    bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-    initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-    goal=loadGoal(); equityHistory=loadEquityHistory();
-    initApp();
-  } else {
-    showProfileScreen();
+  try {
+    if (getCurrentProfile()) {
+      var st2 = loadState();
+      bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+      divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+      initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+      goal=loadGoal(); equityHistory=loadEquityHistory();
+      initApp();
+    } else {
+      showProfileScreen();
+    }
+  } catch(e) {
+    document.title = "TGP ERROR: " + e.message;
+    document.getElementById("ts").style.display = "flex";
   }
 }
 </script>
