@@ -2,6 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -234,6 +236,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   <div id="tbr">
     <div class="tabs">
       <button class="tab on" data-t="chart">GRÁFICO</button>
+      <button class="tab" data-t="group">GRUPO</button>
       <button class="tab" data-t="order">ORDENS</button>
       <button class="tab" data-t="portfolio">CARTEIRA</button>
       <button class="tab" data-t="history">HISTÓRICO</button>
@@ -252,7 +255,30 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div id="tvw" style="width:100%;height:100%"></div>
     </div>
 
-    <div id="order-panel" class="panel">
+    <div id="group-panel" class="panel">
+  <div id="group-content" style="padding:12px">
+    <!-- No room joined yet -->
+    <div id="group-noroom" style="text-align:center;padding:30px 0">
+      <div style="font-size:11px;color:var(--tx3);margin-bottom:20px">Nenhum grupo ativo</div>
+      <button onclick="showCreateRoom()" style="width:100%;padding:12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">+ CRIAR GRUPO</button>
+      <button onclick="showJoinRoom()" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--bd2);border-radius:8px;color:var(--tx2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">ENTRAR COM CÓDIGO</button>
+    </div>
+    <!-- Room active -->
+    <div id="group-room" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div id="group-room-name" style="font-size:13px;font-weight:700;color:var(--bl)"></div>
+        <button onclick="shareRoomInvite()" style="padding:5px 12px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);border-radius:6px;color:#25d366;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">&#128279; CONVIDAR</button>
+      </div>
+      <!-- Chart -->
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">EVOLUÇÃO DO PATRIMÔNIO</div>
+      <canvas id="group-chart" height="160" style="width:100%;margin-bottom:16px;border-radius:8px;background:var(--bg3)"></canvas>
+      <!-- Ranking -->
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">RANKING</div>
+      <div id="group-ranking"></div>
+    </div>
+  </div>
+</div>
+<div id="order-panel" class="panel">
       <div class="sp">
 
         <!-- Ticker search -->
@@ -477,12 +503,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div id="aho-summary" style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--tx2)"></div>
     <div style="display:flex;gap:8px">
       <button id="aho-no" style="flex:1;padding:10px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Cancelar</button>
-      <button id="aho-yes" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:11px;font-weight:700">Agendar para abertura</button>
-    </div>
-  </div>
-</div>
-
-<div id="nf"></div>
+      <button id="aho-yes" style="flex:2;padding:10px;border:none;border-radius:8p
 <script>
 //  Ativos:
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
@@ -723,6 +744,247 @@ var cd = REFRESH, cdi, rfi, nft;
 var tvWidget = null, tvScriptLoaded = false;
 
 var $ = function(id) { return document.getElementById(id); };
+
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+var FB_CONFIG = {
+  apiKey: "AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",
+  authDomain: "trading-gp.firebaseapp.com",
+  databaseURL: "https://trading-gp-default-rtdb.firebaseio.com",
+  projectId: "trading-gp",
+  storageBucket: "trading-gp.firebasestorage.app",
+  messagingSenderId: "603398180172",
+  appId: "1:603398180172:web:d2b66ae0bb884bd625d3e9"
+};
+if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+var fbDb = firebase.database();
+
+var currentRoomId = localStorage.getItem("hb_room_id") || "";
+var currentRoomData = null;
+var groupUnsubscribe = null;
+
+// ── ROOM FUNCTIONS ────────────────────────────────────────────────────────────
+function genRoomId() {
+  return Math.random().toString(36).substr(2,6).toUpperCase();
+}
+
+function createRoom(name, initialBal, endDate, targetPct) {
+  var roomId = genRoomId();
+  var room = {
+    id: roomId,
+    name: name,
+    initialBal: initialBal,
+    endDate: endDate,
+    targetPct: targetPct,
+    createdBy: getCurrentProfile(),
+    createdAt: Date.now(),
+    members: {}
+  };
+  return fbDb.ref("rooms/" + roomId).set(room).then(function() {
+    localStorage.setItem("hb_room_id", roomId);
+    currentRoomId = roomId;
+    return roomId;
+  });
+}
+
+function joinRoom(roomId) {
+  return fbDb.ref("rooms/" + roomId).once("value").then(function(snap) {
+    if (!snap.exists()) throw new Error("Sala não encontrada");
+    var room = snap.val();
+    localStorage.setItem("hb_room_id", roomId);
+    currentRoomId = roomId;
+    currentRoomData = room;
+    return room;
+  });
+}
+
+function pushMyStats() {
+  if (!currentRoomId || !getCurrentProfile()) return;
+  var pv = portValue();
+  var total = bal + pv;
+  var initBal = currentRoomData ? currentRoomData.initialBal : initialBal;
+  var pct = ((total - initBal) / initBal * 100);
+  var member = {
+    name: getCurrentProfile(),
+    total: total,
+    pct: pct,
+    updatedAt: Date.now(),
+    history: getEquitySnap()
+  };
+  fbDb.ref("rooms/" + currentRoomId + "/members/" + getCurrentProfile()).set(member);
+}
+
+function getEquitySnap() {
+  // Last 30 equity points
+  var eq = equityHistory || [];
+  return eq.slice(-30).map(function(p) { return {t: p.t, v: p.v}; });
+}
+
+function subscribeGroup(callback) {
+  if (!currentRoomId) return;
+  if (groupUnsubscribe) groupUnsubscribe();
+  var ref = fbDb.ref("rooms/" + currentRoomId + "/members");
+  ref.on("value", function(snap) { callback(snap.val() || {}); });
+  groupUnsubscribe = function() { ref.off(); };
+}
+
+function getRoomInviteLink() {
+  var base = window.location.origin + window.location.pathname;
+  var enc = btoa(localStorage.getItem("hb_token_v6") || "");
+  return base + "?t=" + enc + "&room=" + currentRoomId;
+}
+
+// Push stats every time render is called (throttled)
+var lastPush = 0;
+function maybePushStats() {
+
+// ── GROUP UI ──────────────────────────────────────────────────────────────────
+function showCreateRoom() {
+  var name = prompt("Nome do grupo (ex: Familia TGP):");
+  if (!name) return;
+  var initBalStr = prompt("Saldo inicial para todos (R$):", "100000");
+  if (!initBalStr) return;
+  var initB = parseFloat(initBalStr.replace(",","."));
+  if (isNaN(initB) || initB <= 0) { notif("Saldo inválido","err"); return; }
+  var endD = prompt("Data de encerramento (DD/MM/AAAA):");
+  if (!endD) return;
+  var targetStr = prompt("Meta de rentabilidade (%):", "5");
+  var tgt = parseFloat(targetStr) || 0;
+  createRoom(name, initB, endD, tgt).then(function(roomId) {
+    notif("Grupo criado! Código: " + roomId);
+    currentRoomData = {name:name, initialBal:initB, endDate:endD, targetPct:tgt};
+    renderGroupRoom();
+    subscribeGroup(renderGroupRanking);
+    pushMyStats();
+  }).catch(function(e) { notif("Erro: "+e.message,"err"); });
+}
+
+function showJoinRoom() {
+  var code = prompt("Digite o código do grupo:");
+  if (!code) return;
+  joinRoom(code.toUpperCase().trim()).then(function(room) {
+    notif("Entrou no grupo: " + room.name);
+    currentRoomData = room;
+    renderGroupRoom();
+    subscribeGroup(renderGroupRanking);
+    pushMyStats();
+  }).catch(function(e) { notif("Grupo não encontrado","err"); });
+}
+
+function renderGroupRoom() {
+  if (!currentRoomId || !currentRoomData) {
+    $("group-noroom").style.display = "block";
+    $("group-room").style.display = "none";
+    return;
+  }
+  $("group-noroom").style.display = "none";
+  $("group-room").style.display = "block";
+  $("group-room-name").textContent = currentRoomData.name || currentRoomId;
+}
+
+function shareRoomInvite() {
+  var link = getRoomInviteLink();
+  var room = currentRoomData || {};
+  var msg = "🎯 *" + (room.name||"Trading TGP") + "*
+" +
+    "Saldo inicial: R$ " + (room.initialBal||100000).toLocaleString("pt-BR") + "
+" +
+    "Prazo: " + (room.endDate||"") + "
+" +
+    "Meta: " + (room.targetPct||0) + "%
+
+" +
+    "Entre aqui: " + link;
+  window.open("https://wa.me/?text=" + encodeURIComponent(msg));
+}
+
+function renderGroupRanking(members) {
+  // Draw chart
+  drawGroupChart(members);
+  // Build ranking
+  var list = Object.values(members).sort(function(a,b){ return b.pct - a.pct; });
+  var el = $("group-ranking"); if (!el) return;
+  el.innerHTML = "";
+  list.forEach(function(m, idx) {
+    var isMe = m.name === getCurrentProfile();
+    var pos = idx+1;
+    var medal = pos===1?"🥇":pos===2?"🥈":pos===3?"🥉":"";
+    var color = m.pct >= 0 ? "var(--g)" : "var(--r)";
+    var sign = m.pct >= 0 ? "+" : "";
+    var div = document.createElement("div");
+    div.style.cssText = "display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:" + 
+      (isMe?"rgba(96,165,250,.12)":"var(--bg3)") + ";border-radius:8px;border:1px solid " +
+      (isMe?"rgba(96,165,250,.3)":"var(--bd2)") + ";gap:10px";
+    div.innerHTML = '<div style="font-size:16px;min-width:24px">' + (medal||("#"+pos)) + '</div>' +
+      '<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--tx)">' + m.name + 
+      (isMe?' <span style="font-size:9px;color:var(--bl)">(você)</span>':'') + '</div>' +
+      '<div style="font-size:9px;color:var(--tx4)">R$ ' + (m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2}) + '</div></div>' +
+      '<div style="font-size:14px;font-weight:700;color:' + color + '">' + sign + m.pct.toFixed(2) + '%</div>';
+    el.appendChild(div);
+  });
+}
+
+function drawGroupChart(members) {
+  var canvas = $("group-chart"); if (!canvas) return;
+  var ctx2 = canvas.getContext("2d");
+  canvas.width = canvas.offsetWidth || 320;
+  var W = canvas.width, H = 160;
+  ctx2.clearRect(0,0,W,H);
+  var list = Object.values(members);
+  if (!list.length) return;
+  var colors = ["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa","#34d399"];
+  var allPts = [];
+  list.forEach(function(m){ if(m.history) allPts = allPts.concat(m.history.map(function(p){return p.v;})); });
+  if (!allPts.length) return;
+  var minV = Math.min.apply(null,allPts)*0.999;
+  var maxV = Math.max.apply(null,allPts)*1.001;
+  var pad = 8;
+  function px(v){ return H - pad - (v-minV)/(maxV-minV)*(H-pad*2); }
+  list.forEach(function(m, ci) {
+    if (!m.history || m.history.length < 2) return;
+    var pts = m.history;
+    ctx2.strokeStyle = colors[ci % colors.length];
+    ctx2.lineWidth = 2;
+    ctx2.beginPath();
+    pts.forEach(function(p,i){
+      var x = pad + (i/(pts.length-1))*(W-pad*2);
+      var y = px(p.v);
+      if(i===0) ctx2.moveTo(x,y); else ctx2.lineTo(x,y);
+    });
+    ctx2.stroke();
+    // Label at end
+    var last = pts[pts.length-1];
+    var lx = W - pad - 2;
+    var ly = px(last.v);
+    ctx2.fillStyle = colors[ci % colors.length];
+    ctx2.font = "bold 9px monospace";
+    ctx2.fillText(m.name.slice(0,6), lx - 36, ly - 4);
+  });
+}
+
+// Check if joining from invite with room param
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  var roomParam = params.get("room");
+  if (roomParam && !currentRoomId) {
+    joinRoom(roomParam.toUpperCase()).then(function(room) {
+      currentRoomData = room;
+    }).catch(function(){});
+  } else if (currentRoomId) {
+    joinRoom(currentRoomId).then(function(room) {
+      currentRoomData = room;
+      renderGroupRoom();
+      subscribeGroup(renderGroupRanking);
+    }).catch(function(){});
+  }
+})();
+  if (!currentRoomId) return;
+  var now = Date.now();
+  if (now - lastPush > 60000) { // max 1x per minute
+    lastPush = now;
+    pushMyStats();
+  }
+}
+
 
 // ── SOUND ENGINE ──────────────────────────────────────────────────────────────
 var SFX_ENABLED = localStorage.getItem("hb_sfx") !== "0";
@@ -1561,6 +1823,7 @@ function renderPort() {
         sel = tk; side = "sell"; qty = qty2;
         document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
         document.querySelectorAll(".panel").forEach(function(p2){ p2.classList.remove("on"); });
+        if (b.dataset.t === "group") { renderGroupRoom(); if(currentRoomId) subscribeGroup(renderGroupRanking); }
         document.querySelector(".tab[data-t='order']").classList.add("on");
         $("order-panel").classList.add("on");
         $("pb").style.display = "none";
@@ -1613,6 +1876,7 @@ function renderHist() {
 
 function render() {
   try { renderHdr(); } catch(e) {}
+  try { maybePushStats(); } catch(e) {}
   try { renderTickers(); } catch(e) {}
   try { renderSB(); } catch(e) {}
   try { renderOrders(); } catch(e) {}
@@ -2651,7 +2915,8 @@ if (token) {
   if (getCurrentProfile()) {
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDa
+te;
     initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
     goal=loadGoal(); equityHistory=loadEquityHistory();
     initApp();
