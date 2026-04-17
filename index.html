@@ -715,12 +715,7 @@ function shareRoomInvite(){
 }
 function switchToProfile(profileId) {
   localStorage.setItem("hb_profile_v1", profileId);
-  var st2 = loadState();
-  bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-  divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-  initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-  goal=loadGoal(); equityHistory=loadEquityHistory();
-  // Load room if group profile
+  // Detect group profile
   var meta = getProfileMeta(profileId);
   if (!meta && profileId && profileId.indexOf("grupo_") === 0) {
     var _sp = profileId.split("_");
@@ -732,14 +727,32 @@ function switchToProfile(profileId) {
     localStorage.setItem("hb_room_id", meta.roomId);
     joinRoom(meta.roomId).then(function(room){
       currentRoomData = room;
-    }).catch(function(){});
+      meta.roomName = room.name;
+      setProfileMeta(profileId, meta);
+    }).catch(function(){
+      currentRoomData = {name: meta.roomName || meta.roomId};
+    });
   } else {
     currentRoomId = "";
     currentRoomData = null;
     localStorage.removeItem("hb_room_id");
   }
-  updateProfileIndicator();
-  render();
+  // Load state
+  var st2 = loadState();
+  bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+  divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+  initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+  goal=loadGoal(); equityHistory=loadEquityHistory();
+  // Show main app properly
+  $("ps").style.display = "none";
+  $("ts").style.display = "none";
+  $("gs").style.display = "none";
+  if (!$("ma").style.display || $("ma").style.display === "none") {
+    initApp();
+  } else {
+    updateProfileIndicator();
+    render();
+  }
   notif("Perfil: " + (meta ? meta.displayName : profileId));
 }
 
