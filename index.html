@@ -744,7 +744,37 @@ function switchToProfile(profileId) {
 function renderGroupPanel() {
   var profile = getCurrentProfile();
   var meta = getProfileMeta(profile);
-  var isGroup = meta && meta.type === "group";
+  // Fallback: detect group profile by naming convention "grupo_ROOMID_Name"
+  var isGroup = (meta && meta.type === "group") || 
+                (!meta && profile && profile.indexOf("grupo_") === 0);
+  
+  // If no metadata but is group profile, reconstruct it
+  if (!meta && isGroup && profile) {
+    var parts = profile.split("_"); // ["grupo", "ROOMID", "Name"]
+    if (parts.length >= 3) {
+      var roomIdPart = parts[1];
+      var namePart = parts.slice(2).join("_");
+      meta = {
+        profileId: profile,
+        displayName: namePart,
+        type: "group",
+        roomId: roomIdPart,
+        roomName: profile // will be updated when room loads
+      };
+      setProfileMeta(profile, meta);
+      // Also load the room
+      if (!currentRoomId || currentRoomId !== roomIdPart) {
+        currentRoomId = roomIdPart;
+        localStorage.setItem("hb_room_id", roomIdPart);
+        joinRoom(roomIdPart).then(function(room){
+          currentRoomData = room;
+          if (meta) meta.roomName = room.name;
+          setProfileMeta(profile, meta);
+          renderGroupPanel();
+        }).catch(function(){});
+      }
+    }
+  }
 
   if (isGroup) {
     // GROUP profile: show chart + ranking
@@ -2718,6 +2748,14 @@ function enterProfile(name) {
   saveProfile(name);
   // Load room if group profile
   var meta = getProfileMeta(name);
+  // Fallback: detect by naming convention
+  if (!meta && name && name.indexOf("grupo_") === 0) {
+    var _parts = name.split("_");
+    if (_parts.length >= 3) {
+      meta = {profileId:name, displayName:_parts.slice(2).join("_"), type:"group", roomId:_parts[1], roomName:name};
+      setProfileMeta(name, meta);
+    }
+  }
   if (meta && meta.type === "group" && meta.roomId) {
     currentRoomId = meta.roomId;
     localStorage.setItem("hb_room_id", meta.roomId);
