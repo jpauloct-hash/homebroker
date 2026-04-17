@@ -602,6 +602,7 @@ try {
 
 var currentRoomId="",currentRoomData=null,groupUnsubscribe=null;
 var roomSwitchToken=0,roomLoadToken=0;
+var soloGroupUnsubs={};
 function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
 function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){return id;});}
 function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");currentRoomId=id;currentRoomData=s.val();return s.val();});}
@@ -609,6 +610,13 @@ function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var
   var _pname=_pmeta?_pmeta.displayName:getCurrentProfile();
   fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:_pname,total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
 var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
+function clearSoloGroupSubscriptions(){
+  Object.keys(soloGroupUnsubs).forEach(function(roomId){
+    try{soloGroupUnsubs[roomId]();}catch(e){}
+  });
+  soloGroupUnsubs={};
+}
+
 function subscribeGroup(cb){
   if(groupUnsubscribe){groupUnsubscribe();groupUnsubscribe=null;}
   if(!currentRoomId||!fbDb)return;
@@ -769,6 +777,7 @@ function renderGroupPanel() {
   var isGroup = profile && profile.indexOf("grupo_") === 0;
 
   if (isGroup) {
+    clearSoloGroupSubscriptions();
     $("group-noroom").style.display = "none";
     $("group-solo-view").style.display = "none";
     $("group-room-view").style.display = "block";
@@ -851,61 +860,65 @@ function getMyGroupProfiles() {
 }
 
 function renderSoloGroupList(groupProfiles) {
-  var el = $("group-solo-list");
-  if (!el) return;
-  el.innerHTML = "";
-  groupProfiles.forEach(function(profileId) {
-    var meta = getProfileMeta(profileId);
-    if (!meta) return;
-    // Load state for this group profile
-    var st = JSON.parse(localStorage.getItem("hb_state_v3_"+profileId)||"{}");
-    var initB = st.initialBal || 100000;
-    var total = (st.bal||0) + Object.values(st.port||{}).reduce(function(s,p){return s+(p.qty||0)*(p.avgPrice||0);},0);
-    var pct = initB > 0 ? ((total - initB) / initB * 100) : 0;
-    var color = pct >= 0 ? "var(--g)" : "var(--r)";
-    var card = document.createElement("div");
-    card.style.cssText = "background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer";
-    card.innerHTML =
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
-        '<div>' +
-          '<div style="font-size:12px;font-weight:700;color:var(--a)">'+meta.roomName+'</div>' +
-          '<div style="font-size:9px;color:var(--tx4);margin-top:2px">'+meta.roomId+'</div>' +
-        '</div>' +
-        '<div style="text-align:right">' +
-          '<div style="font-size:14px;font-weight:700;color:'+color+'">'+(pct>=0?"+":"")+pct.toFixed(2)+'%</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<div style="font-size:10px;color:var(--tx2)">Patrimônio: R$ '+Number(total).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div>' +
-        '<button style="padding:5px 12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>' +
-      '</div>';
-    (function(pid){ 
-      card.querySelector("button").onclick = function(e) {
-        e.stopPropagation();
-        switchToProfile(pid);
-      };
+  var el=$("group-solo-list"); if(!el)return;
+  clearSoloGroupSubscriptions();
+  el.innerHTML="";
+  groupProfiles.forEach(function(profileId){
+    var meta=getProfileMeta(profileId); if(!meta)return;
+    var st={}; try{st=JSON.parse(localStorage.getItem("hb_state_v3_"+profileId)||"{}");}catch(e){}
+    var initB=st.initialBal||100000;
+    var totalLocal=(st.bal||0)+Object.values(st.port||{}).reduce(function(s,p){return s+(p.qty||0)*(p.avgPrice||0);},0);
+    var pctLocal=initB>0?((totalLocal-initB)/initB*100):0;
+    var card=document.createElement("div");
+    card.style.cssText="background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px";
+    card.innerHTML=
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
+        '<div>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--a)">'+(meta.roomName||meta.roomId)+'</div>'+
+          '<div style="font-size:9px;color:var(--tx4);margin-top:2px">'+(meta.roomId||"")+'</div>'+
+        '</div>'+
+        '<div class="solo-group-pct" style="font-size:14px;font-weight:700;color:'+(pctLocal>=0?"var(--g)":"var(--r);")+'">'+(pctLocal>=0?"+":"")+pctLocal.toFixed(2)+'%</div>'+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<div class="solo-group-total" style="font-size:10px;color:var(--tx2)">R$ '+Number(totalLocal).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div>'+
+        '<button style="padding:5px 12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>'+
+      '</div>'+
+      '<div class="solo-group-pos" style="margin-top:6px;font-size:9px;color:var(--tx4)">Carregando posição...</div>';
+    (function(pid){
+      card.querySelector("button").onclick=function(e){e.stopPropagation();switchToProfile(pid);};
     })(profileId);
-    // Load live ranking from Firebase for this group
-    if (fbDb && meta.roomId) {
-      (function(pid, m, cardEl){
-        fbDb.ref("rooms/"+m.roomId+"/members").once("value").then(function(snap){
-          var members = snap.val() || {};
-          var sorted = Object.values(members).sort(function(a,b){return b.pct-a.pct;});
-          var _playerName = meta && meta.displayName ? meta.displayName : pid;
-          var myPos = sorted.findIndex(function(x){ return x.name === _playerName; });
-          if (myPos >= 0) {
-            var posEl = document.createElement("div");
-            posEl.style.cssText = "margin-top:6px;font-size:9px;color:var(--tx4)";
-            var medal = myPos===0?"🥇":myPos===1?"🥈":myPos===2?"🥉":"#"+(myPos+1);
-            posEl.textContent = medal+" de "+sorted.length+" participantes";
-            cardEl.appendChild(posEl);
-          }
-        }).catch(function(){});
-      })(profileId, meta, card);
-    }
     el.appendChild(card);
+    if(fbDb&&meta.roomId){
+      (function(roomId,profileMeta,cardEl){
+        var pctEl=cardEl.querySelector(".solo-group-pct");
+        var totalEl=cardEl.querySelector(".solo-group-total");
+        var posEl=cardEl.querySelector(".solo-group-pos");
+        var ref=fbDb.ref("rooms/"+roomId+"/members");
+        ref.on("value",function(snap){
+          var members=snap.val()||{};
+          var sorted=Object.values(members).sort(function(a,b){return(b.pct||0)-(a.pct||0);});
+          var myName=profileMeta.displayName||profileId;
+          var me=sorted.find(function(x){return x.name===myName;});
+          var myPos=sorted.findIndex(function(x){return x.name===myName;});
+          if(me){
+            var pct=Number(me.pct||0),total=Number(me.total||0);
+            pctEl.textContent=(pct>=0?"+":"")+pct.toFixed(2)+"%";
+            pctEl.style.color=pct>=0?"var(--g)":"var(--r)";
+            totalEl.textContent="R$ "+total.toLocaleString("pt-BR",{minimumFractionDigits:2});
+          }
+          if(myPos>=0){
+            var medal=myPos===0?"🥇":myPos===1?"🥈":myPos===2?"🥉":"🏅";
+            posEl.textContent=medal+" "+(myPos+1)+"º de "+sorted.length+" participantes";
+          } else {
+            posEl.textContent="Sem posição no ranking";
+          }
+        });
+        soloGroupUnsubs[roomId]=function(){ref.off();};
+      })(meta.roomId,meta,card);
+    }
   });
 }
+
 
 function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;}
 function renderGroupRanking(members){
