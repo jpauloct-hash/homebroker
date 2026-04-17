@@ -3086,7 +3086,7 @@ if (urlToken && !token) {
 if (token) {
   $("ts").style.display = "none";
   if (localStorage.getItem("hb_is_owner") === null) {
-    var hasInvite = new URLSearchParams(window.location.search).get("room") ? true : false;
+    var hasInvite = window.location.search.indexOf("t=") >= 0;
     localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
   }
   if (getCurrentProfile()) {
@@ -3143,41 +3143,45 @@ if (urlToken && !token) {
 
 if (token) {
   $("ts").style.display = "none";
-  if (localStorage.getItem("hb_is_owner") === null) {
-    var hasInvite = new URLSearchParams(window.location.search).get("room") ? true : false;
-    localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
-  }
-  if (getCurrentProfile()) {
-    // If group profile, restore room before loading state
-    var _bootProfile = getCurrentProfile();
-    if (_bootProfile && _bootProfile.indexOf("grupo_") === 0) {
-      var _bootParts = _bootProfile.split("_");
+  var _roomParam = new URLSearchParams(window.location.search).get("room");
+  if (_roomParam) {
+    joinRoom(_roomParam.toUpperCase()).then(function(roomData) {
+      showGroupJoinScreen(roomData);
+      try { var _u=new URL(window.location.href); _u.searchParams.delete("room"); window.history.replaceState({},"",_u.pathname+(_u.search||"")); } catch(e){}
+    }).catch(function(){ notif("Grupo não encontrado","err"); });
+  } else {
+    if (localStorage.getItem("hb_is_owner") === null)
+      localStorage.setItem("hb_is_owner", "1");
+    if (getCurrentProfile()) {
+      var _bootProfile = getCurrentProfile();
       var _bootMeta = getProfileMeta(_bootProfile);
-      if (!_bootMeta) {
-        _bootMeta = {profileId:_bootProfile, displayName:_bootParts.slice(2).join("_"), type:"group", roomId:_bootParts[1], roomName:_bootParts[1]};
+      if (!_bootMeta && _bootProfile && _bootProfile.indexOf("grupo_") === 0) {
+        var _bootParts = _bootProfile.split("_");
+        _bootMeta = {profileId:_bootProfile,displayName:_bootParts.slice(2).join("_"),type:"group",roomId:_bootParts[1],roomName:_bootParts[1]};
         setProfileMeta(_bootProfile, _bootMeta);
       }
-      currentRoomId = _bootMeta.roomId;
-      // Load room data async - don't block boot
-      joinRoom(currentRoomId).then(function(room){
-        currentRoomData = room;
-        _bootMeta.roomName = room.name;
-        setProfileMeta(_bootProfile, _bootMeta);
-      }).catch(function(){
-        currentRoomData = {name: _bootMeta.roomName || _bootMeta.roomId};
-      });
+      if (_bootMeta && _bootMeta.type === "group" && _bootMeta.roomId) {
+        currentRoomId = _bootMeta.roomId;
+        joinRoom(currentRoomId).then(function(room){
+          currentRoomData = room;
+          _bootMeta.roomName = room.name;
+          setProfileMeta(_bootProfile, _bootMeta);
+        }).catch(function(){
+          currentRoomData = {name: _bootMeta.roomName || _bootMeta.roomId};
+        });
+      } else {
+        currentRoomId = "";
+        currentRoomData = null;
+      }
+      var st2 = loadState();
+      bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+      divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+      initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+      goal=loadGoal(); equityHistory=loadEquityHistory();
+      initApp();
     } else {
-      currentRoomId = "";
-      currentRoomData = null;
+      showProfileScreen();
     }
-    var st2 = loadState();
-    bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-    initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-    goal=loadGoal(); equityHistory=loadEquityHistory();
-    initApp();
-  } else {
-    showProfileScreen();
   }
 }
 
