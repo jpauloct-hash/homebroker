@@ -278,9 +278,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div id="group-solo-view" style="display:none">
       <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:12px">MEUS GRUPOS</div>
       <div id="group-solo-list"></div>
-      <div style="margin-top:16px;display:flex;gap:8px">
-        <button onclick="showCreateRoom()" style="flex:1;padding:11px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🏆 CRIAR GRUPO</button>
-        <button onclick="showJoinRoom()" style="flex:1;padding:11px;background:var(--bg3);border:1px solid var(--bd2);border-radius:8px;color:var(--tx2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔑 ENTRAR</button>
+      <div style="margin-top:16px">
+        <button onclick="showCreateRoom()" style="width:100%;padding:12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🏆 CRIAR GRUPO</button>
       </div>
     </div>
 
@@ -314,8 +313,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div style="font-size:24px;margin-bottom:8px">🏆</div>
       <div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px">Modo Campeonato</div>
       <div style="font-size:10px;color:var(--tx3);margin-bottom:20px;line-height:1.6">Crie um grupo, defina as regras e<br>convide amigos e família!</div>
-      <button onclick="showCreateRoom()" style="width:100%;padding:13px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">🏆 CRIAR GRUPO</button>
-      <button onclick="showJoinRoom()" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--bd2);border-radius:8px;color:var(--tx2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔑 ENTRAR COM CÓDIGO</button>
+      <button onclick="showCreateRoom()" style="width:100%;padding:13px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🏆 CRIAR GRUPO</button>
     </div>
 
   </div>
@@ -748,62 +746,72 @@ function switchToProfile(profileId) {
 // ── RENDER GROUP PANEL (smart: solo vs group) ─────────────────
 function renderGroupPanel() {
   var profile = getCurrentProfile();
-  var meta = getProfileMeta(profile);
-  
-  // Always reconstruct metadata if missing for grupo_ profiles
-  if (profile && profile.indexOf("grupo_") === 0) {
-    if (!meta) {
-      var _parts = profile.split("_");
-      meta = {profileId:profile, displayName:_parts.slice(2).join("_"), type:"group", roomId:_parts[1], roomName:_parts[1]};
-      setProfileMeta(profile, meta);
-    }
-    // Ensure currentRoomId is set
-    if (meta.roomId && currentRoomId !== meta.roomId) {
-      currentRoomId = meta.roomId;
-      localStorage.setItem("hb_room_id", meta.roomId);
-      joinRoom(meta.roomId).then(function(room){
-        currentRoomData = room;
-        meta.roomName = room.name;
-        setProfileMeta(profile, meta);
-        renderGroupPanel();
-      }).catch(function(){
-        currentRoomData = {name: meta.roomName || meta.roomId};
-      });
-    }
-  }
-
   var isGroup = profile && profile.indexOf("grupo_") === 0;
 
+  // ── GROUP PROFILE ────────────────────────────────────────────
   if (isGroup) {
-    // GROUP profile: show chart + ranking
     $("group-noroom").style.display = "none";
     $("group-solo-view").style.display = "none";
     $("group-room-view").style.display = "block";
-    // Set room info
+
+    // Ensure metadata exists
+    var meta = getProfileMeta(profile);
+    if (!meta) {
+      var _p = profile.split("_");
+      meta = {profileId:profile, displayName:_p.slice(2).join("_"), type:"group", roomId:_p[1], roomName:_p[1]};
+      setProfileMeta(profile, meta);
+    }
+
+    // Show room name immediately
+    var roomName = (currentRoomData && currentRoomData.name) || meta.roomName || meta.roomId || "";
+    $("group-room-name").textContent = roomName;
+    var metaArr = [];
     if (currentRoomData) {
-      $("group-room-name").textContent = currentRoomData.name || currentRoomId;
-      var metaArr = [];
       if (currentRoomData.endDate) metaArr.push("📅 "+currentRoomData.endDate);
       if (currentRoomData.targetPct) metaArr.push("🎯 Meta +"+currentRoomData.targetPct+"%");
       if (currentRoomData.initialBal) metaArr.push("💰 R$ "+Number(currentRoomData.initialBal).toLocaleString("pt-BR"));
-      $("group-room-meta").textContent = metaArr.join(" · ");
     }
-    // Subscribe to live updates
+    var mEl = $("group-room-meta");
+    if (mEl) mEl.textContent = metaArr.join(" · ");
+
+    // Load room from Firebase if not loaded yet
+    if (!currentRoomId || currentRoomId !== meta.roomId) {
+      currentRoomId = meta.roomId;
+      localStorage.setItem("hb_room_id", meta.roomId);
+    }
+    if (!currentRoomData && currentRoomId) {
+      joinRoom(currentRoomId).then(function(room) {
+        currentRoomData = room;
+        meta.roomName = room.name;
+        setProfileMeta(profile, meta);
+        // Update header
+        $("group-room-name").textContent = room.name || currentRoomId;
+        var arr2 = [];
+        if (room.endDate) arr2.push("📅 "+room.endDate);
+        if (room.targetPct) arr2.push("🎯 Meta +"+room.targetPct+"%");
+        if (room.initialBal) arr2.push("💰 R$ "+Number(room.initialBal).toLocaleString("pt-BR"));
+        if (mEl) mEl.textContent = arr2.join(" · ");
+      }).catch(function(){});
+    }
+
+    // Subscribe to live ranking
     if (currentRoomId) subscribeGroup(renderGroupRanking);
+    return;
+  }
+
+  // ── SOLO PROFILE ─────────────────────────────────────────────
+  $("group-room-view").style.display = "none";
+  var myGroups = getMyGroupProfiles();
+  if (myGroups.length === 0) {
+    $("group-noroom").style.display = "block";
+    $("group-solo-view").style.display = "none";
   } else {
-    // SOLO profile: always show group list, never group-room-view
-    $("group-room-view").style.display = "none";
-    var myGroups = getMyGroupProfiles();
-    if (myGroups.length === 0) {
-      $("group-noroom").style.display = "block";
-      $("group-solo-view").style.display = "none";
-    } else {
-      $("group-noroom").style.display = "none";
-      $("group-solo-view").style.display = "block";
-      renderSoloGroupList(myGroups);
-    }
+    $("group-noroom").style.display = "none";
+    $("group-solo-view").style.display = "block";
+    renderSoloGroupList(myGroups);
   }
 }
+
 
 function getMyGroupProfiles() {
   return getProfiles().filter(function(p) {
@@ -3061,13 +3069,36 @@ if (urlToken && !token) {
 }
 
 if (token) {
-  $("ts").style.display = "none"; // hide token screen immediately
-  // Auto-mark as owner if no invite param in URL
+  $("ts").style.display = "none";
   if (localStorage.getItem("hb_is_owner") === null) {
     var hasInvite = window.location.search.indexOf("t=") >= 0;
     localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
   }
   if (getCurrentProfile()) {
+    // If group profile, restore room before loading state
+    var _bootProfile = getCurrentProfile();
+    if (_bootProfile && _bootProfile.indexOf("grupo_") === 0) {
+      var _bootParts = _bootProfile.split("_");
+      var _bootMeta = getProfileMeta(_bootProfile);
+      if (!_bootMeta) {
+        _bootMeta = {profileId:_bootProfile, displayName:_bootParts.slice(2).join("_"), type:"group", roomId:_bootParts[1], roomName:_bootParts[1]};
+        setProfileMeta(_bootProfile, _bootMeta);
+      }
+      currentRoomId = _bootMeta.roomId;
+      localStorage.setItem("hb_room_id", currentRoomId);
+      // Load room data async - don't block boot
+      joinRoom(currentRoomId).then(function(room){
+        currentRoomData = room;
+        _bootMeta.roomName = room.name;
+        setProfileMeta(_bootProfile, _bootMeta);
+      }).catch(function(){
+        currentRoomData = {name: _bootMeta.roomName || _bootMeta.roomId};
+      });
+    } else {
+      currentRoomId = "";
+      currentRoomData = null;
+      localStorage.removeItem("hb_room_id");
+    }
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
     divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
@@ -3098,13 +3129,36 @@ if (urlToken && !token) {
 }
 
 if (token) {
-  $("ts").style.display = "none"; // hide token screen immediately
-  // Auto-mark as owner if no invite param in URL
+  $("ts").style.display = "none";
   if (localStorage.getItem("hb_is_owner") === null) {
     var hasInvite = window.location.search.indexOf("t=") >= 0;
     localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
   }
   if (getCurrentProfile()) {
+    // If group profile, restore room before loading state
+    var _bootProfile = getCurrentProfile();
+    if (_bootProfile && _bootProfile.indexOf("grupo_") === 0) {
+      var _bootParts = _bootProfile.split("_");
+      var _bootMeta = getProfileMeta(_bootProfile);
+      if (!_bootMeta) {
+        _bootMeta = {profileId:_bootProfile, displayName:_bootParts.slice(2).join("_"), type:"group", roomId:_bootParts[1], roomName:_bootParts[1]};
+        setProfileMeta(_bootProfile, _bootMeta);
+      }
+      currentRoomId = _bootMeta.roomId;
+      localStorage.setItem("hb_room_id", currentRoomId);
+      // Load room data async - don't block boot
+      joinRoom(currentRoomId).then(function(room){
+        currentRoomData = room;
+        _bootMeta.roomName = room.name;
+        setProfileMeta(_bootProfile, _bootMeta);
+      }).catch(function(){
+        currentRoomData = {name: _bootMeta.roomName || _bootMeta.roomId};
+      });
+    } else {
+      currentRoomId = "";
+      currentRoomData = null;
+      localStorage.removeItem("hb_room_id");
+    }
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
     divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
