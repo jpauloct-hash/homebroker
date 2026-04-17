@@ -715,43 +715,36 @@ function shareRoomInvite(){
 }
 function switchToProfile(profileId) {
   localStorage.setItem("hb_profile_v1", profileId);
-  // Detect group profile
   var meta = getProfileMeta(profileId);
   if (!meta && profileId && profileId.indexOf("grupo_") === 0) {
     var _sp = profileId.split("_");
     meta = {profileId:profileId, displayName:_sp.slice(2).join("_"), type:"group", roomId:_sp[1], roomName:_sp[1]};
     setProfileMeta(profileId, meta);
   }
-  if (meta && meta.type === "group" && meta.roomId) {
+  function finishSwitch() {
+    var st2 = loadState();
+    bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+    initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+    goal=loadGoal(); equityHistory=loadEquityHistory();
+    $("ps").style.display="none"; $("ts").style.display="none"; $("gs").style.display="none";
+    if (!$("ma").style.display || $("ma").style.display==="none") {
+      initApp();
+    } else {
+      updateProfileIndicator(); render(); renderGroupPanel();
+    }
+    notif("Perfil: "+(meta?meta.displayName:profileId));
+  }
+  if (meta && meta.type==="group" && meta.roomId) {
     currentRoomId = meta.roomId;
     joinRoom(meta.roomId).then(function(room){
-      currentRoomData = room;
-      meta.roomName = room.name;
-      setProfileMeta(profileId, meta);
+      currentRoomData=room; meta.roomName=room.name; setProfileMeta(profileId,meta); finishSwitch();
     }).catch(function(){
-      currentRoomData = {name: meta.roomName || meta.roomId};
+      currentRoomData={name:meta.roomName||meta.roomId}; finishSwitch();
     });
   } else {
-    currentRoomId = "";
-    currentRoomData = null;
+    currentRoomId=""; currentRoomData=null; finishSwitch();
   }
-  // Load state
-  var st2 = loadState();
-  bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-  divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-  initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-  goal=loadGoal(); equityHistory=loadEquityHistory();
-  // Show main app properly
-  $("ps").style.display = "none";
-  $("ts").style.display = "none";
-  $("gs").style.display = "none";
-  if (!$("ma").style.display || $("ma").style.display === "none") {
-    initApp();
-  } else {
-    updateProfileIndicator();
-    render();
-  }
-  notif("Perfil: " + (meta ? meta.displayName : profileId));
 }
 
 // ── RENDER GROUP PANEL (smart: solo vs group) ─────────────────
@@ -2894,7 +2887,8 @@ function initApp() {
       document.querySelectorAll(".panel").forEach(function(x){x.classList.remove("on");});
       b.classList.add("on"); $(b.dataset.t+"-panel").classList.add("on");
       $("pb").style.display=b.dataset.t==="chart"?"flex":"none";
-      if (b.dataset.t==="portfolio") drawEquityChart();
+      if (b.dataset.t==="group") { renderGroupPanel(); }
+      if (b.dataset.t==="portfolio") { drawEquityChart(); }
       if (b.dataset.t==="news") {
         renderNewsTab();
         if (!newsCache.length) { newsLastFetch=0; fetchNews(); }
@@ -3080,7 +3074,7 @@ function initApp() {
     window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
   };
 
-  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
+  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); renderGroupPanel(); loadTV(); startRefresh();
   // Show/hide invite button based on owner status
   var invBtn = $("invite-btn");
   if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
