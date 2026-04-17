@@ -601,6 +601,7 @@ try {
 } catch(e){console.log("FB err:",e.message);}
 
 var currentRoomId="",currentRoomData=null,groupUnsubscribe=null;
+var roomSwitchToken=0,roomLoadToken=0;
 function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
 function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){return id;});}
 function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");currentRoomId=id;currentRoomData=s.val();return s.val();});}
@@ -608,7 +609,13 @@ function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var
   var _pname=_pmeta?_pmeta.displayName:getCurrentProfile();
   fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:_pname,total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
 var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
-function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
+function subscribeGroup(cb){
+  if(groupUnsubscribe){groupUnsubscribe();groupUnsubscribe=null;}
+  if(!currentRoomId||!fbDb)return;
+  var ref=fbDb.ref("rooms/"+currentRoomId+"/members");
+  ref.on("value",function(s){cb(s.val()||{});});
+  groupUnsubscribe=function(){ref.off();};
+}
 function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
 function showCreateRoom(){
   var n=prompt("🏆 Nome do grupo:");
@@ -721,7 +728,9 @@ function switchToProfile(profileId) {
     meta = {profileId:profileId, displayName:_sp.slice(2).join("_"), type:"group", roomId:_sp[1], roomName:_sp[1]};
     setProfileMeta(profileId, meta);
   }
+  var thisSwitch = ++roomSwitchToken;
   function finishSwitch() {
+    if (thisSwitch !== roomSwitchToken) return;
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
     divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
@@ -735,20 +744,26 @@ function switchToProfile(profileId) {
     }
     notif("Perfil: "+(meta?meta.displayName:profileId));
   }
+  if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
   if (meta && meta.type==="group" && meta.roomId) {
     currentRoomId = meta.roomId;
     currentRoomData = null;
-    joinRoom(meta.roomId).then(function(room){
+    var targetRoomId = meta.roomId;
+    joinRoom(targetRoomId).then(function(room) {
+      if (thisSwitch!==roomSwitchToken) return;
+      if (currentRoomId!==targetRoomId) return;
       currentRoomData=room; meta.roomName=room.name; setProfileMeta(profileId,meta); finishSwitch();
-    }).catch(function(){
-      currentRoomData={id:meta.roomId, name:meta.roomName||meta.roomId}; finishSwitch();
+    }).catch(function() {
+      if (thisSwitch!==roomSwitchToken) return;
+      if (currentRoomId!==targetRoomId) return;
+      currentRoomData={id:targetRoomId, name:meta.roomName||targetRoomId}; finishSwitch();
     });
   } else {
     currentRoomId=""; currentRoomData=null; finishSwitch();
   }
 }
 
-// ── RENDER GROUP PANEL (smart: solo vs group) ─────────────────
+
 function renderGroupPanel() {
   var profile = getCurrentProfile();
   var isGroup = profile && profile.indexOf("grupo_") === 0;
@@ -787,16 +802,18 @@ function renderGroupPanel() {
     if (mEl) mEl.textContent = metaArr.join(" · ");
 
     if (!currentRoomData && currentRoomId) {
-      joinRoom(currentRoomId).then(function(room) {
-        currentRoomData = room;
-        meta.roomName = room.name;
-        setProfileMeta(profile, meta);
-        $("group-room-name").textContent = room.name || currentRoomId;
-        var arr2 = [];
+      var thisLoad = ++roomLoadToken;
+      var targetRoomId = currentRoomId;
+      joinRoom(targetRoomId).then(function(room) {
+        if (thisLoad!==roomLoadToken) return;
+        if (currentRoomId!==targetRoomId) return;
+        currentRoomData=room; meta.roomName=room.name; setProfileMeta(profile,meta);
+        $("group-room-name").textContent=room.name||targetRoomId;
+        var arr2=[];
         if (room.endDate) arr2.push("📅 "+room.endDate);
         if (room.targetPct) arr2.push("🎯 Meta +"+room.targetPct+"%");
         if (room.initialBal) arr2.push("💰 R$ "+Number(room.initialBal).toLocaleString("pt-BR"));
-        if (mEl) mEl.textContent = arr2.join(" · ");
+        if (mEl) mEl.textContent=arr2.join(" · ");
         subscribeGroup(renderGroupRanking);
       }).catch(function(){});
     } else {
