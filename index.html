@@ -638,9 +638,24 @@ function getUserDisplayName() {
   return "Jogador";
 }
 
+function updateAuthIdentityUI() {
+  var name = getIdentityName();
+  var uid = getIdentityUid();
+  var el = $("profile-indicator");
+  if (!el) return;
+  if (currentRoomId && currentRoomData) {
+    el.innerHTML = '<span style="color:var(--a)">🏆 '+(currentRoomData.name||currentRoomId)+'</span> <span style="color:var(--tx4);font-size:9px">· '+name+'</span>';
+  } else {
+    el.textContent = "Perfil: " + name;
+  }
+  if (uid) el.dataset.uid = uid;
+}
+
 function getUserUid() {
   return currentUser ? currentUser.uid : null;
 }
+function getIdentityUid() { return currentUser ? currentUser.uid : null; }
+function getIdentityName() { return (currentUser && currentUser.displayName) ? currentUser.displayName : "Jogador"; }
 
 
 
@@ -661,12 +676,21 @@ var soloGroupUnsubs={};
 
 var currentRoomId="",currentRoomData=null,groupUnsubscribe=null;
 function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
-function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
+function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getIdentityUid(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
 function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");localStorage.setItem("hb_room_id",id);currentRoomId=id;currentRoomData=s.val();return s.val();});}
-function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;var _pmeta=getProfileMeta(getCurrentProfile());
-  var _pname=_pmeta?_pmeta.displayName:getCurrentProfile();
-  fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:_pname,total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
-var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
+function pushMyStats(){
+  var uid=getIdentityUid();
+  if(!currentRoomId||!uid||!fbDb)return;
+  var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;
+  var name=getIdentityName();
+  fbDb.ref("rooms/"+currentRoomId+"/members/"+uid).set({
+    uid:uid, name:name, total:total,
+    pct:(total-initB)/initB*100,
+    updatedAt:Date.now(),
+    history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})
+  });
+}
+var _lp=0;function maybePushStats(){if(!currentRoomId||!getIdentityUid())return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
 function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
 function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
 function showCreateRoom(){
@@ -683,7 +707,7 @@ function showCreateRoom(){
   var t=parseFloat(tStr)||0;
   createRoom(n,b,d,t).then(function(roomId){
     // Auto-create a group profile for the creator
-    var creatorName = getProfileDisplayName(getCurrentProfile()) || getCurrentProfile();
+    var creatorName = getIdentityName();
     var groupProfileId = "grupo_"+roomId+"_"+creatorName;
     setProfileMeta(groupProfileId,{
       profileId:groupProfileId,
@@ -722,25 +746,22 @@ function showCreateRoom(){
 function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;joinRoom(c.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});}
 
 function joinGroupAsGuest() {
-  var nameInp=$("gs-name-inp"), errEl=$("gs-err");
-  var name=nameInp?nameInp.value.trim():"";
-  if(!name||name.length<2){errEl.textContent="Digite seu nome (mínimo 2 caracteres)";errEl.style.display="block";return;}
+  var uid=getIdentityUid();
+  var errEl=$("gs-err");
+  if(!uid){errEl.textContent="Faça login antes de entrar no grupo";errEl.style.display="block";return;}
   errEl.style.display="none";
   if(!currentRoomData){notif("Erro: sala não encontrada","err");return;}
-  var profileId="grupo_"+currentRoomId+"_"+name;
-  setProfileMeta(profileId,{profileId:profileId,displayName:name,type:"group",roomId:currentRoomId,roomName:currentRoomData.name});
   var initBal=currentRoomData.initialBal||100000;
-  localStorage.setItem(LS_PROFILE,profileId);
-  var profs=getProfiles();
-  if(profs.indexOf(profileId)===-1){profs.push(profileId);localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));}
-  localStorage.setItem(getProfileKey("hb_state_v3"),JSON.stringify({bal:initBal,port:{},trd:[],pending:[],divs:{},totalDiv:0,checkedDivDate:"",initialBal:initBal,firstTradeDate:""}));
-  if(currentRoomData.endDate||currentRoomData.targetPct){localStorage.setItem(getProfileKey("hb_goal_v1"),JSON.stringify({endDate:currentRoomData.endDate||"",target:currentRoomData.targetPct||0}));}
+  var name=getIdentityName();
+  fbDb.ref("rooms/"+currentRoomId+"/members/"+uid).set({uid:uid,name:name,joinedAt:Date.now()});
+  localStorage.setItem("hb_active_room_"+uid, currentRoomId);
   var st2=loadState();
   bal=st2.bal;port=st2.port;trd=st2.trd;pending=st2.pending;
   divs=st2.divs;totalDiv=st2.totalDiv;checkedDivDate=st2.checkedDivDate;
   initialBal=st2.initialBal;firstTradeDate=st2.firstTradeDate;
   goal=loadGoal();equityHistory=loadEquityHistory();
   $("gs").style.display="none";
+  clearInviteFromUrl();
   pushMyStats();
   notif("Bem-vindo ao grupo "+currentRoomData.name+"!");
   initApp();
@@ -950,7 +971,36 @@ function renderSoloGroupList(groupProfiles) {
 }
 
 function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;}
-function renderGroupRanking(members){drawGroupChart(members);var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;el.innerHTML="";list.forEach(function(m,i){var isMe=m.name===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div><div style='flex:1'><div style='font-size:12px;font-weight:700'>"+m.name+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div><div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div><div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";el.appendChild(div);});}
+function renderGroupRanking(members){
+  drawGroupChart(members);
+  var list=Object.values(members).sort(function(a,b){return(b.pct||0)-(a.pct||0);});
+  var el=$("group-ranking"); if(!el)return; el.innerHTML="";
+  var currentName=getIdentityName();
+  var myIndex=-1;
+  list.forEach(function(m,i){
+    if(m.name===currentName) myIndex=i;
+    var isMe=m.name===currentName;
+    var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1);
+    var color=(m.pct||0)>=0?"var(--g)":"var(--r)";
+    var div=document.createElement("div");
+    div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";
+    div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div>"+
+      "<div style='flex:1'><div style='font-size:12px;font-weight:700'>"+(m.name||"Jogador")+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div>"+
+      "<div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div>"+
+      "<div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";
+    el.appendChild(div);
+  });
+  var medalEl=$("group-my-medal"),pctEl=$("group-my-pct");
+  if(medalEl&&pctEl){
+    if(myIndex>=0){
+      medalEl.textContent=myIndex===0?"🥇":myIndex===1?"🥈":myIndex===2?"🥉":"#"+(myIndex+1);
+      var me=list[myIndex];
+      pctEl.textContent=((me.pct||0)>=0?"+":"")+Number(me.pct||0).toFixed(2)+"%";
+      pctEl.style.color=(me.pct||0)>=0?"var(--g)":"var(--r)";
+    } else { medalEl.textContent="—";pctEl.textContent="—";pctEl.style.color="var(--tx2)"; }
+  }
+}
+
 function drawGroupChart(members){var canvas=document.getElementById("group-chart");if(!canvas)return;var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});if(!allPts.length)return;var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;list.forEach(function(m,ci){if(!m.history||m.history.length<2)return;ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});ctx2.stroke();});}
 (function(){var params=new URLSearchParams(window.location.search),room=params.get("room");if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}})();
 
@@ -2866,16 +2916,7 @@ function enterProfile(name) {
 }
 
 function updateProfileIndicator() {
-  var el = $("profile-indicator");
-  if (!el) return;
-  var profile = getCurrentProfile();
-  if (!profile) { el.textContent = ""; return; }
-  var meta = getProfileMeta(profile);
-  if (meta && meta.type === "group") {
-    el.innerHTML = '<span style="color:var(--a)">🏆 '+meta.roomName+'</span> <span style="color:var(--tx4);font-size:9px">· '+meta.displayName+'</span>';
-  } else {
-    el.textContent = "Perfil: " + profile;
-  }
+  updateAuthIdentityUI();
 }
 
 function renderSettingsProfiles() {
@@ -3103,7 +3144,7 @@ function initApp() {
     window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
   };
 
-  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
+  updateExecBtn(); updatePregaoBar(); updateAuthIdentityUI(); render(); loadTV(); startRefresh();
   // Show/hide invite button based on owner status
   var invBtn = $("invite-btn");
   if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
@@ -3228,6 +3269,8 @@ function enterAppAfterAuth() {
   if ($("ps")) $("ps").style.display="none";
   if ($("gs")) $("gs").style.display="none";
   if ($("ma")) $("ma").style.display="flex";
+  updateAuthIdentityUI();
+  updateAuthIdentityUI();
   var _savedRoomId = currentUser ? localStorage.getItem("hb_active_room_"+currentUser.uid) : null;
   if (_savedRoomId) {
     currentRoomId = _savedRoomId;
