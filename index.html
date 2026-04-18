@@ -682,6 +682,64 @@ function ensureSoloProfile() {
   return soloId;
 }
 
+// ── SOLO FIREBASE HELPERS ────────────────────────────────────────────────────
+function getSoloPortfolioRef() {
+  var uid=getIdentityUid();
+  if(!uid||!fbDb)return null;
+  return fbDb.ref("soloPortfolios/"+uid);
+}
+
+function buildSoloPayloadFromMemory() {
+  return {cash:bal||0,positions:port||{},trades:trd||[],pendingOrders:pending||[],
+    dividends:divs||{},totalDiv:totalDiv||0,initialBal:initialBal||100000,
+    firstTradeDate:firstTradeDate||"",updatedAt:Date.now()};
+}
+
+function applySoloPayloadToMemory(data) {
+  data=data||{};
+  bal=Number(data.cash||0);
+  port=data.positions||{};
+  trd=data.trades||[];
+  pending=data.pendingOrders||[];
+  divs=data.dividends||{};
+  totalDiv=Number(data.totalDiv||0);
+  initialBal=Number(data.initialBal||100000);
+  firstTradeDate=data.firstTradeDate||"";
+}
+
+function syncSoloToLocalCache() {
+  var soloId=getSoloProfileId();if(!soloId)return;
+  localStorage.setItem("hb_state_v3_"+soloId,JSON.stringify({
+    bal:bal||0,port:port||{},trd:trd||[],pending:pending||[],
+    divs:divs||{},totalDiv:totalDiv||0,checkedDivDate:checkedDivDate||"",
+    initialBal:initialBal||100000,firstTradeDate:firstTradeDate||""
+  }));
+}
+
+function loadSoloFromFirebase() {
+  var ref=getSoloPortfolioRef();
+  if(!ref)return Promise.reject(new Error("Solo/Firebase indisponível"));
+  return ref.once("value").then(function(snap){
+    var data=snap.val();
+    if(!data){
+      data={cash:100000,positions:{},trades:[],pendingOrders:[],dividends:{},totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()};
+      return ref.set(data).then(function(){return data;});
+    }
+    return data;
+  }).then(function(data){
+    applySoloPayloadToMemory(data);
+    syncSoloToLocalCache();
+    return data;
+  });
+}
+
+function saveSoloToFirebase() {
+  var ref=getSoloPortfolioRef();if(!ref)return Promise.resolve();
+  syncSoloToLocalCache();
+  return ref.update(buildSoloPayloadFromMemory());
+}
+
+
 
 
 // ── FIREBASE INIT ────────────────────────────────────────────
@@ -1260,13 +1318,19 @@ var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
 var token = "TOKEN_BRAPI_AQUI"; // token centralizado Brapi
 
 function loadState() { return loadStateForProfile(); }
-function saveState() { saveStateForProfile(); }
+function saveState() {
+  saveStateForProfile();
+  // Mirror solo to Firebase
+  if (getCurrentProfile() === getSoloProfileId()) {
+    saveSoloToFirebase();
+  }
+}
+function saveGoal() { localStorage.setItem(getProfileKey("hb_goal_v1"), JSON.stringify(goal)); }
+
 function loadGoal() {
   try { return JSON.parse(localStorage.getItem(getProfileKey("hb_goal_v1"))||"{}"); }
   catch(e) { return {}; }
 }
-function saveGoal() { localStorage.setItem(getProfileKey("hb_goal_v1"), JSON.stringify(goal)); }
-
 function loadEquityHistory() {
   try { return JSON.parse(localStorage.getItem(getProfileKey(LS_EQUITY))||"[]"); } catch(e) { return []; }
 }
@@ -3307,34 +3371,37 @@ function enterAppAfterAuth() {
   if ($("gs")) $("gs").style.display="none";
   if ($("ma")) $("ma").style.display="flex";
 
-  var soloId = ensureSoloProfile();
-  if (!getCurrentProfile()) {
-    localStorage.setItem(LS_PROFILE, soloId);
-  }
+  var soloId=ensureSoloProfile();
+  if(!getCurrentProfile()) localStorage.setItem(LS_PROFILE,soloId);
 
   updateAuthIdentityUI();
 
-  var _savedRoomId = currentUser ? localStorage.getItem("hb_active_room_"+currentUser.uid) : null;
-  if (_savedRoomId) {
-    currentRoomId = _savedRoomId;
-    joinRoom(_savedRoomId).then(function(room){currentRoomData=room;}).catch(function(){currentRoomId="";currentRoomData=null;});
-  }
+  var _savedRoomId=currentUser?localStorage.getItem("hb_active_room_"+currentUser.uid):null;
+  if(_savedRoomId) currentRoomId=_savedRoomId;
 
-  var st2=loadState();
-  bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-  divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-  initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-  goal=loadGoal(); equityHistory=loadEquityHistory();
+  loadSoloFromFirebase().then(function(){
+    goal=loadGoal(); equityHistory=loadEquityHistory();
 
-  var _roomParam=new URLSearchParams(window.location.search).get("room");
-  if (_roomParam) {
-    joinRoom(_roomParam.toUpperCase()).then(function(roomData){
-      showGroupJoinScreen(roomData);
-      try{var _u=new URL(window.location.href);_u.searchParams.delete("room");window.history.replaceState({},"",_u.pathname+(_u.search||""));}catch(e){}
-    }).catch(function(){notif("Grupo não encontrado","err");});
-  } else {
+    var _roomParam=new URLSearchParams(window.location.search).get("room");
+    if(_roomParam){
+      return joinRoom(_roomParam.toUpperCase()).then(function(roomData){
+        showGroupJoinScreen(roomData);
+        try{var _u=new URL(window.location.href);_u.searchParams.delete("room");window.history.replaceState({},"",_u.pathname+(_u.search||""));}catch(e){}
+      }).catch(function(){notif("Grupo não encontrado","err");initApp();});
+    }
+
+    if(currentRoomId){
+      return joinRoom(currentRoomId).then(function(room){currentRoomData=room;})
+        .catch(function(){currentRoomId="";currentRoomData=null;})
+        .then(function(){initApp();});
+    }
+
     initApp();
-  }
+  }).catch(function(err){
+    console.error("Erro ao carregar solo:",err);
+    notif("Erro ao carregar carteira","err");
+    initApp();
+  });
 }
 
 if (fbAuth) {
