@@ -657,6 +657,31 @@ function getUserUid() {
 function getIdentityUid() { return currentUser ? currentUser.uid : null; }
 function getIdentityName() { return (currentUser && currentUser.displayName) ? currentUser.displayName : "Jogador"; }
 
+function getSoloProfileId() {
+  var uid = getIdentityUid();
+  return uid ? ("solo_" + uid) : "";
+}
+
+function ensureSoloProfile() {
+  var uid = getIdentityUid();
+  if (!uid) return "";
+  var soloId = getSoloProfileId();
+  var displayName = getIdentityName();
+  setProfileMeta(soloId, {profileId:soloId, displayName:displayName, type:"solo", uid:uid});
+  var profs = getProfiles();
+  if (profs.indexOf(soloId) === -1) {
+    profs.unshift(soloId);
+    localStorage.setItem("hb_profiles_v1", JSON.stringify(profs));
+  }
+  if (!localStorage.getItem("hb_state_v3_" + soloId)) {
+    localStorage.setItem("hb_state_v3_" + soloId, JSON.stringify({bal:100000,port:{},trd:[],pending:[],divs:{},totalDiv:0,checkedDivDate:"",initialBal:100000,firstTradeDate:""}));
+  }
+  if (!localStorage.getItem(LS_PROFILE)) {
+    localStorage.setItem(LS_PROFILE, soloId);
+  }
+  return soloId;
+}
+
 
 
 // ── FIREBASE INIT ────────────────────────────────────────────
@@ -2815,10 +2840,19 @@ function buildTapePicker() {
 
 // ── Profile system ────────────────────────────────────────────────────────────
 function showProfileScreen() {
-  $("ts").style.display = "none";
-  $("ma").style.display = "none";
-  $("ps").style.display = "flex";
-  renderProfileList();
+  var soloId = ensureSoloProfile();
+  if (soloId) {
+    localStorage.setItem(LS_PROFILE, soloId);
+    if ($("ps")) $("ps").style.display="none";
+    if ($("ts")) $("ts").style.display="none";
+    if ($("gs")) $("gs").style.display="none";
+    if ($("ma")) $("ma").style.display="flex";
+    initApp();
+    return;
+  }
+  $("ts").style.display="flex";
+  $("ma").style.display="none";
+  if ($("ps")) $("ps").style.display="none";
 }
 
 function renderProfileList() {
@@ -3145,6 +3179,7 @@ function initApp() {
   };
 
   updateExecBtn(); updatePregaoBar(); updateAuthIdentityUI(); render(); loadTV(); startRefresh();
+  if ($("switch-profile-btn")) $("switch-profile-btn").style.display="none";
   // Show/hide invite button based on owner status
   var invBtn = $("invite-btn");
   if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
@@ -3253,6 +3288,8 @@ function ensureUserBaseData(user) {
     return fbDb.ref("soloPortfolios/"+uid).once("value");
   }).then(function(snap) {
     if (!snap.exists()) return fbDb.ref("soloPortfolios/"+uid).set({cash:100000,positions:{},trades:{},pendingOrders:{},dividends:{},totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()});
+  }).then(function() {
+    ensureSoloProfile();
   });
 }
 
@@ -3269,18 +3306,26 @@ function enterAppAfterAuth() {
   if ($("ps")) $("ps").style.display="none";
   if ($("gs")) $("gs").style.display="none";
   if ($("ma")) $("ma").style.display="flex";
+
+  var soloId = ensureSoloProfile();
+  if (!getCurrentProfile()) {
+    localStorage.setItem(LS_PROFILE, soloId);
+  }
+
   updateAuthIdentityUI();
-  updateAuthIdentityUI();
+
   var _savedRoomId = currentUser ? localStorage.getItem("hb_active_room_"+currentUser.uid) : null;
   if (_savedRoomId) {
     currentRoomId = _savedRoomId;
     joinRoom(_savedRoomId).then(function(room){currentRoomData=room;}).catch(function(){currentRoomId="";currentRoomData=null;});
   }
+
   var st2=loadState();
   bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
   divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
   initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
   goal=loadGoal(); equityHistory=loadEquityHistory();
+
   var _roomParam=new URLSearchParams(window.location.search).get("room");
   if (_roomParam) {
     joinRoom(_roomParam.toUpperCase()).then(function(roomData){
