@@ -528,7 +528,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div style="border-top:1px solid var(--bd);padding-top:16px">
       <div style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
       <button id="s-rst" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;margin-bottom:8px">RESETAR SIMULADOR</button>
-      <button id="logb" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Trocar Token</button>
+      <button id="logb" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Sair da conta</button>
     </div>
     <button id="csht" style="width:100%;padding:12px;border:none;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:12px;font-weight:700;margin-top:12px">Fechar</button>
   </div>
@@ -640,10 +640,12 @@ function getUserDisplayName() {
 
 function hideLegacyProfileUI() {
   if ($("ps")) $("ps").style.display="none";
-  if ($("settings-profiles")) {
-    var box=$("settings-profiles").parentNode; if(box) box.style.display="none";
-  }
-  if ($("switch-profile-btn")) $("switch-profile-btn").style.display="none";
+}
+
+function updateContextActionsUI() {
+  var inGroup = !!currentRoomId;
+  if ($("solo-back-wrap")) $("solo-back-wrap").style.display = inGroup ? "block" : "none";
+  if ($("invite-btn")) $("invite-btn").style.display = inGroup ? "flex" : "none";
 }
 
 function switchToSoloProfile() {
@@ -897,9 +899,7 @@ function pushEquityPoint() {
   equityHistory.push({t:now,v:total});
   if(equityHistory.length>90)equityHistory=equityHistory.slice(-90);
   localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(equityHistory));
-  if(getCurrentProfile()===getSoloProfileId()){
-    saveSoloHistoryToFirebase();
-  }
+  saveCurrentContextToFirebase();
 }
 
 
@@ -1073,7 +1073,7 @@ function switchToProfile(profileId) {
       if (thisSwitch !== roomSwitchToken) return;
       goal = loadGoal();
       setActiveScreen("ma");
-      updateAuthIdentityUI(); render(); renderGroupPanel();
+      updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
       notif("Perfil: "+meta.displayName);
     }).catch(function(err) {
       console.error("Erro ao carregar grupo:", err);
@@ -3401,6 +3401,7 @@ function initApp() {
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
   $("logb").onclick=function() { doAuthLogout(); };
+  if ($("back-to-solo-btn")) { $("back-to-solo-btn").onclick=function(){switchToSoloProfile();$("sht").classList.remove("on");}; }
   $("fs-up").onclick=function(){ applyFontScale(fontIdx+1); };
   $("fs-down").onclick=function(){ applyFontScale(fontIdx-1); };
   $("switch-profile-btn").onclick = function() { $("sht").classList.remove("on"); showProfileScreen(); };
@@ -3574,7 +3575,7 @@ function enterAppAfterAuth() {
         .then(function(){initApp();});
     }
 
-    initApp();
+    initApp(); updateContextActionsUI();
   }).catch(function(err){
     console.error("Erro ao carregar solo:",err);
     notif("Erro ao carregar carteira","err");
