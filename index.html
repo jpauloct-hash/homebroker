@@ -739,6 +739,54 @@ function saveSoloToFirebase() {
   return ref.update(buildSoloPayloadFromMemory());
 }
 
+// ── SOLO HISTORY FIREBASE HELPERS ────────────────────────────────────────────
+function getSoloHistoryRef() {
+  var uid=getIdentityUid();
+  if(!uid||!fbDb)return null;
+  return fbDb.ref("soloHistory/"+uid+"/points");
+}
+
+function normalizeEquityHistory(points) {
+  if(!Array.isArray(points))return[];
+  return points
+    .filter(function(p){return p&&typeof p.t!=="undefined"&&typeof p.v!=="undefined";})
+    .map(function(p){return{t:Number(p.t),v:Number(p.v)};})
+    .filter(function(p){return!isNaN(p.t)&&!isNaN(p.v);})
+    .sort(function(a,b){return a.t-b.t;});
+}
+
+function loadSoloHistoryFromFirebase() {
+  var ref=getSoloHistoryRef();
+  if(!ref)return Promise.resolve([]);
+  return ref.once("value").then(function(snap){
+    var data=snap.val();
+    var points=Array.isArray(data)?data:[];
+    points=normalizeEquityHistory(points);
+    equityHistory=points;
+    localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(points));
+    return points;
+  });
+}
+
+function saveSoloHistoryToFirebase() {
+  var ref=getSoloHistoryRef();if(!ref)return Promise.resolve();
+  var points=normalizeEquityHistory(equityHistory||[]);
+  localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(points));
+  return ref.set(points);
+}
+
+function pushEquityPoint() {
+  var total=bal+portValue();
+  var now=Date.now();
+  equityHistory=Array.isArray(equityHistory)?equityHistory:[];
+  equityHistory.push({t:now,v:total});
+  if(equityHistory.length>90)equityHistory=equityHistory.slice(-90);
+  localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(equityHistory));
+  if(getCurrentProfile()===getSoloProfileId()){
+    saveSoloHistoryToFirebase();
+  }
+}
+
 
 
 
@@ -1334,9 +1382,11 @@ function loadEquityHistory() {
   try { return JSON.parse(localStorage.getItem(getProfileKey(LS_EQUITY))||"[]"); } catch(e) { return []; }
 }
 function saveEquityHistory() {
-  // Mantm ltimos 90 pontos
   if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
   localStorage.setItem(getProfileKey(LS_EQUITY), JSON.stringify(equityHistory));
+  if (getCurrentProfile() === getSoloProfileId()) {
+    saveSoloHistoryToFirebase();
+  }
 }
 
 var st = loadState();
@@ -3379,8 +3429,11 @@ function enterAppAfterAuth() {
   if(_savedRoomId) currentRoomId=_savedRoomId;
 
   loadSoloFromFirebase().then(function(){
-    goal=loadGoal(); equityHistory=loadEquityHistory();
-
+    goal=loadGoal();
+    return loadSoloHistoryFromFirebase().catch(function(){
+      equityHistory=loadEquityHistory();
+    });
+  }).then(function(){
     var _roomParam=new URLSearchParams(window.location.search).get("room");
     if(_roomParam){
       return joinRoom(_roomParam.toUpperCase()).then(function(roomData){
