@@ -775,6 +775,95 @@ function saveSoloHistoryToFirebase() {
   return ref.set(points);
 }
 
+// ── GROUP PORTFOLIO/HISTORY FIREBASE HELPERS ─────────────────────────────────
+function getGroupPortfolioRef(roomId) {
+  var uid=getIdentityUid();
+  if(!uid||!fbDb||!roomId)return null;
+  return fbDb.ref("groupPortfolios/"+roomId+"/"+uid);
+}
+function getGroupHistoryRef(roomId) {
+  var uid=getIdentityUid();
+  if(!uid||!fbDb||!roomId)return null;
+  return fbDb.ref("groupHistory/"+roomId+"/"+uid+"/points");
+}
+function buildGroupPayloadFromMemory() {
+  return {cash:bal||0,positions:port||{},trades:trd||[],pendingOrders:pending||[],
+    dividends:divs||{},totalDiv:totalDiv||0,initialBal:initialBal||100000,
+    firstTradeDate:firstTradeDate||"",updatedAt:Date.now()};
+}
+function applyGroupPayloadToMemory(data) {
+  data=data||{};
+  bal=Number(data.cash||0); port=data.positions||{}; trd=data.trades||[];
+  pending=data.pendingOrders||[]; divs=data.dividends||{};
+  totalDiv=Number(data.totalDiv||0); initialBal=Number(data.initialBal||100000);
+  firstTradeDate=data.firstTradeDate||"";
+}
+function syncGroupToLocalCache(profileId) {
+  if(!profileId)return;
+  localStorage.setItem("hb_state_v3_"+profileId,JSON.stringify({
+    bal:bal||0,port:port||{},trd:trd||[],pending:pending||[],
+    divs:divs||{},totalDiv:totalDiv||0,checkedDivDate:checkedDivDate||"",
+    initialBal:initialBal||100000,firstTradeDate:firstTradeDate||""
+  }));
+}
+function loadGroupPortfolioFromFirebase(roomId, profileId) {
+  var ref=getGroupPortfolioRef(roomId);
+  if(!ref)return Promise.reject(new Error("Group portfolio indisponível"));
+  return ref.once("value").then(function(snap){
+    var data=snap.val();
+    if(!data){
+      var initBal=(currentRoomData&&currentRoomData.initialBal)||100000;
+      data={cash:initBal,positions:{},trades:[],pendingOrders:[],dividends:{},
+        totalDiv:0,initialBal:initBal,firstTradeDate:"",updatedAt:Date.now()};
+      return ref.set(data).then(function(){return data;});
+    }
+    return data;
+  }).then(function(data){
+    applyGroupPayloadToMemory(data);
+    syncGroupToLocalCache(profileId);
+    return data;
+  });
+}
+function saveGroupPortfolioToFirebase(roomId, profileId) {
+  var ref=getGroupPortfolioRef(roomId);if(!ref)return Promise.resolve();
+  syncGroupToLocalCache(profileId);
+  return ref.update(buildGroupPayloadFromMemory());
+}
+function loadGroupHistoryFromFirebase(roomId, profileId) {
+  var ref=getGroupHistoryRef(roomId);
+  if(!ref)return Promise.resolve([]);
+  return ref.once("value").then(function(snap){
+    var data=snap.val();
+    var points=normalizeEquityHistory(Array.isArray(data)?data:[]);
+    equityHistory=points;
+    localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(points));
+    return points;
+  });
+}
+function saveGroupHistoryToFirebase(roomId) {
+  var ref=getGroupHistoryRef(roomId);if(!ref)return Promise.resolve();
+  var points=normalizeEquityHistory(equityHistory||[]);
+  localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(points));
+  return ref.set(points);
+}
+function isCurrentProfileGroup() {
+  var p=getCurrentProfile();
+  return !!(p&&p.indexOf("grupo_")===0);
+}
+function saveCurrentContextToFirebase() {
+  if(isCurrentProfileGroup()&&currentRoomId){
+    return Promise.all([
+      saveGroupPortfolioToFirebase(currentRoomId,getCurrentProfile()),
+      saveGroupHistoryToFirebase(currentRoomId)
+    ]);
+  }
+  if(getCurrentProfile()===getSoloProfileId()){
+    return Promise.all([saveSoloToFirebase(),saveSoloHistoryToFirebase()]);
+  }
+  return Promise.resolve();
+}
+
+
 function pushEquityPoint() {
   var total=bal+portValue();
   var now=Date.now();
@@ -882,21 +971,30 @@ function joinGroupAsGuest() {
   if(!uid){errEl.textContent="Faça login antes de entrar no grupo";errEl.style.display="block";return;}
   errEl.style.display="none";
   if(!currentRoomData){notif("Erro: sala não encontrada","err");return;}
-  var initBal=currentRoomData.initialBal||100000;
   var name=getIdentityName();
-  fbDb.ref("rooms/"+currentRoomId+"/members/"+uid).set({uid:uid,name:name,joinedAt:Date.now()});
-  localStorage.setItem("hb_active_room_"+uid, currentRoomId);
-  var st2=loadState();
-  bal=st2.bal;port=st2.port;trd=st2.trd;pending=st2.pending;
-  divs=st2.divs;totalDiv=st2.totalDiv;checkedDivDate=st2.checkedDivDate;
-  initialBal=st2.initialBal;firstTradeDate=st2.firstTradeDate;
-  goal=loadGoal();equityHistory=loadEquityHistory();
-  $("gs").style.display="none";
-  clearInviteFromUrl();
-  pushMyStats();
-  notif("Bem-vindo ao grupo "+currentRoomData.name+"!");
-  initApp();
+  fbDb.ref("rooms/"+currentRoomId+"/members/"+uid).set({uid:uid,name:name,joinedAt:Date.now()})
+  .then(function(){
+    localStorage.setItem("hb_active_room_"+uid, currentRoomId);
+    var profileId="grupo_"+currentRoomId+"_"+name;
+    setProfileMeta(profileId,{profileId:profileId,displayName:name,type:"group",roomId:currentRoomId,roomName:currentRoomData.name||currentRoomId});
+    var profs=getProfiles();
+    if(profs.indexOf(profileId)===-1){profs.push(profileId);localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));}
+    localStorage.setItem("hb_profile_v1",profileId);
+    return loadGroupPortfolioFromFirebase(currentRoomId,profileId);
+  }).then(function(){
+    return loadGroupHistoryFromFirebase(currentRoomId,getCurrentProfile());
+  }).then(function(){
+    $("gs").style.display="none";
+    clearInviteFromUrl();
+    pushMyStats();
+    notif("Bem-vindo ao grupo "+currentRoomData.name+"!");
+    initApp();
+  }).catch(function(err){
+    console.error(err);
+    notif("Erro ao entrar no grupo","err");
+  });
 }
+
 
 function showGroupJoinScreen(roomData){
   $("ts").style.display="none";$("ps").style.display="none";$("ma").style.display="none";
@@ -926,7 +1024,6 @@ function shareRoomInvite(){
 }
 function switchToProfile(profileId) {
   localStorage.setItem("hb_profile_v1", profileId);
-  // Detect group profile
   var meta = getProfileMeta(profileId);
   if (!meta && profileId && profileId.indexOf("grupo_") === 0) {
     var _sp = profileId.split("_");
@@ -935,39 +1032,45 @@ function switchToProfile(profileId) {
   }
   if (meta && meta.type === "group" && meta.roomId) {
     currentRoomId = meta.roomId;
-    localStorage.setItem("hb_room_id", meta.roomId);
-    joinRoom(meta.roomId).then(function(room){
-      currentRoomData = room;
-      meta.roomName = room.name;
-      setProfileMeta(profileId, meta);
-    }).catch(function(){
-      currentRoomData = {name: meta.roomName || meta.roomId};
-    });
-  } else {
-    currentRoomId = "";
     currentRoomData = null;
-    localStorage.removeItem("hb_room_id");
+    if (currentUser) localStorage.setItem("hb_active_room_"+currentUser.uid, meta.roomId);
+    if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
+    var thisSwitch = ++roomSwitchToken;
+    joinRoom(meta.roomId).then(function(room) {
+      if (thisSwitch !== roomSwitchToken) return;
+      currentRoomData = room; meta.roomName = room.name; setProfileMeta(profileId, meta);
+      return loadGroupPortfolioFromFirebase(meta.roomId, profileId);
+    }).then(function() {
+      if (thisSwitch !== roomSwitchToken) return;
+      return loadGroupHistoryFromFirebase(meta.roomId, profileId);
+    }).then(function() {
+      if (thisSwitch !== roomSwitchToken) return;
+      goal = loadGoal();
+      $("ps").style.display="none"; $("ts").style.display="none"; $("gs").style.display="none";
+      $("ma").style.display="flex";
+      updateAuthIdentityUI(); render(); renderGroupPanel();
+      notif("Perfil: "+meta.displayName);
+    }).catch(function(err) {
+      console.error("Erro ao carregar grupo:", err);
+      notif("Erro ao carregar carteira do grupo","err");
+    });
+    return;
   }
-  // Load state
+  if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
+  currentRoomId = ""; currentRoomData = null;
+  if (currentUser) localStorage.removeItem("hb_active_room_"+currentUser.uid);
   var st2 = loadState();
   bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
   divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
   initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
   goal=loadGoal(); equityHistory=loadEquityHistory();
-  // Show main app properly
-  $("ps").style.display = "none";
-  $("ts").style.display = "none";
-  $("gs").style.display = "none";
-  if (!$("ma").style.display || $("ma").style.display === "none") {
-    initApp();
-  } else {
-    updateProfileIndicator();
-    render();
-  }
-  notif("Perfil: " + (meta ? meta.displayName : profileId));
+  $("ps").style.display="none"; $("ts").style.display="none"; $("gs").style.display="none";
+  $("ma").style.display="flex";
+  updateAuthIdentityUI(); render(); renderGroupPanel();
+  notif("Perfil: "+(meta?meta.displayName:profileId));
 }
 
-// ── RENDER GROUP PANEL (smart: solo vs group) ─────────────────
+
 function renderGroupPanel() {
   var profile = getCurrentProfile();
   var isGroup = profile && profile.indexOf("grupo_") === 0;
@@ -1367,10 +1470,7 @@ var token = "TOKEN_BRAPI_AQUI"; // token centralizado Brapi
 function loadState() { return loadStateForProfile(); }
 function saveState() {
   saveStateForProfile();
-  // Mirror solo to Firebase
-  if (getCurrentProfile() === getSoloProfileId()) {
-    saveSoloToFirebase();
-  }
+  saveCurrentContextToFirebase();
 }
 function saveGoal() { localStorage.setItem(getProfileKey("hb_goal_v1"), JSON.stringify(goal)); }
 
