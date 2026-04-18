@@ -151,7 +151,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <input id="auth-email" class="tinp" placeholder="Email" type="email" autocomplete="email" style="margin-bottom:8px">
       <input id="auth-pass" class="tinp" placeholder="Senha" type="password" autocomplete="current-password" style="margin-bottom:8px">
       <div id="auth-err" style="font-size:10px;color:var(--r);margin-bottom:8px;display:none"></div>
-      <button onclick="doAuthLogin()" class="tbtn">ENTRAR</button>
+      <button id="auth-btn-login" onclick="doAuthLogin()" class="tbtn">ENTRAR</button>
       <div style="text-align:center;margin-top:10px">
         <span onclick="doForgotPassword()" style="font-size:10px;color:var(--bl);cursor:pointer">Esqueci minha senha</span>
       </div>
@@ -161,7 +161,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <input id="auth-email2" class="tinp" placeholder="Email" type="email" autocomplete="email" style="margin-bottom:8px">
       <input id="auth-pass2" class="tinp" placeholder="Senha (mínimo 6 caracteres)" type="password" autocomplete="new-password" style="margin-bottom:8px">
       <div id="auth-err2" style="font-size:10px;color:var(--r);margin-bottom:8px;display:none"></div>
-      <button onclick="doAuthRegister()" class="tbtn">CRIAR CONTA</button>
+      <button id="auth-btn-register" onclick="doAuthRegister()" class="tbtn">CRIAR CONTA</button>
     </div>
   </div>
 </div>
@@ -586,56 +586,34 @@ function showAuthErr(id, msg) {
 
 function doAuthLogin() {
   if (!fbAuth) { showAuthErr("auth-err","Firebase indisponível"); return; }
-  var email = $("auth-email").value.trim();
-  var pass = $("auth-pass").value;
-  if (!email || !pass) { showAuthErr("auth-err","Preencha email e senha"); return; }
-  var btn = $("auth-btn-login");
-  btn.disabled = true; btn.textContent = "ENTRANDO...";
-  $("auth-err").style.display = "none";
-  fbAuth.signInWithEmailAndPassword(email, pass)
-    .then(function(cred) {
-      // onAuthStateChanged will handle the rest
-    })
-    .catch(function(e) {
-      btn.disabled = false; btn.textContent = "ENTRAR";
-      var msg = e.code === "auth/user-not-found" ? "Usuário não encontrado" :
-                e.code === "auth/wrong-password" ? "Senha incorreta" :
-                e.code === "auth/invalid-email" ? "Email inválido" :
-                e.message;
-      showAuthErr("auth-err", msg);
-    });
+  var email=$("auth-email").value.trim(), pass=$("auth-pass").value;
+  if (!email||!pass) { showAuthErr("auth-err","Preencha email e senha"); return; }
+  var btn=$("auth-btn-login"); btn.disabled=true; btn.textContent="ENTRANDO...";
+  $("auth-err").style.display="none";
+  fbAuth.signInWithEmailAndPassword(email,pass)
+    .catch(function(e){
+      var msg=e.code==="auth/user-not-found"?"Usuário não encontrado":
+              e.code==="auth/wrong-password"?"Senha incorreta":
+              e.code==="auth/invalid-email"?"Email inválido":e.message;
+      showAuthErr("auth-err",msg);
+    }).finally(function(){ btn.disabled=false; btn.textContent="ENTRAR"; });
 }
 
 function doAuthRegister() {
   if (!fbAuth) { showAuthErr("auth-err2","Firebase indisponível"); return; }
-  var name = $("auth-name").value.trim();
-  var email = $("auth-email2").value.trim();
-  var pass = $("auth-pass2").value;
-  if (!name || name.length < 2) { showAuthErr("auth-err2","Digite seu nome"); return; }
+  var name=$("auth-name").value.trim(), email=$("auth-email2").value.trim(), pass=$("auth-pass2").value;
+  if (!name||name.length<2) { showAuthErr("auth-err2","Digite seu nome"); return; }
   if (!email) { showAuthErr("auth-err2","Digite seu email"); return; }
-  if (!pass || pass.length < 6) { showAuthErr("auth-err2","Senha mínima: 6 caracteres"); return; }
-  var btn = $("auth-btn-register");
-  btn.disabled = true; btn.textContent = "CRIANDO...";
-  $("auth-err2").style.display = "none";
-  fbAuth.createUserWithEmailAndPassword(email, pass)
-    .then(function(cred) {
-      var user = cred.user;
-      return user.updateProfile({displayName: name}).then(function() {
-        return fbDb.ref("users/" + user.uid).set({
-          uid: user.uid,
-          displayName: name,
-          email: email,
-          createdAt: Date.now()
-        });
-      });
-    })
-    .catch(function(e) {
-      btn.disabled = false; btn.textContent = "CRIAR CONTA";
-      var msg = e.code === "auth/email-already-in-use" ? "Email já cadastrado" :
-                e.code === "auth/invalid-email" ? "Email inválido" :
-                e.message;
-      showAuthErr("auth-err2", msg);
-    });
+  if (!pass||pass.length<6) { showAuthErr("auth-err2","Senha mínima: 6 caracteres"); return; }
+  var btn=$("auth-btn-register"); btn.disabled=true; btn.textContent="CRIANDO...";
+  $("auth-err2").style.display="none";
+  fbAuth.createUserWithEmailAndPassword(email,pass)
+    .then(function(cred){ return cred.user.updateProfile({displayName:name}); })
+    .catch(function(e){
+      var msg=e.code==="auth/email-already-in-use"?"Email já cadastrado":
+              e.code==="auth/invalid-email"?"Email inválido":e.message;
+      showAuthErr("auth-err2",msg); throw e;
+    }).finally(function(){ btn.disabled=false; btn.textContent="CRIAR CONTA"; });
 }
 
 function doForgotPassword() {
@@ -650,12 +628,9 @@ function doForgotPassword() {
 function doAuthLogout() {
   if (!fbAuth) return;
   if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
-  clearSoloGroupSubscriptions();
-  currentUser = null; currentRoomId = ""; currentRoomData = null;
-  fbAuth.signOut().then(function() {
-    $("ma").style.display="none"; $("ts").style.display="flex";
-    showAuthTab("login");
-  });
+  if (typeof clearSoloGroupSubscriptions==="function") clearSoloGroupSubscriptions();
+  currentUser=null; currentRoomId=""; currentRoomData=null;
+  fbAuth.signOut().then(function() { showAuthScreen(); }).catch(function(err){ console.error("Erro ao sair:",err); });
 }
 
 function getUserDisplayName() {
@@ -680,25 +655,7 @@ try {
 } catch(e){console.log("FB err:",e.message);}
 
 // ── FIREBASE INIT ────────────────────────────────────────────
-var fbDb=null, fbAuth=null, currentUser=null;
-try {
-  if(typeof firebase!=="undefined"){
-    if(!firebase.apps.length) firebase.initializeApp({apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"});
-    fbDb=firebase.database();
-    fbAuth=firebase.auth();
-  }
-} catch(e){console.log("FB err:",e.message);}
-
 // ── FIREBASE INIT ────────────────────────────────────────────
-var fbDb=null, fbAuth=null, currentUser=null;
-try {
-  if(typeof firebase!=="undefined"){
-    if(!firebase.apps.length) firebase.initializeApp({apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"});
-    fbDb=firebase.database();
-    fbAuth=firebase.auth();
-  }
-} catch(e){console.log("FB err:",e.message);}
-
 var roomSwitchToken=0,roomLoadToken=0;
 var soloGroupUnsubs={};
 
@@ -1225,7 +1182,7 @@ var LS_GOAL   = "hb_goal_v1";
 var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
 
 //  State 
-var token = "7fzZFBceKppCEPxfSrXswz"; // token centralizado Brapi
+var token = "TOKEN_BRAPI_AQUI"; // token centralizado Brapi
 
 function loadState() { return loadStateForProfile(); }
 function saveState() { saveStateForProfile(); }
@@ -3246,44 +3203,64 @@ if (urlToken && !token) {
   localStorage.setItem("hb_is_owner", "0"); // guest
 }
 
-// ── AUTH STATE OBSERVER ────────────────────────────────────────
+function ensureUserBaseData(user) {
+  if (!user || !fbDb) return Promise.reject(new Error("Usuário/Firebase indisponível"));
+  var uid=user.uid, displayName=user.displayName||"Jogador", email=user.email||"";
+  return fbDb.ref("users/"+uid).once("value").then(function(snap) {
+    if (!snap.exists()) return fbDb.ref("users/"+uid).set({uid:uid,displayName:displayName,email:email,createdAt:Date.now()});
+  }).then(function() {
+    return fbDb.ref("soloPortfolios/"+uid).once("value");
+  }).then(function(snap) {
+    if (!snap.exists()) return fbDb.ref("soloPortfolios/"+uid).set({cash:100000,positions:{},trades:{},pendingOrders:{},dividends:{},totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()});
+  });
+}
+
+function showAuthScreen() {
+  if ($("ma")) $("ma").style.display="none";
+  if ($("ps")) $("ps").style.display="none";
+  if ($("gs")) $("gs").style.display="none";
+  if ($("ts")) $("ts").style.display="flex";
+  showAuthTab("login");
+}
+
+function enterAppAfterAuth() {
+  if ($("ts")) $("ts").style.display="none";
+  if ($("ps")) $("ps").style.display="none";
+  if ($("gs")) $("gs").style.display="none";
+  if ($("ma")) $("ma").style.display="flex";
+  var _savedRoomId = currentUser ? localStorage.getItem("hb_active_room_"+currentUser.uid) : null;
+  if (_savedRoomId) {
+    currentRoomId = _savedRoomId;
+    joinRoom(_savedRoomId).then(function(room){currentRoomData=room;}).catch(function(){currentRoomId="";currentRoomData=null;});
+  }
+  var st2=loadState();
+  bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+  divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+  initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+  goal=loadGoal(); equityHistory=loadEquityHistory();
+  var _roomParam=new URLSearchParams(window.location.search).get("room");
+  if (_roomParam) {
+    joinRoom(_roomParam.toUpperCase()).then(function(roomData){
+      showGroupJoinScreen(roomData);
+      try{var _u=new URL(window.location.href);_u.searchParams.delete("room");window.history.replaceState({},"",_u.pathname+(_u.search||""));}catch(e){}
+    }).catch(function(){notif("Grupo não encontrado","err");});
+  } else {
+    initApp();
+  }
+}
+
 if (fbAuth) {
   fbAuth.onAuthStateChanged(function(user) {
-    if (user) {
-      currentUser = user;
-      $("ts").style.display = "none";
-      fbDb.ref("users/" + user.uid).once("value").then(function(snap) {
-        if (!snap.exists()) {
-          fbDb.ref("users/" + user.uid).set({uid:user.uid, displayName:user.displayName||"Jogador", email:user.email||"", createdAt:Date.now()});
-        }
-      }).catch(function(){});
-      var _roomParam = new URLSearchParams(window.location.search).get("room");
-      if (_roomParam) {
-        joinRoom(_roomParam.toUpperCase()).then(function(roomData) {
-          showGroupJoinScreen(roomData);
-          try{var _u=new URL(window.location.href);_u.searchParams.delete("room");window.history.replaceState({},"",_u.pathname+(_u.search||""));}catch(e){}
-        }).catch(function(){ notif("Grupo não encontrado","err"); });
-      } else {
-        var _savedRoomId = localStorage.getItem("hb_active_room_" + user.uid);
-        if (_savedRoomId) {
-          currentRoomId = _savedRoomId;
-          joinRoom(_savedRoomId).then(function(room){currentRoomData=room;}).catch(function(){currentRoomId="";currentRoomData=null;});
-        }
-        var st2 = loadState();
-        bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-        divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-        initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-        goal=loadGoal(); equityHistory=loadEquityHistory();
-        initApp();
-      }
-    } else {
-      currentUser = null;
-      $("ma").style.display="none"; $("ts").style.display="flex";
-      showAuthTab("login");
-    }
+    currentUser = user || null;
+    if (!user) { showAuthScreen(); return; }
+    ensureUserBaseData(user).then(function() {
+      enterAppAfterAuth();
+    }).catch(function(err) {
+      console.error("Erro ao preparar conta:", err);
+      showAuthScreen();
+      if ($("auth-err")) { $("auth-err").textContent="Erro ao carregar sua conta."; $("auth-err").style.display="block"; }
+    });
   });
-} else {
-  $("ts").style.display="flex";
 }
 
 
