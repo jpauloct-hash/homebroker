@@ -5,6 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -135,18 +136,33 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <div id="app">
 
 <!-- TOKEN -->
-<div id="ts">
-  <div style="text-align:center">
+<div id="ts" style="display:flex">
+  <div style="text-align:center;margin-bottom:4px">
     <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">TRADING GP</div>
     <div style="font-size:22px;font-weight:700;letter-spacing:1px">HOME BROKER</div>
     <div style="font-size:10px;color:var(--tx3);margin-top:4px">19 ativos · Dividendos · TradingView</div>
   </div>
   <div class="tcard">
-    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:10px">TOKEN BRAPI PRO</div>
-    <div style="font-size:10px;color:var(--tx2);line-height:1.8;margin-bottom:14px">Obtenha em <span style="color:var(--bl)">brapi.dev</span> &rarr; Dashboard &rarr; API Token.</div>
-    <input id="tinp" class="tinp" placeholder="Cole aqui seu token..." type="password" autocomplete="off">
-    <div id="terr" style="font-size:10px;color:var(--r);margin-top:6px;display:none"></div>
-    <button id="tbtn" class="tbtn" onclick="doLogin()">ENTRAR</button>
+    <div style="display:flex;gap:0;margin-bottom:18px;background:var(--bg3);border-radius:8px;padding:3px">
+      <button id="tab-login" onclick="showAuthTab('login')" style="flex:1;padding:8px;border:none;border-radius:6px;background:var(--bl);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">ENTRAR</button>
+      <button id="tab-register" onclick="showAuthTab('register')" style="flex:1;padding:8px;border:none;border-radius:6px;background:transparent;color:var(--tx3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">CRIAR CONTA</button>
+    </div>
+    <div id="auth-login">
+      <input id="auth-email" class="tinp" placeholder="Email" type="email" autocomplete="email" style="margin-bottom:8px">
+      <input id="auth-pass" class="tinp" placeholder="Senha" type="password" autocomplete="current-password" style="margin-bottom:8px">
+      <div id="auth-err" style="font-size:10px;color:var(--r);margin-bottom:8px;display:none"></div>
+      <button onclick="doAuthLogin()" class="tbtn">ENTRAR</button>
+      <div style="text-align:center;margin-top:10px">
+        <span onclick="doForgotPassword()" style="font-size:10px;color:var(--bl);cursor:pointer">Esqueci minha senha</span>
+      </div>
+    </div>
+    <div id="auth-register" style="display:none">
+      <input id="auth-name" class="tinp" placeholder="Seu nome" type="text" autocomplete="name" style="margin-bottom:8px">
+      <input id="auth-email2" class="tinp" placeholder="Email" type="email" autocomplete="email" style="margin-bottom:8px">
+      <input id="auth-pass2" class="tinp" placeholder="Senha (mínimo 6 caracteres)" type="password" autocomplete="new-password" style="margin-bottom:8px">
+      <div id="auth-err2" style="font-size:10px;color:var(--r);margin-bottom:8px;display:none"></div>
+      <button onclick="doAuthRegister()" class="tbtn">CRIAR CONTA</button>
+    </div>
   </div>
 </div>
 
@@ -551,79 +567,150 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <div id="nf"></div>
 
 <script>
-function doLogin() {
-  var t = document.getElementById("tinp").value.trim();
-  var terr = document.getElementById("terr");
-  var btn = document.getElementById("tbtn");
-  if (!t) {
-    terr.textContent = "Cole seu token Brapi PRO";
-    terr.style.display = "block";
-    return;
-  }
-  terr.style.display = "none";
-  btn.disabled = true;
-  btn.textContent = "VALIDANDO...";
-  fetch("https://brapi.dev/api/quote/PETR4?fundamental=false&token=" + encodeURIComponent(t))
-    .then(function(resp){
-      return resp.json().catch(function(){ return {}; }).then(function(data){
-        return { ok: resp.ok, status: resp.status, data: data };
-      });
+// ── AUTH TAB TOGGLE ──────────────────────────────────────────
+function showAuthTab(tab) {
+  var isLogin = tab === "login";
+  $("auth-login").style.display = isLogin ? "block" : "none";
+  $("auth-register").style.display = isLogin ? "none" : "block";
+  $("tab-login").style.background = isLogin ? "var(--bl)" : "transparent";
+  $("tab-login").style.color = isLogin ? "#fff" : "var(--tx3)";
+  $("tab-register").style.background = isLogin ? "transparent" : "var(--bl)";
+  $("tab-register").style.color = isLogin ? "var(--tx3)" : "#fff";
+  $("auth-err").style.display = "none";
+  $("auth-err2").style.display = "none";
+}
+
+function showAuthErr(id, msg) {
+  var el = $(id); el.textContent = msg; el.style.display = "block";
+}
+
+function doAuthLogin() {
+  if (!fbAuth) { showAuthErr("auth-err","Firebase indisponível"); return; }
+  var email = $("auth-email").value.trim();
+  var pass = $("auth-pass").value;
+  if (!email || !pass) { showAuthErr("auth-err","Preencha email e senha"); return; }
+  var btn = $("auth-btn-login");
+  btn.disabled = true; btn.textContent = "ENTRANDO...";
+  $("auth-err").style.display = "none";
+  fbAuth.signInWithEmailAndPassword(email, pass)
+    .then(function(cred) {
+      // onAuthStateChanged will handle the rest
     })
-    .then(function(result){
-      var data = result.data || {};
-      var invalid = !result.ok || data.error === true || (data.message && !data.results) || !data.results || !data.results.length;
-      if (invalid) {
-        terr.textContent = data.message || ("Token inválido ou erro HTTP " + result.status);
-        terr.style.display = "block";
-        btn.disabled = false;
-        btn.textContent = "ENTRAR";
-        return;
-      }
-      localStorage.setItem("hb_token_v6", t);
-      if (localStorage.getItem("hb_is_owner") === null) localStorage.setItem("hb_is_owner", "1");
-      window.location.reload();
-    })
-    .catch(function(e){
-      console.error("Falha ao validar token:", e);
-      terr.textContent = "Falha de conexão ao validar o token.";
-      terr.style.display = "block";
-      btn.disabled = false;
-      btn.textContent = "ENTRAR";
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = "ENTRAR";
+      var msg = e.code === "auth/user-not-found" ? "Usuário não encontrado" :
+                e.code === "auth/wrong-password" ? "Senha incorreta" :
+                e.code === "auth/invalid-email" ? "Email inválido" :
+                e.message;
+      showAuthErr("auth-err", msg);
     });
 }
 
-var fbDb=null;
+function doAuthRegister() {
+  if (!fbAuth) { showAuthErr("auth-err2","Firebase indisponível"); return; }
+  var name = $("auth-name").value.trim();
+  var email = $("auth-email2").value.trim();
+  var pass = $("auth-pass2").value;
+  if (!name || name.length < 2) { showAuthErr("auth-err2","Digite seu nome"); return; }
+  if (!email) { showAuthErr("auth-err2","Digite seu email"); return; }
+  if (!pass || pass.length < 6) { showAuthErr("auth-err2","Senha mínima: 6 caracteres"); return; }
+  var btn = $("auth-btn-register");
+  btn.disabled = true; btn.textContent = "CRIANDO...";
+  $("auth-err2").style.display = "none";
+  fbAuth.createUserWithEmailAndPassword(email, pass)
+    .then(function(cred) {
+      var user = cred.user;
+      return user.updateProfile({displayName: name}).then(function() {
+        return fbDb.ref("users/" + user.uid).set({
+          uid: user.uid,
+          displayName: name,
+          email: email,
+          createdAt: Date.now()
+        });
+      });
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = "CRIAR CONTA";
+      var msg = e.code === "auth/email-already-in-use" ? "Email já cadastrado" :
+                e.code === "auth/invalid-email" ? "Email inválido" :
+                e.message;
+      showAuthErr("auth-err2", msg);
+    });
+}
+
+function doForgotPassword() {
+  if (!fbAuth) return;
+  var email = $("auth-email").value.trim();
+  if (!email) { showAuthErr("auth-err","Digite o email para recuperar a senha"); return; }
+  fbAuth.sendPasswordResetEmail(email)
+    .then(function() { showAuthErr("auth-err","Email de recuperação enviado!"); $("auth-err").style.color="var(--g)"; })
+    .catch(function(e) { showAuthErr("auth-err", e.message); });
+}
+
+function doAuthLogout() {
+  if (!fbAuth) return;
+  if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
+  clearSoloGroupSubscriptions();
+  currentUser = null; currentRoomId = ""; currentRoomData = null;
+  fbAuth.signOut().then(function() {
+    $("ma").style.display="none"; $("ts").style.display="flex";
+    showAuthTab("login");
+  });
+}
+
+function getUserDisplayName() {
+  if (currentUser && currentUser.displayName) return currentUser.displayName;
+  return "Jogador";
+}
+
+function getUserUid() {
+  return currentUser ? currentUser.uid : null;
+}
+
+
+
+// ── FIREBASE INIT ────────────────────────────────────────────
+var fbDb=null, fbAuth=null, currentUser=null;
 try {
   if(typeof firebase!=="undefined"){
     if(!firebase.apps.length) firebase.initializeApp({apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"});
     fbDb=firebase.database();
+    fbAuth=firebase.auth();
   }
 } catch(e){console.log("FB err:",e.message);}
 
-var currentRoomId="",currentRoomData=null,groupUnsubscribe=null;
+// ── FIREBASE INIT ────────────────────────────────────────────
+var fbDb=null, fbAuth=null, currentUser=null;
+try {
+  if(typeof firebase!=="undefined"){
+    if(!firebase.apps.length) firebase.initializeApp({apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"});
+    fbDb=firebase.database();
+    fbAuth=firebase.auth();
+  }
+} catch(e){console.log("FB err:",e.message);}
+
+// ── FIREBASE INIT ────────────────────────────────────────────
+var fbDb=null, fbAuth=null, currentUser=null;
+try {
+  if(typeof firebase!=="undefined"){
+    if(!firebase.apps.length) firebase.initializeApp({apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"});
+    fbDb=firebase.database();
+    fbAuth=firebase.auth();
+  }
+} catch(e){console.log("FB err:",e.message);}
+
 var roomSwitchToken=0,roomLoadToken=0;
 var soloGroupUnsubs={};
+
+var currentRoomId="",currentRoomData=null,groupUnsubscribe=null;
 function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
-function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){return id;});}
-function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");currentRoomId=id;currentRoomData=s.val();return s.val();});}
+function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
+function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");localStorage.setItem("hb_room_id",id);currentRoomId=id;currentRoomData=s.val();return s.val();});}
 function pushMyStats(){if(!currentRoomId||!getCurrentProfile()||!fbDb)return;var total=bal+portValue(),initB=(currentRoomData&&currentRoomData.initialBal)||initialBal;var _pmeta=getProfileMeta(getCurrentProfile());
   var _pname=_pmeta?_pmeta.displayName:getCurrentProfile();
   fbDb.ref("rooms/"+currentRoomId+"/members/"+getCurrentProfile()).set({name:_pname,total:total,pct:(total-initB)/initB*100,updatedAt:Date.now(),history:(equityHistory||[]).slice(-30).map(function(p){return{t:p.t,v:p.v};})});}
 var _lp=0;function maybePushStats(){if(!currentRoomId)return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
-function clearSoloGroupSubscriptions(){
-  Object.keys(soloGroupUnsubs).forEach(function(roomId){
-    try{soloGroupUnsubs[roomId]();}catch(e){}
-  });
-  soloGroupUnsubs={};
-}
-
-function subscribeGroup(cb){
-  if(groupUnsubscribe){groupUnsubscribe();groupUnsubscribe=null;}
-  if(!currentRoomId||!fbDb)return;
-  var ref=fbDb.ref("rooms/"+currentRoomId+"/members");
-  ref.on("value",function(s){cb(s.val()||{});});
-  groupUnsubscribe=function(){ref.off();};
-}
+function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
 function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
 function showCreateRoom(){
   var n=prompt("🏆 Nome do grupo:");
@@ -730,58 +817,59 @@ function shareRoomInvite(){
 }
 function switchToProfile(profileId) {
   localStorage.setItem("hb_profile_v1", profileId);
+  // Detect group profile
   var meta = getProfileMeta(profileId);
   if (!meta && profileId && profileId.indexOf("grupo_") === 0) {
     var _sp = profileId.split("_");
     meta = {profileId:profileId, displayName:_sp.slice(2).join("_"), type:"group", roomId:_sp[1], roomName:_sp[1]};
     setProfileMeta(profileId, meta);
   }
-  var thisSwitch = ++roomSwitchToken;
-  function finishSwitch() {
-    if (thisSwitch !== roomSwitchToken) return;
-    var st2 = loadState();
-    bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-    divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-    initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-    goal=loadGoal(); equityHistory=loadEquityHistory();
-    $("ps").style.display="none"; $("ts").style.display="none"; $("gs").style.display="none";
-    if (!$("ma").style.display || $("ma").style.display==="none") {
-      initApp();
-    } else {
-      updateProfileIndicator(); render(); renderGroupPanel();
-    }
-    notif("Perfil: "+(meta?meta.displayName:profileId));
-  }
-  if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
-  if (meta && meta.type==="group" && meta.roomId) {
+  if (meta && meta.type === "group" && meta.roomId) {
     currentRoomId = meta.roomId;
-    currentRoomData = null;
-    var targetRoomId = meta.roomId;
-    joinRoom(targetRoomId).then(function(room) {
-      if (thisSwitch!==roomSwitchToken) return;
-      if (currentRoomId!==targetRoomId) return;
-      currentRoomData=room; meta.roomName=room.name; setProfileMeta(profileId,meta); finishSwitch();
-    }).catch(function() {
-      if (thisSwitch!==roomSwitchToken) return;
-      if (currentRoomId!==targetRoomId) return;
-      currentRoomData={id:targetRoomId, name:meta.roomName||targetRoomId}; finishSwitch();
+    localStorage.setItem("hb_room_id", meta.roomId);
+    joinRoom(meta.roomId).then(function(room){
+      currentRoomData = room;
+      meta.roomName = room.name;
+      setProfileMeta(profileId, meta);
+    }).catch(function(){
+      currentRoomData = {name: meta.roomName || meta.roomId};
     });
   } else {
-    currentRoomId=""; currentRoomData=null; finishSwitch();
+    currentRoomId = "";
+    currentRoomData = null;
+    localStorage.removeItem("hb_room_id");
   }
+  // Load state
+  var st2 = loadState();
+  bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+  divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+  initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+  goal=loadGoal(); equityHistory=loadEquityHistory();
+  // Show main app properly
+  $("ps").style.display = "none";
+  $("ts").style.display = "none";
+  $("gs").style.display = "none";
+  if (!$("ma").style.display || $("ma").style.display === "none") {
+    initApp();
+  } else {
+    updateProfileIndicator();
+    render();
+  }
+  notif("Perfil: " + (meta ? meta.displayName : profileId));
 }
 
-
+// ── RENDER GROUP PANEL (smart: solo vs group) ─────────────────
 function renderGroupPanel() {
   var profile = getCurrentProfile();
   var isGroup = profile && profile.indexOf("grupo_") === 0;
 
+  // ── GROUP PROFILE ────────────────────────────────────────────
   if (isGroup) {
-    clearSoloGroupSubscriptions();
     $("group-noroom").style.display = "none";
     $("group-solo-view").style.display = "none";
     $("group-room-view").style.display = "block";
 
+    // Ensure metadata exists
     var meta = getProfileMeta(profile);
     if (!meta) {
       var _p = profile.split("_");
@@ -789,48 +877,44 @@ function renderGroupPanel() {
       setProfileMeta(profile, meta);
     }
 
-    if (!currentRoomId || currentRoomId !== meta.roomId) {
-      currentRoomId = meta.roomId;
-    }
-
-    // Invalida roomData se for de outro grupo
-    if (currentRoomData && currentRoomData.id !== meta.roomId) {
-      currentRoomData = null;
-    }
-
+    // Show room name immediately
     var roomName = (currentRoomData && currentRoomData.name) || meta.roomName || meta.roomId || "";
     $("group-room-name").textContent = roomName;
-
-    var mEl = $("group-room-meta");
     var metaArr = [];
     if (currentRoomData) {
       if (currentRoomData.endDate) metaArr.push("📅 "+currentRoomData.endDate);
       if (currentRoomData.targetPct) metaArr.push("🎯 Meta +"+currentRoomData.targetPct+"%");
       if (currentRoomData.initialBal) metaArr.push("💰 R$ "+Number(currentRoomData.initialBal).toLocaleString("pt-BR"));
     }
+    var mEl = $("group-room-meta");
     if (mEl) mEl.textContent = metaArr.join(" · ");
 
+    // Load room from Firebase if not loaded yet
+    if (!currentRoomId || currentRoomId !== meta.roomId) {
+      currentRoomId = meta.roomId;
+      localStorage.setItem("hb_room_id", meta.roomId);
+    }
     if (!currentRoomData && currentRoomId) {
-      var thisLoad = ++roomLoadToken;
-      var targetRoomId = currentRoomId;
-      joinRoom(targetRoomId).then(function(room) {
-        if (thisLoad!==roomLoadToken) return;
-        if (currentRoomId!==targetRoomId) return;
-        currentRoomData=room; meta.roomName=room.name; setProfileMeta(profile,meta);
-        $("group-room-name").textContent=room.name||targetRoomId;
-        var arr2=[];
+      joinRoom(currentRoomId).then(function(room) {
+        currentRoomData = room;
+        meta.roomName = room.name;
+        setProfileMeta(profile, meta);
+        // Update header
+        $("group-room-name").textContent = room.name || currentRoomId;
+        var arr2 = [];
         if (room.endDate) arr2.push("📅 "+room.endDate);
         if (room.targetPct) arr2.push("🎯 Meta +"+room.targetPct+"%");
         if (room.initialBal) arr2.push("💰 R$ "+Number(room.initialBal).toLocaleString("pt-BR"));
-        if (mEl) mEl.textContent=arr2.join(" · ");
-        subscribeGroup(renderGroupRanking);
+        if (mEl) mEl.textContent = arr2.join(" · ");
       }).catch(function(){});
-    } else {
-      if (currentRoomId) subscribeGroup(renderGroupRanking);
     }
+
+    // Subscribe to live ranking
+    if (currentRoomId) subscribeGroup(renderGroupRanking);
     return;
   }
 
+  // ── SOLO PROFILE ─────────────────────────────────────────────
   $("group-room-view").style.display = "none";
   var myGroups = getMyGroupProfiles();
   if (myGroups.length === 0) {
@@ -845,117 +929,71 @@ function renderGroupPanel() {
 
 
 function getMyGroupProfiles() {
-  var _cp = getCurrentProfile();
-  var _cm = getProfileMeta(_cp);
-  var _myName = _cm ? _cm.displayName : _cp;
   return getProfiles().filter(function(p) {
+    if (p && p.indexOf("grupo_") === 0) return true;
     var m = getProfileMeta(p);
-    if (!m && p && p.indexOf("grupo_") === 0) {
-      var _pp = p.split("_");
-      m = {profileId:p,displayName:_pp.slice(2).join("_"),type:"group",roomId:_pp[1],roomName:_pp[1]};
-      setProfileMeta(p, m);
-    }
-    return m && m.type === "group" && m.displayName === _myName;
+    return m && m.type === "group";
   });
 }
 
 function renderSoloGroupList(groupProfiles) {
-  var el=$("group-solo-list"); if(!el)return;
-  clearSoloGroupSubscriptions();
-  el.innerHTML="";
-  groupProfiles.forEach(function(profileId){
-    var meta=getProfileMeta(profileId); if(!meta)return;
-    var st={}; try{st=JSON.parse(localStorage.getItem("hb_state_v3_"+profileId)||"{}");}catch(e){}
-    var initB=st.initialBal||100000;
-    var totalLocal=(st.bal||0)+Object.values(st.port||{}).reduce(function(s,p){return s+(p.qty||0)*(p.avgPrice||0);},0);
-    var pctLocal=initB>0?((totalLocal-initB)/initB*100):0;
-    var card=document.createElement("div");
-    card.style.cssText="background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px";
-    card.innerHTML=
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
-        '<div>'+
-          '<div style="font-size:12px;font-weight:700;color:var(--a)">'+(meta.roomName||meta.roomId)+'</div>'+
-          '<div style="font-size:9px;color:var(--tx4);margin-top:2px">'+(meta.roomId||"")+'</div>'+
-        '</div>'+
-        '<div class="solo-group-pct" style="font-size:14px;font-weight:700;color:'+(pctLocal>=0?"var(--g)":"var(--r);")+'">'+(pctLocal>=0?"+":"")+pctLocal.toFixed(2)+'%</div>'+
-      '</div>'+
-      '<div style="display:flex;justify-content:space-between;align-items:center">'+
-        '<div class="solo-group-total" style="font-size:10px;color:var(--tx2)">R$ '+Number(totalLocal).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div>'+
-        '<button style="padding:5px 12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>'+
-      '</div>'+
-      '<div class="solo-group-pos" style="margin-top:6px;font-size:9px;color:var(--tx4)">Carregando posição...</div>';
-    (function(pid){
-      card.querySelector("button").onclick=function(e){e.stopPropagation();switchToProfile(pid);};
+  var el = $("group-solo-list");
+  if (!el) return;
+  el.innerHTML = "";
+  groupProfiles.forEach(function(profileId) {
+    var meta = getProfileMeta(profileId);
+    if (!meta) return;
+    // Load state for this group profile
+    var st = JSON.parse(localStorage.getItem("hb_state_v3_"+profileId)||"{}");
+    var initB = st.initialBal || 100000;
+    var total = (st.bal||0) + Object.values(st.port||{}).reduce(function(s,p){return s+(p.qty||0)*(p.avgPrice||0);},0);
+    var pct = initB > 0 ? ((total - initB) / initB * 100) : 0;
+    var color = pct >= 0 ? "var(--g)" : "var(--r)";
+    var card = document.createElement("div");
+    card.style.cssText = "background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer";
+    card.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+        '<div>' +
+          '<div style="font-size:12px;font-weight:700;color:var(--a)">'+meta.roomName+'</div>' +
+          '<div style="font-size:9px;color:var(--tx4);margin-top:2px">'+meta.roomId+'</div>' +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div style="font-size:14px;font-weight:700;color:'+color+'">'+(pct>=0?"+":"")+pct.toFixed(2)+'%</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<div style="font-size:10px;color:var(--tx2)">Patrimônio: R$ '+Number(total).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div>' +
+        '<button style="padding:5px 12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>' +
+      '</div>';
+    (function(pid){ 
+      card.querySelector("button").onclick = function(e) {
+        e.stopPropagation();
+        switchToProfile(pid);
+      };
     })(profileId);
-    el.appendChild(card);
-    if(fbDb&&meta.roomId){
-      (function(roomId,profileMeta,cardEl){
-        var pctEl=cardEl.querySelector(".solo-group-pct");
-        var totalEl=cardEl.querySelector(".solo-group-total");
-        var posEl=cardEl.querySelector(".solo-group-pos");
-        var ref=fbDb.ref("rooms/"+roomId+"/members");
-        ref.on("value",function(snap){
-          var members=snap.val()||{};
-          var sorted=Object.values(members).sort(function(a,b){return(b.pct||0)-(a.pct||0);});
-          var myName=profileMeta.displayName||profileId;
-          var me=sorted.find(function(x){return x.name===myName;});
-          var myPos=sorted.findIndex(function(x){return x.name===myName;});
-          if(me){
-            var pct=Number(me.pct||0),total=Number(me.total||0);
-            pctEl.textContent=(pct>=0?"+":"")+pct.toFixed(2)+"%";
-            pctEl.style.color=pct>=0?"var(--g)":"var(--r)";
-            totalEl.textContent="R$ "+total.toLocaleString("pt-BR",{minimumFractionDigits:2});
+    // Load live ranking from Firebase for this group
+    if (fbDb && meta.roomId) {
+      (function(pid, m, cardEl){
+        fbDb.ref("rooms/"+m.roomId+"/members").once("value").then(function(snap){
+          var members = snap.val() || {};
+          var sorted = Object.values(members).sort(function(a,b){return b.pct-a.pct;});
+          var myPos = sorted.findIndex(function(x){return x.name===pid;});
+          if (myPos >= 0) {
+            var posEl = document.createElement("div");
+            posEl.style.cssText = "margin-top:6px;font-size:9px;color:var(--tx4)";
+            var medal = myPos===0?"🥇":myPos===1?"🥈":myPos===2?"🥉":"#"+(myPos+1);
+            posEl.textContent = medal+" de "+sorted.length+" participantes";
+            cardEl.appendChild(posEl);
           }
-          if(myPos>=0){
-            var medal=myPos===0?"🥇":myPos===1?"🥈":myPos===2?"🥉":"🏅";
-            posEl.textContent=medal+" "+(myPos+1)+"º de "+sorted.length+" participantes";
-          } else {
-            posEl.textContent="Sem posição no ranking";
-          }
-        });
-        soloGroupUnsubs[roomId]=function(){ref.off();};
-      })(meta.roomId,meta,card);
+        }).catch(function(){});
+      })(profileId, meta, card);
     }
+    el.appendChild(card);
   });
 }
-
 
 function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;}
-function renderGroupRanking(members){
-  drawGroupChart(members);
-  var list=Object.values(members).sort(function(a,b){return (b.pct||0)-(a.pct||0);});
-  var el=$("group-ranking"); if(!el)return; el.innerHTML="";
-  var currentMeta=getProfileMeta(getCurrentProfile());
-  var currentName=currentMeta&&currentMeta.displayName?currentMeta.displayName:getCurrentProfile();
-  var myIndex=-1;
-  list.forEach(function(m,i){
-    if(m.name===currentName) myIndex=i;
-    var isMe=m.name===currentName;
-    var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1);
-    var color=(m.pct||0)>=0?"var(--g)":"var(--r)";
-    var div=document.createElement("div");
-    div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";
-    div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div>"+
-      "<div style='flex:1'>"+
-        "<div style='font-size:12px;font-weight:700'>"+(m.name||"Jogador")+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div>"+
-        "<div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div>"+
-      "</div>"+
-      "<div style='font-size:14px;font-weight:700;color:"+color+"'>"+((m.pct||0)>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";
-    el.appendChild(div);
-  });
-  var medalEl=$("group-my-medal"); var pctEl=$("group-my-pct");
-  if(medalEl&&pctEl){
-    if(myIndex>=0){
-      medalEl.textContent=myIndex===0?"🥇":myIndex===1?"🥈":myIndex===2?"🥉":"#"+(myIndex+1);
-      var me=list[myIndex];
-      pctEl.textContent=((me.pct||0)>=0?"+":"")+Number(me.pct||0).toFixed(2)+"%";
-      pctEl.style.color=(me.pct||0)>=0?"var(--g)":"var(--r)";
-    } else {
-      medalEl.textContent="—"; pctEl.textContent="—"; pctEl.style.color="var(--tx2)";
-    }
-  }
-}
-
+function renderGroupRanking(members){drawGroupChart(members);var list=Object.values(members).sort(function(a,b){return b.pct-a.pct;}),el=document.getElementById("group-ranking");if(!el)return;el.innerHTML="";list.forEach(function(m,i){var isMe=m.name===getCurrentProfile(),medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"#"+(i+1),color=m.pct>=0?"var(--g)":"var(--r)",div=document.createElement("div");div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div><div style='flex:1'><div style='font-size:12px;font-weight:700'>"+m.name+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div><div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div><div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";el.appendChild(div);});}
 function drawGroupChart(members){var canvas=document.getElementById("group-chart");if(!canvas)return;var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});if(!allPts.length)return;var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;list.forEach(function(m,ci){if(!m.history||m.history.length<2)return;ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});ctx2.stroke();});}
 (function(){var params=new URLSearchParams(window.location.search),room=params.get("room");if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}})();
 
@@ -1091,8 +1129,8 @@ var LS_PROFILE = "hb_profile_v1";   // active profile name
 var LS_PROFILES = "hb_profiles_v1"; // list of profiles
 
 function getProfileKey(key) {
-  var profile = localStorage.getItem(LS_PROFILE) || "default";
-  return key + "_" + profile;
+  var id = (currentUser && currentUser.uid) ? currentUser.uid : (localStorage.getItem(LS_PROFILE) || "default");
+  return key + "_" + id;
 }
 
 // ── PROFILE METADATA ─────────────────────────────────────────
@@ -1167,6 +1205,7 @@ function deleteProfile(name) {
 }
 
 function getCurrentProfile() {
+  if (currentUser && currentUser.uid) return currentUser.uid;
   return localStorage.getItem(LS_PROFILE) || "";
 }
 
@@ -1186,7 +1225,7 @@ var LS_GOAL   = "hb_goal_v1";
 var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
 
 //  State 
-var token = localStorage.getItem(LS_TOKEN) || "";
+var token = "TOKEN_BRAPI_AQUI"; // token centralizado Brapi
 
 function loadState() { return loadStateForProfile(); }
 function saveState() { saveStateForProfile(); }
@@ -2842,6 +2881,7 @@ function enterProfile(name) {
   }
   if (meta && meta.type === "group" && meta.roomId) {
     currentRoomId = meta.roomId;
+    localStorage.setItem("hb_room_id", meta.roomId);
     joinRoom(meta.roomId).then(function(room){
       currentRoomData = room;
     }).catch(function(){
@@ -2850,6 +2890,7 @@ function enterProfile(name) {
   } else {
     currentRoomId = "";
     currentRoomData = null;
+    localStorage.removeItem("hb_room_id");
   }
   // Reload state for this profile
   var st2 = loadState();
@@ -2919,8 +2960,7 @@ function initApp() {
       document.querySelectorAll(".panel").forEach(function(x){x.classList.remove("on");});
       b.classList.add("on"); $(b.dataset.t+"-panel").classList.add("on");
       $("pb").style.display=b.dataset.t==="chart"?"flex":"none";
-      if (b.dataset.t==="group") { renderGroupPanel(); }
-      if (b.dataset.t==="portfolio") { drawEquityChart(); }
+      if (b.dataset.t==="portfolio") drawEquityChart();
       if (b.dataset.t==="news") {
         renderNewsTab();
         if (!newsCache.length) { newsLastFetch=0; fetchNews(); }
@@ -3090,7 +3130,7 @@ function initApp() {
     if($("order-panel")) $("order-panel").classList.add("on");
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
-  $("logb").onclick=function() { localStorage.removeItem(LS_TOKEN); location.reload(); };
+  $("logb").onclick=function() { doAuthLogout(); };
   $("fs-up").onclick=function(){ applyFontScale(fontIdx+1); };
   $("fs-down").onclick=function(){ applyFontScale(fontIdx-1); };
   $("switch-profile-btn").onclick = function() { $("sht").classList.remove("on"); showProfileScreen(); };
@@ -3106,7 +3146,7 @@ function initApp() {
     window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
   };
 
-  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); renderGroupPanel(); loadTV(); startRefresh();
+  updateExecBtn(); updatePregaoBar(); updateProfileIndicator(); render(); loadTV(); startRefresh();
   // Show/hide invite button based on owner status
   var invBtn = $("invite-btn");
   if (invBtn) invBtn.style.display = isOwner() ? "flex" : "none";
@@ -3127,7 +3167,8 @@ function initApp() {
   }, 8000);
 }
 
-$("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+$("auth-pass").addEventListener("keydown",function(e){ if(e.key==="Enter") doAuthLogin(); });
+$("auth-pass2").addEventListener("keydown",function(e){ if(e.key==="Enter") doAuthRegister(); });
 
 $("profile-create").onclick = function() {
   var name = $("profile-name").value.trim();
@@ -3161,6 +3202,7 @@ if (token) {
         setProfileMeta(_bootProfile, _bootMeta);
       }
       currentRoomId = _bootMeta.roomId;
+      localStorage.setItem("hb_room_id", currentRoomId);
       // Load room data async - don't block boot
       joinRoom(currentRoomId).then(function(room){
         currentRoomData = room;
@@ -3172,6 +3214,7 @@ if (token) {
     } else {
       currentRoomId = "";
       currentRoomData = null;
+      localStorage.removeItem("hb_room_id");
     }
     var st2 = loadState();
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
@@ -3185,7 +3228,8 @@ if (token) {
 }
 
 
-$("tinp").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+$("auth-pass").addEventListener("keydown",function(e){ if(e.key==="Enter") doAuthLogin(); });
+$("auth-pass2").addEventListener("keydown",function(e){ if(e.key==="Enter") doAuthRegister(); });
 
 $("profile-create").onclick = function() {
   var name = $("profile-name").value.trim();
@@ -3202,48 +3246,44 @@ if (urlToken && !token) {
   localStorage.setItem("hb_is_owner", "0"); // guest
 }
 
-if (token) {
-  $("ts").style.display = "none";
-  var _roomParam = new URLSearchParams(window.location.search).get("room");
-  if (_roomParam) {
-    joinRoom(_roomParam.toUpperCase()).then(function(roomData) {
-      showGroupJoinScreen(roomData);
-      try { var _u=new URL(window.location.href); _u.searchParams.delete("room"); window.history.replaceState({},"",_u.pathname+(_u.search||"")); } catch(e){}
-    }).catch(function(){ notif("Grupo não encontrado","err"); });
-  } else {
-    if (localStorage.getItem("hb_is_owner") === null)
-      localStorage.setItem("hb_is_owner", "1");
-    if (getCurrentProfile()) {
-      var _bootProfile = getCurrentProfile();
-      var _bootMeta = getProfileMeta(_bootProfile);
-      if (!_bootMeta && _bootProfile && _bootProfile.indexOf("grupo_") === 0) {
-        var _bootParts = _bootProfile.split("_");
-        _bootMeta = {profileId:_bootProfile,displayName:_bootParts.slice(2).join("_"),type:"group",roomId:_bootParts[1],roomName:_bootParts[1]};
-        setProfileMeta(_bootProfile, _bootMeta);
-      }
-      if (_bootMeta && _bootMeta.type === "group" && _bootMeta.roomId) {
-        currentRoomId = _bootMeta.roomId;
-        joinRoom(currentRoomId).then(function(room){
-          currentRoomData = room;
-          _bootMeta.roomName = room.name;
-          setProfileMeta(_bootProfile, _bootMeta);
-        }).catch(function(){
-          currentRoomData = {name: _bootMeta.roomName || _bootMeta.roomId};
-        });
+// ── AUTH STATE OBSERVER ────────────────────────────────────────
+if (fbAuth) {
+  fbAuth.onAuthStateChanged(function(user) {
+    if (user) {
+      currentUser = user;
+      $("ts").style.display = "none";
+      fbDb.ref("users/" + user.uid).once("value").then(function(snap) {
+        if (!snap.exists()) {
+          fbDb.ref("users/" + user.uid).set({uid:user.uid, displayName:user.displayName||"Jogador", email:user.email||"", createdAt:Date.now()});
+        }
+      }).catch(function(){});
+      var _roomParam = new URLSearchParams(window.location.search).get("room");
+      if (_roomParam) {
+        joinRoom(_roomParam.toUpperCase()).then(function(roomData) {
+          showGroupJoinScreen(roomData);
+          try{var _u=new URL(window.location.href);_u.searchParams.delete("room");window.history.replaceState({},"",_u.pathname+(_u.search||""));}catch(e){}
+        }).catch(function(){ notif("Grupo não encontrado","err"); });
       } else {
-        currentRoomId = "";
-        currentRoomData = null;
+        var _savedRoomId = localStorage.getItem("hb_active_room_" + user.uid);
+        if (_savedRoomId) {
+          currentRoomId = _savedRoomId;
+          joinRoom(_savedRoomId).then(function(room){currentRoomData=room;}).catch(function(){currentRoomId="";currentRoomData=null;});
+        }
+        var st2 = loadState();
+        bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
+        divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
+        initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+        goal=loadGoal(); equityHistory=loadEquityHistory();
+        initApp();
       }
-      var st2 = loadState();
-      bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-      divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-      initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-      goal=loadGoal(); equityHistory=loadEquityHistory();
-      initApp();
     } else {
-      showProfileScreen();
+      currentUser = null;
+      $("ma").style.display="none"; $("ts").style.display="flex";
+      showAuthTab("login");
     }
-  }
+  });
+} else {
+  $("ts").style.display="flex";
 }
 
 
