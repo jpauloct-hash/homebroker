@@ -1295,7 +1295,6 @@ function deleteProfile(name) {
 }
 
 function getCurrentProfile() {
-  if (currentUser && currentUser.uid) return currentUser.uid;
   return localStorage.getItem(LS_PROFILE) || "";
 }
 
@@ -3351,7 +3350,7 @@ function ensureUserBaseData(user) {
   }).then(function() {
     return fbDb.ref("soloPortfolios/"+uid).once("value");
   }).then(function(snap) {
-    if (!snap.exists()) return fbDb.ref("soloPortfolios/"+uid).set({cash:100000,positions:{},trades:{},pendingOrders:{},dividends:{},totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()});
+    if (!snap.exists()) return fbDb.ref("soloPortfolios/"+uid).set({cash:100000,positions:{},trades:[],pendingOrders:[],dividends:{},totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()});
   }).then(function() {
     ensureSoloProfile();
   });
