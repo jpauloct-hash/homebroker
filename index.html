@@ -515,18 +515,14 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">Escolha ate 18 tickers adicionais (atual: <span id="tape-count">0</span>)</div>
     <div id="tape-picker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
     <button id="tape-save" style="width:100%;padding:9px;border:none;border-radius:7px;background:#1e4a80;color:#fff;font-size:11px;font-weight:700;margin-bottom:16px">SALVAR TAPE</button>
-    <div style="border-top:1px solid var(--bd);padding-top:16px;margin-bottom:16px">
-      <div style="font-size:10px;font-weight:700;color:var(--bl);letter-spacing:1px;margin-bottom:10px">PERFIS</div>
-      <div id="settings-profiles" style="margin-bottom:8px"></div>
-      <button id="switch-profile-btn" style="width:100%;padding:9px;border:1px solid var(--bl);border-radius:8px;color:var(--bl);font-size:11px;font-weight:700;background:transparent;margin-bottom:8px">Trocar / Criar Perfil</button>
-      <button id="invite-btn" style="width:100%;padding:9px;border:none;border-radius:8px;background:#25d366;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:none;align-items:center;justify-content:center;gap:6px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-        Convidar pelo WhatsApp
-      </button>
-    </div>
+    
 
     <div style="border-top:1px solid var(--bd);padding-top:16px">
-      <div style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
+      <div id="solo-back-wrap" style="display:none;margin-bottom:12px">
+      <button id="back-to-solo-btn" style="width:100%;padding:10px;border:1px solid var(--bl);border-radius:8px;background:transparent;color:var(--bl);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Voltar ao solo</button>
+   </div>
+   <button id="invite-btn" style="display:none;width:100%;padding:9px;margin-bottom:12px;border:none;border-radius:8px;background:#25d366;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📲 Convidar pelo WhatsApp</button>
+   <div style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
       <button id="s-rst" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;margin-bottom:8px">RESETAR SIMULADOR</button>
       <button id="logb" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Sair da conta</button>
     </div>
@@ -639,13 +635,13 @@ function getUserDisplayName() {
 }
 
 function hideLegacyProfileUI() {
-  if ($("ps")) $("ps").style.display="none";
+  if ($("ps")) $("ps").style.display = "none";
 }
 
 function updateContextActionsUI() {
   var inGroup = isInGroupContext();
   if ($("solo-back-wrap")) $("solo-back-wrap").style.display = inGroup ? "block" : "none";
-  if ($("invite-btn")) $("invite-btn").style.display = inGroup ? "flex" : "none";
+  if ($("invite-btn")) $("invite-btn").style.display = inGroup ? "block" : "none";
 }
 
 function switchToSoloProfile() {
@@ -925,6 +921,7 @@ try {
 // ── FIREBASE INIT ────────────────────────────────────────────
 // ── FIREBASE INIT ────────────────────────────────────────────
 var roomSwitchToken=0,roomLoadToken=0;
+var myGroupsCache=[];
 var soloGroupUnsubs={};
 
 var currentRoomId="",currentRoomData=null,groupUnsubscribe=null;
@@ -944,6 +941,57 @@ function pushMyStats(){
   });
 }
 var _lp=0;function maybePushStats(){if(!currentRoomId||!getIdentityUid())return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
+// ── MY GROUPS FROM FIREBASE ──────────────────────────────────────────────────
+function loadMyGroupsFromFirebase() {
+  var uid=getIdentityUid();
+  if(!uid||!fbDb)return Promise.resolve([]);
+  return fbDb.ref("rooms").once("value").then(function(snap){
+    var rooms=snap.val()||{}, list=[];
+    Object.keys(rooms).forEach(function(roomId){
+      var room=rooms[roomId]||{};
+      var members=room.members||{};
+      if(members[uid]){
+        list.push({roomId:roomId,roomName:room.name||roomId,
+          initialBal:Number(room.initialBal||100000),endDate:room.endDate||"",
+          targetPct:Number(room.targetPct||0),
+          memberName:members[uid].name||getIdentityName(),
+          createdAt:Number(room.createdAt||0)});
+      }
+    });
+    list.sort(function(a,b){return(b.createdAt||0)-(a.createdAt||0);});
+    myGroupsCache=list;
+    return list;
+  });
+}
+
+function loadGroupSummaryFromFirebase(roomId) {
+  var uid=getIdentityUid();
+  if(!uid||!fbDb||!roomId)return Promise.resolve(null);
+  return Promise.all([
+    fbDb.ref("groupPortfolios/"+roomId+"/"+uid).once("value"),
+    fbDb.ref("rooms/"+roomId+"/members").once("value")
+  ]).then(function(results){
+    var portData=results[0].val()||null;
+    var members=results[1].val()||{};
+    if(!portData)return null;
+    var cash=Number(portData.cash||0);
+    var positions=portData.positions||{};
+    var totalPositions=0;
+    Object.keys(positions).forEach(function(k){
+      var p=positions[k]||{};
+      totalPositions+=Number(p.qty||0)*Number(p.avgPrice||0);
+    });
+    var total=cash+totalPositions;
+    var initialBal=Number(portData.initialBal||100000);
+    var pct=initialBal>0?((total-initialBal)/initialBal*100):0;
+    var ranking=Object.values(members).sort(function(a,b){return Number(b.pct||0)-Number(a.pct||0);});
+    var myName=getIdentityName();
+    var myPos=ranking.findIndex(function(x){return(x.uid&&x.uid===uid)||(x.name===myName);});
+    return{total:total,pct:pct,pos:myPos>=0?myPos+1:null,totalMembers:ranking.length};
+  });
+}
+
+
 function clearSoloGroupSubscriptions() {
   Object.keys(soloGroupUnsubs).forEach(function(roomId){
     try{soloGroupUnsubs[roomId]();}catch(e){}
@@ -1148,92 +1196,69 @@ function renderGroupPanel() {
   roomView.style.display="none";
   updateContextActionsUI();
 
-  var hasGroups=false;
-  var profs=getProfiles();
-  for (var i=0;i<profs.length;i++){
-    var meta=getProfileMeta(profs[i]);
-    if (meta&&meta.type==="group"){hasGroups=true;break;}
-  }
-
-  if (hasGroups) {
-    soloView.style.display="block";
-    noRoom.style.display="none";
-    renderSoloGroupList(getMyGroupProfiles());
-  } else {
+  loadMyGroupsFromFirebase().then(function(groups){
+    if(groups&&groups.length){
+      soloView.style.display="block";
+      noRoom.style.display="none";
+      renderSoloGroupList(groups);
+    } else {
+      soloView.style.display="none";
+      noRoom.style.display="block";
+    }
+  }).catch(function(err){
+    console.error("Erro ao carregar meus grupos:",err);
     soloView.style.display="none";
     noRoom.style.display="block";
-  }
+  });
 }
 
 
 function getMyGroupProfiles() {
-  var _myName = getIdentityName();
-  return getProfiles().filter(function(p) {
-    var m = getProfileMeta(p);
-    if (!m && p && p.indexOf("grupo_") === 0) {
-      var _pp = p.split("_");
-      m = {profileId:p, displayName:_pp.slice(2).join("_"), type:"group", roomId:_pp[1], roomName:_pp[1]};
-      setProfileMeta(p, m);
-    }
-    return m && m.type === "group" && m.displayName === _myName;
-  });
+  return myGroupsCache || [];
 }
 
-function renderSoloGroupList(groupProfiles) {
-  var el = $("group-solo-list");
-  if (!el) return;
-  el.innerHTML = "";
-  groupProfiles.forEach(function(profileId) {
-    var meta = getProfileMeta(profileId);
-    if (!meta) return;
-    // Load state for this group profile
-    var st = JSON.parse(localStorage.getItem("hb_state_v3_"+profileId)||"{}");
-    var initB = st.initialBal || 100000;
-    var total = (st.bal||0) + Object.values(st.port||{}).reduce(function(s,p){return s+(p.qty||0)*(p.avgPrice||0);},0);
-    var pct = initB > 0 ? ((total - initB) / initB * 100) : 0;
-    var color = pct >= 0 ? "var(--g)" : "var(--r)";
-    var card = document.createElement("div");
-    card.style.cssText = "background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer";
-    card.innerHTML =
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
-        '<div>' +
-          '<div style="font-size:12px;font-weight:700;color:var(--a)">'+meta.roomName+'</div>' +
-          '<div style="font-size:9px;color:var(--tx4);margin-top:2px">'+meta.roomId+'</div>' +
-        '</div>' +
-        '<div style="text-align:right">' +
-          '<div style="font-size:14px;font-weight:700;color:'+color+'">'+(pct>=0?"+":"")+pct.toFixed(2)+'%</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<div style="font-size:10px;color:var(--tx2)">Patrimônio: R$ '+Number(total).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div>' +
-        '<button style="padding:5px 12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>' +
+function renderSoloGroupList(groups) {
+  var el=$("group-solo-list");if(!el)return;
+  el.innerHTML="";
+  if(!groups||!groups.length){
+    el.innerHTML='<div class="empty">Você ainda não participa de nenhum grupo.</div>';
+    return;
+  }
+  groups.forEach(function(group){
+    var card=document.createElement("div");
+    card.style.cssText="background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px";
+    card.innerHTML=
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
+        '<div>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--a)">'+group.roomName+'</div>'+
+          '<div style="font-size:9px;color:var(--tx4);margin-top:2px">'+group.roomId+'</div>'+
+        '</div>'+
+        '<div class="grp-pct" style="font-size:14px;font-weight:700;color:var(--tx3)">...</div>'+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<div class="grp-meta" style="font-size:10px;color:var(--tx2)">Carregando...</div>'+
+        '<button style="padding:5px 12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>'+
       '</div>';
-    (function(pid){ 
-      card.querySelector("button").onclick = function(e) {
+    (function(g,c){
+      c.querySelector("button").onclick=function(e){
         e.stopPropagation();
+        var pid="grupo_"+g.roomId+"_"+(g.memberName||getIdentityName());
+        setProfileMeta(pid,{profileId:pid,displayName:g.memberName||getIdentityName(),type:"group",roomId:g.roomId,roomName:g.roomName});
         switchToProfile(pid);
       };
-    })(profileId);
-    // Load live ranking from Firebase for this group
-    if (fbDb && meta.roomId) {
-      (function(pid, m, cardEl){
-        fbDb.ref("rooms/"+m.roomId+"/members").once("value").then(function(snap){
-          var members = snap.val() || {};
-          var sorted = Object.values(members).sort(function(a,b){return b.pct-a.pct;});
-          var myPos = sorted.findIndex(function(x){return x.name===pid;});
-          if (myPos >= 0) {
-            var posEl = document.createElement("div");
-            posEl.style.cssText = "margin-top:6px;font-size:9px;color:var(--tx4)";
-            var medal = myPos===0?"🥇":myPos===1?"🥈":myPos===2?"🥉":"#"+(myPos+1);
-            posEl.textContent = medal+" de "+sorted.length+" participantes";
-            cardEl.appendChild(posEl);
-          }
-        }).catch(function(){});
-      })(profileId, meta, card);
-    }
+      loadGroupSummaryFromFirebase(g.roomId).then(function(s){
+        if(!s)return;
+        var pctEl=c.querySelector(".grp-pct"),metaEl=c.querySelector(".grp-meta");
+        var color=s.pct>=0?"var(--g)":"var(--r)";
+        var medal=s.pos===1?"🥇":s.pos===2?"🥈":s.pos===3?"🥉":(s.pos?"#"+s.pos:"—");
+        if(pctEl){pctEl.style.color=color;pctEl.textContent=(s.pct>=0?"+":"")+s.pct.toFixed(2)+"%";}
+        if(metaEl){metaEl.textContent="R$ "+Number(s.total).toLocaleString("pt-BR",{minimumFractionDigits:2})+" · "+medal+" de "+s.totalMembers;}
+      }).catch(function(err){console.error("Erro resumo grupo:",err);});
+    })(group, card);
     el.appendChild(card);
   });
 }
+
 
 function renderGroupRoom(){if(!currentRoomId||!currentRoomData){document.getElementById("group-noroom").style.display="block";document.getElementById("group-room").style.display="none";return;}document.getElementById("group-noroom").style.display="none";document.getElementById("group-room").style.display="block";document.getElementById("group-room-name").textContent=currentRoomData.name||currentRoomId;}
 function renderGroupRanking(members){
@@ -3410,7 +3435,13 @@ function initApp() {
     if($("order-panel")) $("order-panel").classList.add("on");
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
-  $("logb").onclick=function() { doAuthLogout(); };
+  $("logb").onclick = function() { doAuthLogout(); };
+  if ($("back-to-solo-btn")) {
+    $("back-to-solo-btn").onclick = function() { switchToSoloProfile(); $("sht").classList.remove("on"); };
+  }
+  if ($("invite-btn")) {
+    $("invite-btn").onclick = function() { shareRoomInvite(); };
+  }
   if ($("back-to-solo-btn")) { $("back-to-solo-btn").onclick=function(){switchToSoloProfile();$("sht").classList.remove("on");}; }
   $("fs-up").onclick=function(){ applyFontScale(fontIdx+1); };
   $("fs-down").onclick=function(){ applyFontScale(fontIdx-1); };
