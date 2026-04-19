@@ -649,30 +649,35 @@ function switchToSoloProfile() {
   currentRoomId=""; currentRoomData=null;
   localStorage.removeItem("hb_room_id");
   if (currentUser) localStorage.removeItem("hb_active_room_"+currentUser.uid);
-  localStorage.setItem(LS_PROFILE, soloId);
   if (groupUnsubscribe){groupUnsubscribe();groupUnsubscribe=null;}
   clearSoloGroupSubscriptions();
+  localStorage.setItem(LS_PROFILE, soloId);
   setActiveScreen("ma");
   loadSoloFromFirebase().then(function(){
     return loadSoloHistoryFromFirebase().catch(function(){equityHistory=loadEquityHistory();});
   }).then(function(){
+    return loadMyGroupsFromFirebase();
+  }).then(function(){
     goal=loadGoal(); updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
   }).catch(function(err){
-    console.error("Erro ao voltar para solo:",err); render(); renderGroupPanel(); updateContextActionsUI();
+    console.error("Erro ao voltar para solo:",err); notif("Erro ao voltar ao solo","err");
   });
 }
 
 function updateAuthIdentityUI() {
   var name = getIdentityName();
-  var uid = getIdentityUid();
   var el = $("profile-indicator");
   if (!el) return;
-  if (currentRoomId && currentRoomData) {
-    el.innerHTML = '<span style="color:var(--a)">🏆 '+(currentRoomData.name||currentRoomId)+'</span> <span style="color:var(--tx4);font-size:9px">· '+name+'</span>';
-  } else {
-    el.textContent = "Perfil: " + name;
+  if (currentRoomId) {
+    var roomName = (currentRoomData && currentRoomData.name) ||
+      (function(){
+        var found=(myGroupsCache||[]).find(function(g){return g.roomId===currentRoomId;});
+        return found?found.roomName:currentRoomId;
+      })();
+    el.innerHTML='<span style="color:var(--a)">🏆 '+roomName+'</span> <span style="color:var(--tx4);font-size:9px">· '+name+'</span>';
+    return;
   }
-  if (uid) el.dataset.uid = uid;
+  el.textContent = "Perfil: " + name;
 }
 
 function getUserUid() {
@@ -1014,42 +1019,27 @@ function showCreateRoom(){
   var tStr=prompt("🎯 Meta de rentabilidade (%) — opcional:","5");
   var t=parseFloat(tStr)||0;
   createRoom(n,b,d,t).then(function(roomId){
-    // Auto-create a group profile for the creator
-    var creatorName = getIdentityName();
-    var groupProfileId = "grupo_"+roomId+"_"+creatorName;
-    setProfileMeta(groupProfileId,{
-      profileId:groupProfileId,
-      displayName:creatorName,
-      type:"group",
-      roomId:roomId,
-      roomName:n
-    });
-    // Add to profiles list
-    var profs=getProfiles();
-    if(profs.indexOf(groupProfileId)===-1){
-      profs.push(groupProfileId);
-      localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));
-    }
-    // Set up initial state for group profile
-    localStorage.setItem("hb_state_v3_"+groupProfileId, JSON.stringify({
-      bal:b, port:{}, trd:[], pending:[], divs:{}, totalDiv:0,
-      checkedDivDate:"", initialBal:b, firstTradeDate:""
-    }));
-    if(d||t){
-      localStorage.setItem("hb_goal_v1_"+groupProfileId, JSON.stringify({endDate:d||"",target:t||0}));
-    }
-    currentRoomData={id:roomId,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getCurrentProfile()};
-    notif("Grupo '"+n+"' criado! Perfil de grupo disponível na seleção de perfil.");
-    renderGroupPanel();
-    setTimeout(function(){
-      if(confirm("Entrar no perfil do grupo agora para começar a operar?")){
-        // Switch to group profile
-        switchToProfile(groupProfileId);
-      } else {
-        setTimeout(function(){shareRoomInvite();},300);
-      }
-    },500);
-  }).catch(function(e){notif("Erro: "+e.message,"err");});
+  currentRoomId = roomId;
+  currentRoomData = {id:roomId, name:n, initialBal:b, endDate:d, targetPct:t, createdBy:getIdentityUid()};
+  if (currentUser) localStorage.setItem("hb_active_room_"+currentUser.uid, roomId);
+  var pid="grupo_"+roomId+"_"+getIdentityName();
+  setProfileMeta(pid,{profileId:pid,displayName:getIdentityName(),type:"group",roomId:roomId,roomName:n});
+  localStorage.setItem("hb_profile_v1", pid);
+  return fbDb.ref("rooms/"+roomId+"/members/"+getIdentityUid()).set({
+    uid:getIdentityUid(), name:getIdentityName(), joinedAt:Date.now()
+  }).then(function(){
+    return loadGroupPortfolioFromFirebase(roomId, pid);
+  }).then(function(){
+    return loadGroupHistoryFromFirebase(roomId, pid);
+  }).then(function(){
+    return loadMyGroupsFromFirebase();
+  }).then(function(){
+    setActiveScreen("ma");
+    updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
+  });
+}).catch(function(err){
+  console.error(err); notif("Erro ao criar grupo","err");
+});
 }
 function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;joinRoom(c.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});}
 
@@ -1160,35 +1150,17 @@ function switchToProfile(profileId) {
 function renderGroupPanel() {
   clearSoloGroupSubscriptions();
   var soloView=$("group-solo-view"), roomView=$("group-room-view"), noRoom=$("group-noroom");
-  if (!soloView||!roomView||!noRoom) return;
+  if(!soloView||!roomView||!noRoom)return;
 
-  if (isInGroupContext() && currentRoomData) {
-    soloView.style.display="none";
-    roomView.style.display="block";
-    noRoom.style.display="none";
-    if ($("group-room-name")) $("group-room-name").textContent=currentRoomData.name||currentRoomId;
-    if ($("group-room-meta")) {
-      var mArr=[];
-      if (currentRoomData.endDate) mArr.push("📅 "+currentRoomData.endDate);
-      if (currentRoomData.targetPct) mArr.push("🎯 Meta +"+currentRoomData.targetPct+"%");
-      if (currentRoomData.initialBal) mArr.push("💰 R$ "+Number(currentRoomData.initialBal).toLocaleString("pt-BR"));
-      $("group-room-meta").textContent=mArr.join(" · ");
-    }
-    if (currentRoomId) subscribeGroup(renderGroupRanking);
-    updateContextActionsUI();
-    return;
-  }
-
-  if (isInGroupContext() && !currentRoomData) {
-    soloView.style.display="none";
-    roomView.style.display="block";
-    noRoom.style.display="none";
-    if ($("group-room-name")) $("group-room-name").textContent=currentRoomId;
-    var thisLoad=++roomLoadToken, targetRoomId=currentRoomId;
-    joinRoom(targetRoomId).then(function(room){
-      if (thisLoad!==roomLoadToken||currentRoomId!==targetRoomId) return;
-      currentRoomData=room; renderGroupPanel();
-    }).catch(function(){});
+  if(isInGroupContext()&&currentRoomData){
+    soloView.style.display="none"; roomView.style.display="block"; noRoom.style.display="none";
+    if($("group-room-name"))$("group-room-name").textContent=currentRoomData.name||currentRoomId;
+    var mArr=[];
+    if(currentRoomData.endDate)mArr.push("📅 "+currentRoomData.endDate);
+    if(currentRoomData.targetPct)mArr.push("🎯 Meta +"+currentRoomData.targetPct+"%");
+    if(currentRoomData.initialBal)mArr.push("💰 R$ "+Number(currentRoomData.initialBal).toLocaleString("pt-BR"));
+    if($("group-room-meta"))$("group-room-meta").textContent=mArr.join(" · ");
+    if(currentRoomId)subscribeGroup(renderGroupRanking);
     updateContextActionsUI();
     return;
   }
@@ -1198,17 +1170,14 @@ function renderGroupPanel() {
 
   loadMyGroupsFromFirebase().then(function(groups){
     if(groups&&groups.length){
-      soloView.style.display="block";
-      noRoom.style.display="none";
+      soloView.style.display="block"; noRoom.style.display="none";
       renderSoloGroupList(groups);
     } else {
-      soloView.style.display="none";
-      noRoom.style.display="block";
+      soloView.style.display="none"; noRoom.style.display="block";
     }
   }).catch(function(err){
     console.error("Erro ao carregar meus grupos:",err);
-    soloView.style.display="none";
-    noRoom.style.display="block";
+    soloView.style.display="none"; noRoom.style.display="block";
   });
 }
 
@@ -1242,6 +1211,9 @@ function renderSoloGroupList(groups) {
     (function(g,c){
       c.querySelector("button").onclick=function(e){
         e.stopPropagation();
+        currentRoomId=g.roomId;
+        currentRoomData={id:g.roomId,name:g.roomName,initialBal:g.initialBal,endDate:g.endDate,targetPct:g.targetPct};
+        if(currentUser)localStorage.setItem("hb_active_room_"+currentUser.uid,g.roomId);
         var pid="grupo_"+g.roomId+"_"+(g.memberName||getIdentityName());
         setProfileMeta(pid,{profileId:pid,displayName:g.memberName||getIdentityName(),type:"group",roomId:g.roomId,roomName:g.roomName});
         switchToProfile(pid);
