@@ -648,19 +648,32 @@ function switchToSoloProfile() {
   var soloId=ensureSoloProfile(); if(!soloId)return;
   currentRoomId=""; currentRoomData=null;
   localStorage.removeItem("hb_room_id");
-  if (currentUser) localStorage.removeItem("hb_active_room_"+currentUser.uid);
-  if (groupUnsubscribe){groupUnsubscribe();groupUnsubscribe=null;}
+  // keep hb_active_room_ so group can be resumed later
+  if(groupUnsubscribe){groupUnsubscribe();groupUnsubscribe=null;}
   clearSoloGroupSubscriptions();
   localStorage.setItem(LS_PROFILE, soloId);
   setActiveScreen("ma");
   loadSoloFromFirebase().then(function(){
     return loadSoloHistoryFromFirebase().catch(function(){equityHistory=loadEquityHistory();});
   }).then(function(){
-    return loadMyGroupsFromFirebase();
-  }).then(function(){
-    goal=loadGoal(); updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
+    goal=loadGoal(); updateAuthIdentityUI(); render(); updateContextActionsUI();
+    // load groups without blocking solo return
+    return loadMyGroupsFromFirebase().then(function(){
+      renderGroupPanel();
+    }).catch(function(err){
+      console.error("Erro ao carregar meus grupos no solo:",err);
+      renderGroupPanel();
+    });
   }).catch(function(err){
-    console.error("Erro ao voltar para solo:",err); notif("Erro ao voltar ao solo","err");
+    console.error("Erro ao voltar para solo:",err);
+    // fallback: enter solo anyway
+    try{
+      goal=loadGoal(); updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
+      notif("Voltou ao solo (fallback local)","err");
+    }catch(e2){
+      console.error("Fallback do solo falhou:",e2);
+      notif("Erro ao voltar ao solo","err");
+    }
   });
 }
 
