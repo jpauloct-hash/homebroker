@@ -1019,7 +1019,7 @@ function clearSoloGroupSubscriptions() {
 
 function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
 function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
-function showCreateRoom(){
+function showCreateRoom() {
   var n=prompt("🏆 Nome do grupo:");
   if(!n||!n.trim())return;
   n=n.trim();
@@ -1031,28 +1031,33 @@ function showCreateRoom(){
   if(!d)return;
   var tStr=prompt("🎯 Meta de rentabilidade (%) — opcional:","5");
   var t=parseFloat(tStr)||0;
+
   createRoom(n,b,d,t).then(function(roomId){
-  currentRoomId = roomId;
-  currentRoomData = {id:roomId, name:n, initialBal:b, endDate:d, targetPct:t, createdBy:getIdentityUid()};
-  if (currentUser) localStorage.setItem("hb_active_room_"+currentUser.uid, roomId);
-  var pid="grupo_"+roomId+"_"+getIdentityName();
-  setProfileMeta(pid,{profileId:pid,displayName:getIdentityName(),type:"group",roomId:roomId,roomName:n});
-  localStorage.setItem("hb_profile_v1", pid);
-  return fbDb.ref("rooms/"+roomId+"/members/"+getIdentityUid()).set({
-    uid:getIdentityUid(), name:getIdentityName(), joinedAt:Date.now()
-  }).then(function(){
-    return loadGroupPortfolioFromFirebase(roomId, pid);
-  }).then(function(){
-    return loadGroupHistoryFromFirebase(roomId, pid);
-  }).then(function(){
-    return loadMyGroupsFromFirebase();
-  }).then(function(){
-    setActiveScreen("ma");
-    updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
+    currentRoomId=roomId;
+    currentRoomData={id:roomId,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getIdentityUid()};
+    if(currentUser)localStorage.setItem("hb_active_room_"+currentUser.uid,roomId);
+    var pid="grupo_"+roomId+"_"+getIdentityName();
+    setProfileMeta(pid,{profileId:pid,displayName:getIdentityName(),type:"group",roomId:roomId,roomName:n});
+    localStorage.setItem("hb_profile_v1",pid);
+    return fbDb.ref("rooms/"+roomId+"/members/"+getIdentityUid()).set({
+      uid:getIdentityUid(),name:getIdentityName(),joinedAt:Date.now()
+    }).then(function(){
+      return loadGroupPortfolioFromFirebase(roomId,pid);
+    }).then(function(){
+      return loadGroupHistoryFromFirebase(roomId,pid);
+    }).then(function(){
+      setActiveScreen("ma");
+      updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
+      notif("Grupo criado com sucesso!");
+      // atualiza lista sem bloquear
+      return loadMyGroupsFromFirebase().catch(function(err){
+        console.error("Erro ao atualizar Meus Grupos:",err);
+      });
+    });
+  }).catch(function(err){
+    console.error("Erro real ao criar grupo:",err);
+    notif("Erro ao criar grupo: "+(err&&err.message?err.message:"desconhecido"),"err");
   });
-}).catch(function(err){
-  console.error(err); notif("Erro ao criar grupo","err");
-});
 }
 function showJoinRoom(){var c=prompt("Código do grupo:");if(!c)return;joinRoom(c.toUpperCase().trim()).then(function(r){notif("Entrou: "+r.name);renderGroupRoom();subscribeGroup(renderGroupRanking);pushMyStats();}).catch(function(){notif("Grupo não encontrado","err");});}
 
