@@ -660,9 +660,9 @@ function switchToSoloProfile() {
   loadSoloFromFirebase().then(function(){
     return loadSoloHistoryFromFirebase().catch(function(){equityHistory=loadEquityHistory();});
   }).then(function(){
-    goal=loadGoal(); updateAuthIdentityUI(); render(); renderGroupPanel();
+    goal=loadGoal(); updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
   }).catch(function(err){
-    console.error("Erro ao voltar para solo:",err); render(); renderGroupPanel();
+    console.error("Erro ao voltar para solo:",err); render(); renderGroupPanel(); updateContextActionsUI();
   });
 }
 
@@ -944,6 +944,13 @@ function pushMyStats(){
   });
 }
 var _lp=0;function maybePushStats(){if(!currentRoomId||!getIdentityUid())return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
+function clearSoloGroupSubscriptions() {
+  Object.keys(soloGroupUnsubs).forEach(function(roomId){
+    try{soloGroupUnsubs[roomId]();}catch(e){}
+  });
+  soloGroupUnsubs={};
+}
+
 function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
 function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
 function showCreateRoom(){
@@ -1111,45 +1118,50 @@ function renderGroupPanel() {
     soloView.style.display="none";
     roomView.style.display="block";
     noRoom.style.display="none";
-
-    $("group-room-name").textContent=currentRoomData.name||currentRoomId;
-    var mEl=$("group-room-meta"), metaArr=[];
-    if (currentRoomData.endDate) metaArr.push("📅 "+currentRoomData.endDate);
-    if (currentRoomData.targetPct) metaArr.push("🎯 Meta +"+currentRoomData.targetPct+"%");
-    if (currentRoomData.initialBal) metaArr.push("💰 R$ "+Number(currentRoomData.initialBal).toLocaleString("pt-BR"));
-    if (mEl) mEl.textContent=metaArr.join(" · ");
-
+    if ($("group-room-name")) $("group-room-name").textContent=currentRoomData.name||currentRoomId;
+    if ($("group-room-meta")) {
+      var mArr=[];
+      if (currentRoomData.endDate) mArr.push("📅 "+currentRoomData.endDate);
+      if (currentRoomData.targetPct) mArr.push("🎯 Meta +"+currentRoomData.targetPct+"%");
+      if (currentRoomData.initialBal) mArr.push("💰 R$ "+Number(currentRoomData.initialBal).toLocaleString("pt-BR"));
+      $("group-room-meta").textContent=mArr.join(" · ");
+    }
     if (currentRoomId) subscribeGroup(renderGroupRanking);
+    updateContextActionsUI();
     return;
   }
 
   if (isInGroupContext() && !currentRoomData) {
-    // Still loading room data
     soloView.style.display="none";
     roomView.style.display="block";
     noRoom.style.display="none";
     if ($("group-room-name")) $("group-room-name").textContent=currentRoomId;
-    if (currentRoomId) {
-      var thisLoad=++roomLoadToken, targetRoomId=currentRoomId;
-      joinRoom(targetRoomId).then(function(room){
-        if (thisLoad!==roomLoadToken||currentRoomId!==targetRoomId) return;
-        currentRoomData=room;
-        renderGroupPanel();
-      }).catch(function(){});
-    }
+    var thisLoad=++roomLoadToken, targetRoomId=currentRoomId;
+    joinRoom(targetRoomId).then(function(room){
+      if (thisLoad!==roomLoadToken||currentRoomId!==targetRoomId) return;
+      currentRoomData=room; renderGroupPanel();
+    }).catch(function(){});
+    updateContextActionsUI();
     return;
   }
 
-  // Solo context
   roomView.style.display="none";
-  var myGroups=getMyGroupProfiles();
-  if (myGroups.length===0) {
-    noRoom.style.display="block";
-    soloView.style.display="none";
-  } else {
-    noRoom.style.display="none";
+  updateContextActionsUI();
+
+  var hasGroups=false;
+  var profs=getProfiles();
+  for (var i=0;i<profs.length;i++){
+    var meta=getProfileMeta(profs[i]);
+    if (meta&&meta.type==="group"){hasGroups=true;break;}
+  }
+
+  if (hasGroups) {
     soloView.style.display="block";
-    renderSoloGroupList(myGroups);
+    noRoom.style.display="none";
+    renderSoloGroupList(getMyGroupProfiles());
+  } else {
+    soloView.style.display="none";
+    noRoom.style.display="block";
   }
 }
 
