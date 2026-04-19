@@ -2,12 +2,16 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Home Broker B3</title>
+<title>Trading GP</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -127,9 +131,6 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 /* After-hours order modal */
 
 </style>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 <div id="app">
@@ -166,9 +167,25 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 </div>
 
 <!-- PROFILE SCREEN -->
+<!-- GROUP JOIN SCREEN -->
+<div id="gs" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:16px;background:var(--bg)">
+  <div style="text-align:center;margin-bottom:8px">
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">CAMPEONATO</div>
+    <div id="gs-name" style="font-size:22px;font-weight:700;color:var(--a)"></div>
+    <div style="font-size:10px;color:var(--tx3);margin-top:4px">Você foi convidado para este grupo!</div>
+  </div>
+  <div style="width:100%;max-width:400px;background:var(--bg2);border-radius:14px;padding:18px;border:1px solid var(--bd)">
+    <div id="gs-rules" style="margin-bottom:16px;font-size:11px;color:var(--tx2);line-height:1.8"></div>
+    <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:10px">SEU NOME NO GRUPO</div>
+    <input id="gs-name-inp" class="tinp" placeholder="Ex: João, Maria..." autocomplete="off" style="margin-bottom:8px">
+    <div id="gs-err" style="font-size:10px;color:var(--r);margin-bottom:8px;display:none"></div>
+    <button onclick="joinGroupAsGuest()" style="width:100%;padding:13px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">ENTRAR NO GRUPO</button>
+  </div>
+</div>
+
 <div id="ps" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:20px;gap:12px;overflow-y:auto;">
   <div style="text-align:center">
-    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER B3</div>
+    <div style="font-size:9px;letter-spacing:4px;color:var(--tx4);margin-bottom:6px">HOME BROKER TGP</div>
     <div style="font-size:20px;font-weight:700;margin-bottom:4px">Selecionar Perfil</div>
     <div style="font-size:10px;color:var(--tx3)">Cada perfil tem carteira e historico independentes</div>
   </div>
@@ -187,7 +204,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div>
         <div style="font-size:9px;letter-spacing:3px;color:var(--tx3);text-transform:uppercase;margin-bottom:2px">Simulador</div>
         <div id="profile-indicator" style="font-size:9px;color:var(--bl);margin-bottom:2px"></div>
-        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER B3</div>
+        <div style="font-size:15px;font-weight:700;letter-spacing:.5px">HOME BROKER TGP</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">PATRIMÔNIO</div>
@@ -251,6 +268,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   <div id="tbr">
     <div class="tabs">
       <button class="tab on" data-t="chart">GRÁFICO</button>
+      <button class="tab" data-t="group">GRUPO</button>
       <button class="tab" data-t="order">ORDENS</button>
       <button class="tab" data-t="portfolio">CARTEIRA</button>
       <button class="tab" data-t="history">HISTÓRICO</button>
@@ -269,7 +287,54 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div id="tvw" style="width:100%;height:100%"></div>
     </div>
 
-    <div id="order-panel" class="panel">
+    <div id="group-panel" class="panel" style="overflow-y:auto">
+  <div style="padding:12px">
+
+    <!-- SOLO PROFILE: list of groups I participate in -->
+    <div id="group-solo-view" style="display:none">
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:12px">MEUS GRUPOS</div>
+      <div id="group-solo-list"></div>
+      <div style="margin-top:16px">
+        <button onclick="showCreateRoom()" style="width:100%;padding:12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🏆 CRIAR GRUPO</button>
+      </div>
+    </div>
+
+    <!-- GROUP PROFILE: chart + ranking -->
+    <div id="group-room-view" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div>
+          <div id="group-room-name" style="font-size:14px;font-weight:700;color:var(--a)"></div>
+          <div id="group-room-meta" style="font-size:9px;color:var(--tx4);margin-top:2px"></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="shareRoomInvite()" style="padding:6px 10px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);border-radius:6px;color:#25d366;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📲</button>
+        </div>
+      </div>
+      <div id="group-my-pos" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+        <div style="font-size:22px" id="group-my-medal">—</div>
+        <div>
+          <div style="font-size:9px;color:var(--tx4);letter-spacing:1px">MINHA POSIÇÃO</div>
+          <div id="group-my-pct" style="font-size:16px;font-weight:700;color:var(--g)">—</div>
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">EVOLUÇÃO DO PATRIMÔNIO</div>
+      <canvas id="group-chart" height="150" style="width:100%;margin-bottom:6px;border-radius:8px;background:var(--bg3)"></canvas>
+      <div id="group-legend" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-size:9px"></div>
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:2px;margin-bottom:8px">RANKING</div>
+      <div id="group-ranking"></div>
+    </div>
+
+    <!-- NO GROUP state (solo with no groups yet) -->
+    <div id="group-noroom" style="text-align:center;padding:20px 0">
+      <div style="font-size:24px;margin-bottom:8px">🏆</div>
+      <div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px">Modo Campeonato</div>
+      <div style="font-size:10px;color:var(--tx3);margin-bottom:20px;line-height:1.6">Crie um grupo, defina as regras e<br>convide amigos e família!</div>
+      <button onclick="showCreateRoom()" style="width:100%;padding:13px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🏆 CRIAR GRUPO</button>
+    </div>
+
+  </div>
+</div>
+<div id="order-panel" class="panel">
       <div class="sp">
 
         <!-- Ticker search -->
@@ -440,6 +505,10 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <div class="srow"><div class="slbl">DATA DE ENCERRAMENTO</div><input type="date" id="s-end" class="sinp"></div>
     <div class="srow"><div class="slbl">META DE RENTABILIDADE (%)</div><input type="number" id="s-tgt" class="sinp" placeholder="Ex: 30" min="0" step="0.1"></div>
     <button id="s-save" style="width:100%;padding:11px;border:none;border-radius:8px;background:#1e4a80;color:#fff;font-size:12px;font-weight:700;margin-bottom:8px">SALVAR</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:9px;color:var(--tx3);letter-spacing:1px">EFEITOS SONOROS</div>
+      <button id="sfx-btn" onclick="SFX_ENABLED=!SFX_ENABLED;localStorage.setItem('hb_sfx',SFX_ENABLED?'1':'0');this.textContent=SFX_ENABLED?'ON':'OFF';this.style.color=SFX_ENABLED?'var(--g)':'var(--r)'" style="padding:5px 16px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--g)">ON</button>
+    </div>
     <button id="s-clr" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;background:transparent;color:var(--tx3);font-size:11px;font-weight:600;margin-bottom:16px">Remover meta / prazo</button>
 
     <div style="font-size:10px;font-weight:700;color:var(--a);letter-spacing:1px;margin-bottom:8px">TICKER TAPE</div>
@@ -457,8 +526,6 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     </div>
 
     <div style="border-top:1px solid var(--bd);padding-top:16px">
-   <button id="invite-btn" style="display:none;width:100%;padding:9px;margin-bottom:12px;border:none;border-radius:8px;background:#25d366;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📲 Convidar pelo WhatsApp</button>
-      <div id="solo-back-wrap" style="display:none;margin-bottom:12px"><button id="back-to-solo-btn" style="width:100%;padding:10px;border:1px solid var(--bl);border-radius:8px;background:transparent;color:var(--bl);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Voltar ao solo</button></div>
       <div style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
       <button id="s-rst" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;margin-bottom:8px">RESETAR SIMULADOR</button>
       <button id="logb" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Sair da conta</button>
@@ -498,9 +565,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 </div>
 
 <div id="nf"></div>
+
 <script>
-
-
 // ── AUTH TAB TOGGLE ──────────────────────────────────────────
 function showAuthTab(tab) {
   var isLogin = tab === "login";
@@ -1104,13 +1170,11 @@ function getMyGroupProfiles() {
   var _myName = getIdentityName();
   return getProfiles().filter(function(p) {
     var m = getProfileMeta(p);
-    // Reconstruct metadata for legacy grupo_ profiles
     if (!m && p && p.indexOf("grupo_") === 0) {
       var _pp = p.split("_");
       m = {profileId:p, displayName:_pp.slice(2).join("_"), type:"group", roomId:_pp[1], roomName:_pp[1]};
       setProfileMeta(p, m);
     }
-    // Only return groups belonging to current user
     return m && m.type === "group" && m.displayName === _myName;
   });
 }
@@ -3351,7 +3415,7 @@ function initApp() {
   $("fs-up").onclick=function(){ applyFontScale(fontIdx+1); };
   $("fs-down").onclick=function(){ applyFontScale(fontIdx-1); };
   // switch-profile-btn removed
-  if ($("invite-btn")) $("invite-btn").onclick = function() {
+  $("invite-btn").onclick = function() {
     if (!token) { notif("Entre no app primeiro","err"); return; }
     var base = window.location.href.split("?")[0];
     var enc = encodeToken(token);
@@ -3546,22 +3610,6 @@ if (fbAuth) {
     });
   });
 }
-
-
-if (fbAuth) {
-  fbAuth.onAuthStateChanged(function(user) {
-    currentUser = user || null;
-    if (!user) { showAuthScreen(); return; }
-    ensureUserBaseData(user).then(function() {
-      enterAppAfterAuth();
-    }).catch(function(err) {
-      console.error("Erro ao preparar conta:", err);
-      showAuthScreen();
-      if ($("auth-err")) { $("auth-err").textContent="Erro ao carregar sua conta."; $("auth-err").style.display="block"; }
-    });
-  });
-}
-
 
 
 
