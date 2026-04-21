@@ -826,6 +826,12 @@ function saveSoloHistoryToFirebase() {
 }
 
 // ── GROUP PORTFOLIO/HISTORY FIREBASE HELPERS ─────────────────────────────────
+function getUserRoomsRef() {
+  var uid=getIdentityUid();
+  if(!uid||!fbDb)return null;
+  return fbDb.ref("userRooms/"+uid);
+}
+
 function getGroupPortfolioRef(roomId) {
   var uid=getIdentityUid();
   if(!uid||!fbDb||!roomId)return null;
@@ -962,19 +968,17 @@ var _lp=0;function maybePushStats(){if(!currentRoomId||!getIdentityUid())return;
 // ── MY GROUPS FROM FIREBASE ──────────────────────────────────────────────────
 function loadMyGroupsFromFirebase() {
   var uid=getIdentityUid();
-  if(!uid||!fbDb)return Promise.resolve([]);
-  return fbDb.ref("rooms").once("value").then(function(snap){
-    var rooms=snap.val()||{}, list=[];
-    Object.keys(rooms).forEach(function(roomId){
-      var room=rooms[roomId]||{};
-      var members=room.members||{};
-      if(members[uid]){
-        list.push({roomId:roomId,roomName:room.name||roomId,
-          initialBal:Number(room.initialBal||100000),endDate:room.endDate||"",
-          targetPct:Number(room.targetPct||0),
-          memberName:members[uid].name||getIdentityName(),
-          createdAt:Number(room.createdAt||0)});
-      }
+  var ref=getUserRoomsRef();
+  if(!uid||!ref)return Promise.resolve([]);
+  return ref.once("value").then(function(snap){
+    var data=snap.val()||{};
+    var list=Object.keys(data).map(function(roomId){
+      var x=data[roomId]||{};
+      return{roomId:roomId,roomName:x.roomName||roomId,
+        initialBal:Number(x.initialBal||100000),endDate:x.endDate||"",
+        targetPct:Number(x.targetPct||0),
+        memberName:x.memberName||getIdentityName(),
+        createdAt:Number(x.createdAt||0)};
     });
     list.sort(function(a,b){return(b.createdAt||0)-(a.createdAt||0);});
     myGroupsCache=list;
@@ -1042,6 +1046,11 @@ function showCreateRoom() {
     return fbDb.ref("rooms/"+roomId+"/members/"+getIdentityUid()).set({
       uid:getIdentityUid(),name:getIdentityName(),joinedAt:Date.now()
     }).then(function(){
+      return fbDb.ref("userRooms/"+getIdentityUid()+"/"+roomId).set({
+        roomName:n,initialBal:b,endDate:d,targetPct:t,
+        memberName:getIdentityName(),createdAt:Date.now()
+      });
+    }).then(function(){
       return loadGroupPortfolioFromFirebase(roomId,pid);
     }).then(function(){
       return loadGroupHistoryFromFirebase(roomId,pid);
@@ -1071,6 +1080,14 @@ function joinGroupAsGuest() {
   fbDb.ref("rooms/"+currentRoomId+"/members/"+uid).set({uid:uid,name:name,joinedAt:Date.now()})
   .then(function(){
     localStorage.setItem("hb_active_room_"+uid, currentRoomId);
+    fbDb.ref("userRooms/"+uid+"/"+currentRoomId).set({
+      roomName:currentRoomData.name||currentRoomId,
+      initialBal:Number(currentRoomData.initialBal||100000),
+      endDate:currentRoomData.endDate||"",
+      targetPct:Number(currentRoomData.targetPct||0),
+      memberName:name,
+      createdAt:Number(currentRoomData.createdAt||Date.now())
+    }).catch(function(e){console.error("userRooms write failed:",e);});
     var profileId="grupo_"+currentRoomId+"_"+name;
     setProfileMeta(profileId,{profileId:profileId,displayName:name,type:"group",roomId:currentRoomId,roomName:currentRoomData.name||currentRoomId});
     var profs=getProfiles();
