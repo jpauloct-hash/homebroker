@@ -522,7 +522,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <button id="back-to-solo-btn" style="width:100%;padding:10px;border:1px solid var(--bl);border-radius:8px;background:transparent;color:var(--bl);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Voltar ao solo</button>
    </div>
    <button id="invite-btn" style="display:none;width:100%;padding:9px;margin-bottom:12px;border:none;border-radius:8px;background:#25d366;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📲 Convidar pelo WhatsApp</button>
-   <div style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
+   <div id="danger-zone-title" style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
       <button id="s-rst" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;margin-bottom:8px">RESETAR SIMULADOR</button>
       <button id="logb" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Sair da conta</button>
     </div>
@@ -643,6 +643,7 @@ function updateContextActionsUI() {
   if ($("solo-back-wrap")) $("solo-back-wrap").style.display = inGroup ? "block" : "none";
   if ($("invite-btn")) $("invite-btn").style.display = inGroup ? "block" : "none";
   if ($("s-rst")) $("s-rst").style.display = inGroup ? "none" : "block";
+  if ($("danger-zone-title")) $("danger-zone-title").style.display = inGroup ? "none" : "block";
 }
 
 function switchToSoloProfile() {
