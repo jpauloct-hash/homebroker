@@ -655,38 +655,37 @@ function updateContextActionsUI() {
   if ($("danger-zone-title")) $("danger-zone-title").style.display = inGroup ? "none" : "block";
 }
 
-function leaveCurrentGroup() {
+function leaveGroupById(roomId) {
   var uid=getIdentityUid();
-  if(!uid||!currentRoomId||!fbDb)return Promise.resolve();
-  var roomId=currentRoomId;
-  var roomName=(currentRoomData&&currentRoomData.name)||roomId;
+  if(!uid||!roomId||!fbDb)return Promise.resolve();
+  var group=(myGroupsCache||[]).find(function(g){return g.roomId===roomId;});
+  var roomName=group?group.roomName:roomId;
   return Promise.all([
     fbDb.ref("rooms/"+roomId+"/members/"+uid).remove(),
     fbDb.ref("groupPortfolios/"+roomId+"/"+uid).remove(),
     fbDb.ref("groupHistory/"+roomId+"/"+uid).remove(),
     fbDb.ref("userRooms/"+uid+"/"+roomId).remove()
   ]).then(function(){
-    var profs=getProfiles().filter(function(p){
-      var m=getProfileMeta(p);
-      return!(m&&m.type==="group"&&m.roomId===roomId&&m.displayName===getIdentityName());
-    });
+    var profs=getProfiles().filter(function(p){var m=getProfileMeta(p);return!(m&&m.type==="group"&&m.roomId===roomId);});
     localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));
     Object.keys(localStorage).forEach(function(k){
       if(k.indexOf("hb_state_v3_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
       if(k.indexOf("hb_goal_v1_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
     });
-    if(currentUser)localStorage.removeItem("hb_active_room_"+currentUser.uid);
-    notif("Você saiu do grupo "+roomName);
-    return switchToSoloProfile();
+    if(currentUser&&currentRoomId===roomId)localStorage.removeItem("hb_active_room_"+currentUser.uid);
+    myGroupsCache=(myGroupsCache||[]).filter(function(g){return g.roomId!==roomId;});
+    if(currentRoomId===roomId){notif("Você saiu do grupo "+roomName);return switchToSoloProfile();}
+    notif("Você saiu do grupo "+roomName); renderGroupPanel();
   });
 }
 
-function deleteCurrentGroup() {
+function deleteGroupById(roomId) {
   var uid=getIdentityUid();
-  if(!uid||!currentRoomId||!fbDb||!currentRoomData)return Promise.resolve();
-  if(currentRoomData.createdBy!==uid){notif("Apenas o criador pode excluir o grupo","err");return Promise.resolve();}
-  var roomId=currentRoomId;
-  var roomName=currentRoomData.name||roomId;
+  if(!uid||!roomId||!fbDb)return Promise.resolve();
+  var group=(myGroupsCache||[]).find(function(g){return g.roomId===roomId;});
+  var roomName=group?group.roomName:roomId;
+  var createdBy=group?group.createdBy:"";
+  if(createdBy&&createdBy!==uid){notif("Apenas o criador pode excluir o grupo","err");return Promise.resolve();}
   return fbDb.ref("rooms/"+roomId).once("value").then(function(snap){
     var room=snap.val()||{};
     var members=room.members||{};
@@ -699,19 +698,27 @@ function deleteCurrentGroup() {
     updates["rooms/"+roomId]=null;
     return fbDb.ref().update(updates);
   }).then(function(){
-    var profs=getProfiles().filter(function(p){
-      var m=getProfileMeta(p);
-      return!(m&&m.type==="group"&&m.roomId===roomId);
-    });
+    var profs=getProfiles().filter(function(p){var m=getProfileMeta(p);return!(m&&m.type==="group"&&m.roomId===roomId);});
     localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));
     Object.keys(localStorage).forEach(function(k){
       if(k.indexOf("hb_state_v3_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
       if(k.indexOf("hb_goal_v1_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
     });
-    if(currentUser)localStorage.removeItem("hb_active_room_"+currentUser.uid);
-    notif("Grupo "+roomName+" excluído");
-    return switchToSoloProfile();
+    if(currentUser&&currentRoomId===roomId)localStorage.removeItem("hb_active_room_"+currentUser.uid);
+    myGroupsCache=(myGroupsCache||[]).filter(function(g){return g.roomId!==roomId;});
+    if(currentRoomId===roomId){notif("Grupo "+roomName+" excluído");return switchToSoloProfile();}
+    notif("Grupo "+roomName+" excluído"); renderGroupPanel();
   });
+}
+
+function leaveCurrentGroup() {
+  if(!currentRoomId)return Promise.resolve();
+  return leaveGroupById(currentRoomId);
+}
+
+function deleteCurrentGroup() {
+  if(!currentRoomId)return Promise.resolve();
+  return deleteGroupById(currentRoomId);
 }
 
 
@@ -1049,7 +1056,8 @@ function loadMyGroupsFromFirebase() {
         initialBal:Number(x.initialBal||100000),endDate:x.endDate||"",
         targetPct:Number(x.targetPct||0),
         memberName:x.memberName||getIdentityName(),
-        createdAt:Number(x.createdAt||0)};
+        createdAt:Number(x.createdAt||0),
+        createdBy:x.createdBy||""};
     });
     list.sort(function(a,b){return(b.createdAt||0)-(a.createdAt||0);});
     myGroupsCache=list;
@@ -1119,7 +1127,7 @@ function showCreateRoom() {
     }).then(function(){
       return fbDb.ref("userRooms/"+getIdentityUid()+"/"+roomId).set({
         roomName:n,initialBal:b,endDate:d,targetPct:t,
-        memberName:getIdentityName(),createdAt:Date.now()
+        memberName:getIdentityName(),createdAt:Date.now(),createdBy:getIdentityUid()
       });
     }).then(function(){
       return loadGroupPortfolioFromFirebase(roomId,pid);
@@ -1157,7 +1165,8 @@ function joinGroupAsGuest() {
       endDate:currentRoomData.endDate||"",
       targetPct:Number(currentRoomData.targetPct||0),
       memberName:name,
-      createdAt:Number(currentRoomData.createdAt||Date.now())
+      createdAt:Number(currentRoomData.createdAt||Date.now()),
+      createdBy:currentRoomData.createdBy||""
     }).catch(function(e){console.error("userRooms write failed:",e);});
     var profileId="grupo_"+currentRoomId+"_"+name;
     setProfileMeta(profileId,{profileId:profileId,displayName:name,type:"group",roomId:currentRoomId,roomName:currentRoomData.name||currentRoomId});
@@ -1301,8 +1310,9 @@ function renderSoloGroupList(groups) {
     return;
   }
   groups.forEach(function(group){
+    var isCreator=group.createdBy===getIdentityUid();
     var card=document.createElement("div");
-    card.style.cssText="background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px";
+    card.style.cssText="background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px;";
     card.innerHTML=
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
         '<div>'+
@@ -1311,19 +1321,28 @@ function renderSoloGroupList(groups) {
         '</div>'+
         '<div class="grp-pct" style="font-size:14px;font-weight:700;color:var(--tx3)">...</div>'+
       '</div>'+
-      '<div style="display:flex;justify-content:space-between;align-items:center">'+
-        '<div class="grp-meta" style="font-size:10px;color:var(--tx2)">Carregando...</div>'+
-        '<button style="padding:5px 12px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>'+
+      '<div class="grp-meta" style="font-size:10px;color:var(--tx2);margin-bottom:10px">Carregando...</div>'+
+      '<div style="display:flex;gap:6px">'+
+        '<button class="grp-open-btn" style="flex:1;padding:8px 10px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>'+
+        '<button class="grp-admin-btn" style="padding:8px 10px;background:transparent;border:1px solid '+(isCreator?'var(--r)':'#f59e0b')+';"+'+"border-radius:6px;color:"+(isCreator?'var(--r)':'#f59e0b')+';font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">'+(isCreator?'EXCLUIR':'SAIR')+'</button>'+
       '</div>';
-    (function(g,c){
-      c.querySelector("button").onclick=function(e){
-        e.stopPropagation();
+    (function(g,c,creator){
+      c.querySelector(".grp-open-btn").onclick=function(){
         currentRoomId=g.roomId;
-        currentRoomData={id:g.roomId,name:g.roomName,initialBal:g.initialBal,endDate:g.endDate,targetPct:g.targetPct};
+        currentRoomData={id:g.roomId,name:g.roomName,initialBal:g.initialBal,endDate:g.endDate,targetPct:g.targetPct,createdBy:g.createdBy||""};
         if(currentUser)localStorage.setItem("hb_active_room_"+currentUser.uid,g.roomId);
         var pid="grupo_"+g.roomId+"_"+(g.memberName||getIdentityName());
         setProfileMeta(pid,{profileId:pid,displayName:g.memberName||getIdentityName(),type:"group",roomId:g.roomId,roomName:g.roomName});
         switchToProfile(pid);
+      };
+      c.querySelector(".grp-admin-btn").onclick=function(){
+        if(creator){
+          if(!confirm("Deseja EXCLUIR o grupo "+g.roomName+" para todos?"))return;
+          deleteGroupById(g.roomId).catch(function(err){console.error(err);notif("Erro ao excluir grupo","err");});
+        } else {
+          if(!confirm("Deseja sair do grupo "+g.roomName+"?"))return;
+          leaveGroupById(g.roomId).catch(function(err){console.error(err);notif("Erro ao sair do grupo","err");});
+        }
       };
       loadGroupSummaryFromFirebase(g.roomId).then(function(s){
         if(!s)return;
@@ -1332,8 +1351,8 @@ function renderSoloGroupList(groups) {
         var medal=s.pos===1?"🥇":s.pos===2?"🥈":s.pos===3?"🥉":(s.pos?"#"+s.pos:"—");
         if(pctEl){pctEl.style.color=color;pctEl.textContent=(s.pct>=0?"+":"")+s.pct.toFixed(2)+"%";}
         if(metaEl){metaEl.textContent="R$ "+Number(s.total).toLocaleString("pt-BR",{minimumFractionDigits:2})+" · "+medal+" de "+s.totalMembers;}
-      }).catch(function(err){console.error("Erro resumo grupo:",err);});
-    })(group, card);
+      }).catch(function(){});
+    })(group,card,isCreator);
     el.appendChild(card);
   });
 }
