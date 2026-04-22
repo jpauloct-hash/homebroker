@@ -522,6 +522,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <button id="back-to-solo-btn" style="width:100%;padding:10px;border:1px solid var(--bl);border-radius:8px;background:transparent;color:var(--bl);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Voltar ao solo</button>
    </div>
    <button id="invite-btn" style="display:none;width:100%;padding:9px;margin-bottom:12px;border:none;border-radius:8px;background:#25d366;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📲 Convidar pelo WhatsApp</button>
+   <div id="group-leave-wrap" style="display:none;margin-bottom:8px">
+      <button id="leave-group-btn" style="width:100%;padding:11px;border:1px solid #f59e0b;border-radius:8px;background:transparent;color:#f59e0b;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">SAIR DO GRUPO</button>
+   </div>
+   <div id="group-delete-wrap" style="display:none;margin-bottom:8px">
+      <button id="delete-group-btn" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">EXCLUIR GRUPO</button>
+   </div>
    <div id="danger-zone-title" style="font-size:10px;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:10px">ZONA DE PERIGO</div>
       <button id="s-rst" style="width:100%;padding:11px;border:1px solid var(--r);border-radius:8px;background:transparent;color:var(--r);font-size:12px;font-weight:700;margin-bottom:8px">RESETAR SIMULADOR</button>
       <button id="logb" style="width:100%;padding:9px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Sair da conta</button>
@@ -640,11 +646,74 @@ function hideLegacyProfileUI() {
 
 function updateContextActionsUI() {
   var inGroup = isInGroupContext();
+  var isCreator = inGroup && currentRoomData && currentRoomData.createdBy === getIdentityUid();
   if ($("solo-back-wrap")) $("solo-back-wrap").style.display = inGroup ? "block" : "none";
   if ($("invite-btn")) $("invite-btn").style.display = inGroup ? "block" : "none";
+  if ($("group-leave-wrap")) $("group-leave-wrap").style.display = (inGroup && !isCreator) ? "block" : "none";
+  if ($("group-delete-wrap")) $("group-delete-wrap").style.display = (inGroup && isCreator) ? "block" : "none";
   if ($("s-rst")) $("s-rst").style.display = inGroup ? "none" : "block";
   if ($("danger-zone-title")) $("danger-zone-title").style.display = inGroup ? "none" : "block";
 }
+
+function leaveCurrentGroup() {
+  var uid=getIdentityUid();
+  if(!uid||!currentRoomId||!fbDb)return Promise.resolve();
+  var roomId=currentRoomId;
+  var roomName=(currentRoomData&&currentRoomData.name)||roomId;
+  return Promise.all([
+    fbDb.ref("rooms/"+roomId+"/members/"+uid).remove(),
+    fbDb.ref("groupPortfolios/"+roomId+"/"+uid).remove(),
+    fbDb.ref("groupHistory/"+roomId+"/"+uid).remove(),
+    fbDb.ref("userRooms/"+uid+"/"+roomId).remove()
+  ]).then(function(){
+    var profs=getProfiles().filter(function(p){
+      var m=getProfileMeta(p);
+      return!(m&&m.type==="group"&&m.roomId===roomId&&m.displayName===getIdentityName());
+    });
+    localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));
+    Object.keys(localStorage).forEach(function(k){
+      if(k.indexOf("hb_state_v3_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
+      if(k.indexOf("hb_goal_v1_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
+    });
+    if(currentUser)localStorage.removeItem("hb_active_room_"+currentUser.uid);
+    notif("Você saiu do grupo "+roomName);
+    return switchToSoloProfile();
+  });
+}
+
+function deleteCurrentGroup() {
+  var uid=getIdentityUid();
+  if(!uid||!currentRoomId||!fbDb||!currentRoomData)return Promise.resolve();
+  if(currentRoomData.createdBy!==uid){notif("Apenas o criador pode excluir o grupo","err");return Promise.resolve();}
+  var roomId=currentRoomId;
+  var roomName=currentRoomData.name||roomId;
+  return fbDb.ref("rooms/"+roomId).once("value").then(function(snap){
+    var room=snap.val()||{};
+    var members=room.members||{};
+    var updates={};
+    Object.keys(members).forEach(function(memberUid){
+      updates["userRooms/"+memberUid+"/"+roomId]=null;
+      updates["groupPortfolios/"+roomId+"/"+memberUid]=null;
+      updates["groupHistory/"+roomId+"/"+memberUid]=null;
+    });
+    updates["rooms/"+roomId]=null;
+    return fbDb.ref().update(updates);
+  }).then(function(){
+    var profs=getProfiles().filter(function(p){
+      var m=getProfileMeta(p);
+      return!(m&&m.type==="group"&&m.roomId===roomId);
+    });
+    localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));
+    Object.keys(localStorage).forEach(function(k){
+      if(k.indexOf("hb_state_v3_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
+      if(k.indexOf("hb_goal_v1_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
+    });
+    if(currentUser)localStorage.removeItem("hb_active_room_"+currentUser.uid);
+    notif("Grupo "+roomName+" excluído");
+    return switchToSoloProfile();
+  });
+}
+
 
 function switchToSoloProfile() {
   var soloId=ensureSoloProfile(); if(!soloId)return;
@@ -3447,6 +3516,18 @@ function initApp() {
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
   $("logb").onclick = function() { doAuthLogout(); };
+  if ($("leave-group-btn")) {
+    $("leave-group-btn").onclick = function() {
+      if (!confirm("Deseja sair deste grupo?")) return;
+      leaveCurrentGroup().catch(function(err){ console.error(err); notif("Erro ao sair do grupo","err"); });
+    };
+  }
+  if ($("delete-group-btn")) {
+    $("delete-group-btn").onclick = function() {
+      if (!confirm("Deseja EXCLUIR este grupo para todos os participantes?")) return;
+      deleteCurrentGroup().catch(function(err){ console.error(err); notif("Erro ao excluir grupo","err"); });
+    };
+  }
   if ($("back-to-solo-btn")) {
     $("back-to-solo-btn").onclick = function() { switchToSoloProfile(); $("sht").classList.remove("on"); };
   }
