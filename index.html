@@ -642,7 +642,6 @@ function updateContextActionsUI() {
   var inGroup = isInGroupContext();
   if ($("solo-back-wrap")) $("solo-back-wrap").style.display = inGroup ? "block" : "none";
   if ($("invite-btn")) $("invite-btn").style.display = inGroup ? "block" : "none";
-  if ($("s-rst")) $("s-rst").style.display = inGroup ? "none" : "block";
 }
 
 function switchToSoloProfile() {
@@ -1185,6 +1184,7 @@ function switchToProfile(profileId) {
 
 function renderGroupPanel() {
   clearSoloGroupSubscriptions();
+  updateContextActionsUI();
   var soloView=$("group-solo-view"), roomView=$("group-room-view"), noRoom=$("group-noroom");
   if(!soloView||!roomView||!noRoom)return;
 
@@ -3334,6 +3334,7 @@ function initApp() {
   $("theme-dark").onclick = function(){ applyTheme("dark"); };
   $("theme-light").onclick = function(){ applyTheme("light"); };
   $("cfgb").onclick=function() {
+    updateContextActionsUI();
     applyTheme(localStorage.getItem(LS_THEME)||"dark");
     $("tdsp").textContent=token.slice(0,8)+"..."+token.slice(-4); $("s-end").value=goal.endDate||""; $("s-tgt").value=goal.target||""; buildTapePicker(); $("sht").classList.add("on");
   };
@@ -3625,10 +3626,10 @@ function enterAppAfterAuth() {
     if(currentRoomId){
       return joinRoom(currentRoomId).then(function(room){currentRoomData=room;})
         .catch(function(){currentRoomId="";currentRoomData=null;})
-        .then(function(){initApp();});
+        .then(function(){initApp(); updateContextActionsUI();});
     }
 
-    initApp(); updateContextActionsUI();
+    initApp(); updateContextActionsUI(); updateContextActionsUI();
   }).catch(function(err){
     console.error("Erro ao carregar solo:",err);
     notif("Erro ao carregar carteira","err");
