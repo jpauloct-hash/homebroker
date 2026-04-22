@@ -642,6 +642,7 @@ function updateContextActionsUI() {
   var inGroup = isInGroupContext();
   if ($("solo-back-wrap")) $("solo-back-wrap").style.display = inGroup ? "block" : "none";
   if ($("invite-btn")) $("invite-btn").style.display = inGroup ? "block" : "none";
+  if ($("s-rst")) $("s-rst").style.display = inGroup ? "none" : "block";
 }
 
 function switchToSoloProfile() {
