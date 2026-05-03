@@ -1389,11 +1389,107 @@ function renderGroupRanking(members){
   }
 }
 
-function drawGroupChart(members){var canvas=document.getElementById("group-chart");if(!canvas)return;var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});if(!allPts.length)return;var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;list.forEach(function(m,ci){if(!m.history||m.history.length<2)return;ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});ctx2.stroke();});}
-(function(){var params=new URLSearchParams(window.location.search),room=params.get("room");if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}})();
+function drawGroupChart(members) {
+  var canvas=$("group-chart"), legendEl=$("group-legend");
+  if(!canvas)return;
+  var ctx=canvas.getContext("2d");
+  canvas.width=canvas.offsetWidth||320;
+  var W=canvas.width, H=160;
+  ctx.clearRect(0,0,W,H);
+  if(legendEl)legendEl.innerHTML="";
 
-//  Ativos:
-//  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
+  var list=Object.values(members||{});
+  var colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa","#22c55e","#f97316","#06b6d4"];
+
+  var allPts=[];
+  list.forEach(function(m){
+    if(Array.isArray(m.history)){
+      allPts=allPts.concat(m.history.map(function(p){return Number(p.v);}).filter(function(v){return!isNaN(v);}));
+    }
+  });
+  if(!allPts.length)return;
+
+  var minV=Math.min.apply(null,allPts), maxV=Math.max.apply(null,allPts);
+  if(minV===maxV){minV*=0.999;maxV*=1.001;}else{minV*=0.999;maxV*=1.001;}
+
+  var padL=8, padR=46, padY=8;
+  function getY(v){return H-padY-((Number(v)-minV)/(maxV-minV))*(H-padY*2);}
+
+  var labelSlots=[];
+  list.forEach(function(m,ci){
+    if(!Array.isArray(m.history)||m.history.length<2)return;
+    var color=colors[ci%colors.length];
+    var pts=m.history.slice().sort(function(a,b){return Number(a.t)-Number(b.t);});
+    ctx.beginPath();
+    pts.forEach(function(p,i){
+      var x=padL+(i/Math.max(pts.length-1,1))*(W-padL-padR);
+      var y=getY(p.v);
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+    var last=pts[pts.length-1];
+    var lastX=padL+((pts.length-1)/Math.max(pts.length-1,1))*(W-padL-padR);
+    var lastY=getY(last.v);
+    ctx.beginPath();ctx.arc(lastX,lastY,3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+    if(legendEl){
+      var item=document.createElement("div");
+      item.style.cssText="display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--bd);border-radius:999px;padding:4px 8px";
+      var sw=document.createElement("span");
+      sw.style.cssText="width:14px;height:2px;border-radius:2px;background:"+color+";display:inline-block";
+      var nm=document.createElement("span");
+      nm.style.cssText="color:var(--tx2);font-size:10px";
+      nm.textContent=m.name||("Participante "+(ci+1));
+      item.appendChild(sw);item.appendChild(nm);legendEl.appendChild(item);
+    }
+    var pct=Number(m.pct||0);
+    labelSlots.push({x:lastX+6,y:lastY,color:color,text:(pct>=0?"+":"")+pct.toFixed(2)+"%"});
+  });
+
+  labelSlots.sort(function(a,b){return a.y-b.y;});
+  for(var i=1;i<labelSlots.length;i++){
+    if(labelSlots[i].y-labelSlots[i-1].y<12)labelSlots[i].y=labelSlots[i-1].y+12;
+  }
+  ctx.font="10px monospace";ctx.textBaseline="middle";
+  labelSlots.forEach(function(lbl){
+    ctx.fillStyle=lbl.color;
+    ctx.fillText(lbl.text,lbl.x,Math.max(10,Math.min(H-10,lbl.y)));
+  });
+}
+
+function loadTapeTickers() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("hb_tape_v1") || "null");
+    if (Array.isArray(saved) && saved.length > 0) {
+      // Always ensure IBOV and USDBRL are first, remove duplicates
+      var filtered = saved.filter(function(t){ return PINNED_TICKERS.indexOf(t) === -1; });
+      return PINNED_TICKERS.concat(filtered);
+    }
+  } catch(e) {}
+  return ["IBOV","USDBRL","PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBJ3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3"];
+}
+var TAPE_TICKERS = loadTapeTickers();
+var DISPLAY_TICKERS = ["IBOV"].concat(TICKERS);
+var NAMES = {
+  "USDBRL":"Dolar Comercial (USD/BRL)",
+  "IBOV":"Ibovespa Index",
+  IBOV:"Ibovespa Index", PETR4:"Petrobras PN", VALE3:"Vale ON", ITUB4:"Itau Unibanco PN",
+  BBDC4:"Bradesco PN", BBAS3:"Banco do Brasil ON", ABEV3:"Ambev ON", WEGE3:"WEG ON",
+  RENT3:"Localiza ON", PRIO3:"PetroReconcavo ON", BERK34:"Berkshire BDR", B3SA3:"B3 ON",
+  EMBJ3:"Embraer ON", RADL3:"Raia Drogasil ON", SUZB3:"Suzano ON", VIVT3:"Telefonica Vivo ON",
+  EQTL3:"Equatorial ON", DOLA11:"Dolar ETF", RDOR3:"Rede DOr ON", UGPA3:"Ultrapar ON"
+};
+var TVSYM = {
+  "USDBRL":"USDBRL",
+  "IBOV":"BMFBOVESPA:IBOV",
+  IBOV:"BMFBOVESPA:IBOV", PETR4:"BMFBOVESPA:PETR4", VALE3:"BMFBOVESPA:VALE3",
+  ITUB4:"BMFBOVESPA:ITUB4", BBDC4:"BMFBOVESPA:BBDC4", BBAS3:"BMFBOVESPA:BBAS3",
+  ABEV3:"BMFBOVESPA:ABEV3", WEGE3:"BMFBOVESPA:WEGE3", RENT3:"BMFBOVESPA:RENT3",
+  PRIO3:"BMFBOVESPA:PRIO3", BERK34:"BMFBOVESPA:BERK34", B3SA3:"BMFBOVESPA:B3SA3",
+  EMBJ3:"BMFBOVESPA:EMBJ3", RADL3:"BMFBOVESPA:RADL3", SUZB3:"BMFBOVESPA:SUZB3",
+  VIVT3:"BMFBOVESPA:VIVT3", EQTL3:"BMFBOVESPA:EQTL3", DOLA11:"BMFBOVESPA:DOLA11",
+  RDOR3:"BMFBOVESPA:RDOR3", UGPA3:"BMFBOVESPA:UGPA3"
+};
+// Brapi endpoint  busca em lotes de 10 (limite PRO por req)
 var TICKERS = ["PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3","BERK34","B3SA3","EMBJ3","RADL3","SUZB3","VIVT3","EQTL3","DOLA11","RDOR3","UGPA3"];
 
 // Full universe available for tape customization
@@ -1464,6 +1560,12 @@ var TVSYM = {
   RDOR3:"BMFBOVESPA:RDOR3", UGPA3:"BMFBOVESPA:UGPA3"
 };
 // Brapi endpoint  busca em lotes de 10 (limite PRO por req)
+var TICKERS_A = TICKERS.slice(0, 10); // batch 1
+var TICKERS_B = TICKERS.slice(10);    // batch 2
+
+var BRAPI   = "https://brapi.dev/api";
+var REFRESH = 60; // 1 minuto
+
 var TICKERS_A = TICKERS.slice(0, 10); // batch 1
 var TICKERS_B = TICKERS.slice(10);    // batch 2
 
