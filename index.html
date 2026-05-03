@@ -2529,21 +2529,24 @@ function goToSellFromPortfolio(tk) {
   var pos=port[tk];
   if(!pos||!pos.qty){notif("Sem posição para vender em "+tk,"err");return;}
   sel=tk; side="sell"; qty=Number(pos.qty||0); orderMode="market";
-  document.querySelectorAll(".tab").forEach(function(b){
-    b.classList.toggle("on", b.dataset.t==="order");
-  });
+  // tabs
+  document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
+  var orderTab=document.querySelector('.tab[data-t="order"]');
+  if(orderTab)orderTab.classList.add("on");
+  // panels
   document.querySelectorAll(".panel").forEach(function(p){p.classList.remove("on");});
   if($("order-panel"))$("order-panel").classList.add("on");
   if($("pb"))$("pb").style.display="none";
-  if($("bsel"))$("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
-  if($("bbuy"))$("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);";
+  // buy/sell buttons
+  if($("bbuy")){$("bbuy").style.background="var(--bg3)";$("bbuy").style.color="var(--tx3)";$("bbuy").style.boxShadow="none";}
+  if($("bsel")){$("bsel").style.background="var(--r)";$("bsel").style.color="#fff";$("bsel").style.boxShadow="0 0 20px rgba(240,64,96,.35)";}
+  // market order
   if($("ot-mkt"))$("ot-mkt").classList.add("on");
   if($("ot-lmt"))$("ot-lmt").classList.remove("on");
   if($("lmt-wrap"))$("lmt-wrap").style.display="none";
   if($("lmt-price"))$("lmt-price").value="";
   if($("qinp"))$("qinp").value=qty;
   renderOrders();
-  var ct=$("ct");if(ct)ct.scrollTop=0;
   notif("Pronto para vender "+qty+" de "+tk);
 }
 
@@ -2573,7 +2576,7 @@ function renderPort() {
     sb2.style.cssText = "width:100%;padding:7px;background:rgba(240,64,96,.1);border:1px solid rgba(240,64,96,.35);border-radius:6px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px";
     sb2.textContent = "VENDER " + t;
     (function(tk, qty2){
-      sb2.onclick = function(){ goToSellFromPortfolio(tk); };
+      sb2.onclick = function(e){ e.preventDefault(); e.stopPropagation(); goToSellFromPortfolio(tk); };
     })(t, pos.qty);
     e.appendChild(sb2);
     l.appendChild(e);
