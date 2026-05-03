@@ -568,9 +568,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
 <div id="nf"></div>
 
-<script>
-// ── AUTH TAB TOGGLE ──────────────────────────────────────────
-function showAuthTab(tab) {
+<script>function showAuthTab(tab) {
   var isLogin = tab === "login";
   $("auth-login").style.display = isLogin ? "block" : "none";
   $("auth-register").style.display = isLogin ? "none" : "block";
@@ -2525,6 +2523,41 @@ function cancelPending(id) {
   saveState(); renderPending(); notif("Ordem cancelada");
 }
 
+function showSellableTickers() {
+  var box=$("ticker-results"), inp=$("ticker-search");
+  if(!box||!inp)return;
+  var owned=Object.keys(port||{}).filter(function(tk){return port[tk]&&Number(port[tk].qty||0)>0;});
+  box.innerHTML="";
+  if(!owned.length){
+    box.style.display="block";
+    box.innerHTML='<div class="ticker-result" style="color:var(--tx3);cursor:default">Nenhum ativo disponível para venda</div>';
+    return;
+  }
+  owned.forEach(function(tk){
+    var qtyOwned=Number((port[tk]&&port[tk].qty)||0);
+    var price=Number(prices[tk]||0);
+    var row=document.createElement("div");
+    row.className="ticker-result";
+    row.innerHTML=
+      '<div>'+
+        '<div style="color:var(--bl);font-weight:700;font-size:12px">'+tk+'</div>'+
+        '<div style="font-size:9px;color:var(--tx4)">Disponível: '+qtyOwned+' cotas</div>'+
+      '</div>'+
+      '<div style="text-align:right">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--tx)">'+(price?R(price):"—")+'</div>'+
+      '</div>';
+    row.onclick=function(){
+      sel=tk; qty=qtyOwned;
+      inp.value=tk;
+      box.style.display="none";
+      renderOrders();
+      notif("Selecionado para venda: "+tk);
+    };
+    box.appendChild(row);
+  });
+  box.style.display="block";
+}
+
 function goToSellFromPortfolio(tk) {
   var pos=port[tk];
   if(!pos||!pos.qty){notif("Sem posição para vender em "+tk,"err");return;}
@@ -3224,6 +3257,13 @@ function initTickerSearch() {
     });
     results.style.display = "block";
   });
+  input.onfocus = function() {
+    if (side === "sell") showSellableTickers();
+  };
+
+  input.onfocus = function() {
+    if (side === "sell") showSellableTickers();
+  };
 
   // Close results when tapping outside
   document.addEventListener("touchstart", function(e) {
@@ -3497,12 +3537,10 @@ function initApp() {
   $("ot-lmt").onclick=function() { orderMode="limit"; $("ot-lmt").classList.add("on"); $("ot-mkt").classList.remove("on"); $("lmt-wrap").style.display="block"; var p=prices[sel]; if(p&&!$("lmt-price").value) $("lmt-price").value=p.toFixed(2); updateExecBtn(); };
   $("lmt-price").oninput=function(){ renderOrders(); };
 
-  $("bbuy").onclick=function() { side="buy"; $("bbuy").style.cssText="background:var(--g);color:#fff;box-shadow:0 0 20px rgba(0,200,150,.35);"; $("bsel").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
-  $("bsel").onclick=function() { side="sell"; $("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);"; $("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
-
-  $("qinp").oninput=function(e){
-    qty=parseInt(e.target.value)||0;
-    if(qty<0) qty=0;
+  $("bbuy").onclick = function() {
+    side="buy"; qty=0;
+    if($("qinp"))$("qinp").value="";
+    if($("ticker-results"))$("ticker-results").style.display="none";
     renderOrders();
   };
   $("qclear").onclick=function(){
