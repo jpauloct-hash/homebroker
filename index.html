@@ -2525,6 +2525,28 @@ function cancelPending(id) {
   saveState(); renderPending(); notif("Ordem cancelada");
 }
 
+function goToSellFromPortfolio(tk) {
+  var pos=port[tk];
+  if(!pos||!pos.qty){notif("Sem posição para vender em "+tk,"err");return;}
+  sel=tk; side="sell"; qty=Number(pos.qty||0); orderMode="market";
+  document.querySelectorAll(".tab").forEach(function(b){
+    b.classList.toggle("on", b.dataset.t==="order");
+  });
+  document.querySelectorAll(".panel").forEach(function(p){p.classList.remove("on");});
+  if($("order-panel"))$("order-panel").classList.add("on");
+  if($("pb"))$("pb").style.display="none";
+  if($("bsel"))$("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
+  if($("bbuy"))$("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);";
+  if($("ot-mkt"))$("ot-mkt").classList.add("on");
+  if($("ot-lmt"))$("ot-lmt").classList.remove("on");
+  if($("lmt-wrap"))$("lmt-wrap").style.display="none";
+  if($("lmt-price"))$("lmt-price").value="";
+  if($("qinp"))$("qinp").value=qty;
+  renderOrders();
+  var ct=$("ct");if(ct)ct.scrollTop=0;
+  notif("Pronto para vender "+qty+" de "+tk);
+}
+
 function renderPort() {
   var pv=portValue(), pnl=bal+pv-100000;
   $("pbal").textContent=R(bal); $("ppv").textContent=R(pv);
