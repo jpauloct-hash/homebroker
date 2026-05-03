@@ -1066,27 +1066,13 @@ function loadMyGroupsFromFirebase() {
 function loadGroupSummaryFromFirebase(roomId) {
   var uid=getIdentityUid();
   if(!uid||!fbDb||!roomId)return Promise.resolve(null);
-  return Promise.all([
-    fbDb.ref("groupPortfolios/"+roomId+"/"+uid).once("value"),
-    fbDb.ref("rooms/"+roomId+"/members").once("value")
-  ]).then(function(results){
-    var portData=results[0].val()||null;
-    var members=results[1].val()||{};
-    if(!portData)return null;
-    var cash=Number(portData.cash||0);
-    var positions=portData.positions||{};
-    var totalPositions=0;
-    Object.keys(positions).forEach(function(k){
-      var p=positions[k]||{};
-      totalPositions+=Number(p.qty||0)*Number(p.avgPrice||0);
-    });
-    var total=cash+totalPositions;
-    var initialBal=Number(portData.initialBal||100000);
-    var pct=initialBal>0?((total-initialBal)/initialBal*100):0;
+  return fbDb.ref("rooms/"+roomId+"/members").once("value").then(function(snap){
+    var members=snap.val()||{};
+    var me=members[uid]||null;
+    if(!me)return null;
     var ranking=Object.values(members).sort(function(a,b){return Number(b.pct||0)-Number(a.pct||0);});
-    var myName=getIdentityName();
-    var myPos=ranking.findIndex(function(x){return(x.uid&&x.uid===uid)||(x.name===myName);});
-    return{total:total,pct:pct,pos:myPos>=0?myPos+1:null,totalMembers:ranking.length};
+    var myPos=ranking.findIndex(function(x){return x&&x.uid===uid;});
+    return{total:Number(me.total||0),pct:Number(me.pct||0),pos:myPos>=0?myPos+1:null,totalMembers:ranking.length};
   });
 }
 
