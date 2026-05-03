@@ -3538,11 +3538,26 @@ function initApp() {
   $("lmt-price").oninput=function(){ renderOrders(); };
 
   $("bbuy").onclick = function() {
-    side="buy"; qty=0;
-    if($("qinp"))$("qinp").value="";
-    if($("ticker-results"))$("ticker-results").style.display="none";
+    side = "buy"; qty = 0;
+    if ($("qinp")) $("qinp").value = "";
+    $("bbuy").style.cssText = "background:var(--g);color:#fff;box-shadow:0 0 20px rgba(0,200,150,.35);";
+    $("bsel").style.cssText = "background:var(--bg3);color:var(--tx3);";
+    if ($("ticker-results")) $("ticker-results").style.display = "none";
+    updateExecBtn();
     renderOrders();
   };
+  $("bsel").onclick = function() {
+    side = "sell";
+    qty = 0;
+    if ($("qinp")) $("qinp").value = "";
+    $("bsel").style.cssText = "background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
+    $("bbuy").style.cssText = "background:var(--bg3);color:var(--tx3);";
+    updateExecBtn();
+    renderOrders();
+    showSellableTickers();
+    if ($("ticker-search")) $("ticker-search").focus();
+  };
+
   $("qclear").onclick=function(){
     qty=0; $("qinp").value=""; $("qinp").focus(); renderOrders();
   };
