@@ -1961,6 +1961,33 @@ function fetchQ() {
 // 10:00-17:00 BRT   every 1 min  (prego aberto)
 // 17:00-19:00 BRT   every 5 min  (ps-fechamento)
 // 19:00-10:00 BRT   parado        (cotaes congeladas no fechamento)
+// ── MARKET BELLS ─────────────────────────────────────────────────────────────
+var marketOpenBell = new Audio("abertura_6_toques_extraida_alt.mp3");
+var marketCloseBell = new Audio("fechamento_3_toques_extraido.mp3");
+marketOpenBell.preload = "auto";
+marketCloseBell.preload = "auto";
+
+function getBellDayKey(prefix) {
+  var brt=getBRTDate();
+  var y=brt.getFullYear(), m=String(brt.getMonth()+1).padStart(2,"0"), d=String(brt.getDate()).padStart(2,"0");
+  return prefix+"_"+y+"-"+m+"-"+d;
+}
+
+function maybePlayMarketBells() {
+  if(!SFX_ENABLED)return;
+  var brt=getBRTDate(), dow=brt.getDay();
+  if(dow===0||dow===6)return;
+  var mins=brt.getHours()*60+brt.getMinutes();
+  var openKey=getBellDayKey("hb_bell_open");
+  var closeKey=getBellDayKey("hb_bell_close");
+  if(mins>=545&&!localStorage.getItem(openKey)){
+    try{marketOpenBell.currentTime=0;marketOpenBell.play().catch(function(){});localStorage.setItem(openKey,"1");}catch(e){}
+  }
+  if(mins>=1025&&!localStorage.getItem(closeKey)){
+    try{marketCloseBell.currentTime=0;marketCloseBell.play().catch(function(){});localStorage.setItem(closeKey,"1");}catch(e){}
+  }
+}
+
 function getRefreshInterval() {
   var brt = getBRTDate();
   var dow = brt.getDay();
@@ -1980,6 +2007,7 @@ function startRefresh() {
   var interval = getRefreshInterval();
   if (interval > 0) {
     cd = interval;
+    maybePlayMarketBells();
     fetchQ();
     rfi = setInterval(function() {
       var newInterval = getRefreshInterval();
@@ -1997,6 +2025,7 @@ function startRefresh() {
         cd = interval;
         rfi = setInterval(arguments.callee, interval*1000);
       }
+      maybePlayMarketBells();
       fetchQ();
     }, interval*1000);
   } else {
