@@ -1967,25 +1967,67 @@ var marketCloseBell = new Audio("fechamento_3_toques_extraido.mp3");
 marketOpenBell.preload = "auto";
 marketCloseBell.preload = "auto";
 
+var AUDIO_UNLOCKED = false;
+
 function getBellDayKey(prefix) {
-  var brt=getBRTDate();
-  var y=brt.getFullYear(), m=String(brt.getMonth()+1).padStart(2,"0"), d=String(brt.getDate()).padStart(2,"0");
-  return prefix+"_"+y+"-"+m+"-"+d;
+  var brt = getBRTDate();
+  var y = brt.getFullYear();
+  var m = String(brt.getMonth() + 1).padStart(2, "0");
+  var d = String(brt.getDate()).padStart(2, "0");
+  return prefix + "_" + y + "-" + m + "-" + d;
 }
 
+function unlockAudioOnce() {
+  if (AUDIO_UNLOCKED) return;
+  AUDIO_UNLOCKED = true;
+  try {
+    marketOpenBell.muted = true;
+    marketCloseBell.muted = true;
+    marketOpenBell.play().then(function() {
+      marketOpenBell.pause(); marketOpenBell.currentTime = 0; marketOpenBell.muted = false;
+    }).catch(function(){});
+    marketCloseBell.play().then(function() {
+      marketCloseBell.pause(); marketCloseBell.currentTime = 0; marketCloseBell.muted = false;
+    }).catch(function(){});
+  } catch(e) {}
+}
+
+document.addEventListener("click", unlockAudioOnce, { once: true });
+document.addEventListener("touchstart", unlockAudioOnce, { once: true });
+
 function maybePlayMarketBells() {
-  if(!SFX_ENABLED)return;
-  var brt=getBRTDate(), dow=brt.getDay();
-  if(dow===0||dow===6)return;
-  var mins=brt.getHours()*60+brt.getMinutes();
-  var openKey=getBellDayKey("hb_bell_open");
-  var closeKey=getBellDayKey("hb_bell_close");
-  if(mins>=545&&!localStorage.getItem(openKey)){
-    try{marketOpenBell.currentTime=0;marketOpenBell.play().catch(function(){});localStorage.setItem(openKey,"1");}catch(e){}
+  if (!SFX_ENABLED) return;
+  if (!AUDIO_UNLOCKED) return;
+  var brt = getBRTDate();
+  var dow = brt.getDay();
+  if (dow === 0 || dow === 6) return;
+  var mins = brt.getHours() * 60 + brt.getMinutes();
+  var openKey = getBellDayKey("hb_bell_open");
+  var closeKey = getBellDayKey("hb_bell_close");
+  if (mins >= 545 && !localStorage.getItem(openKey)) {
+    marketOpenBell.currentTime = 0;
+    marketOpenBell.play().then(function() {
+      localStorage.setItem(openKey, "1");
+    }).catch(function(err) {
+      console.warn("Falha sino abertura:", err);
+    });
   }
-  if(mins>=1025&&!localStorage.getItem(closeKey)){
-    try{marketCloseBell.currentTime=0;marketCloseBell.play().catch(function(){});localStorage.setItem(closeKey,"1");}catch(e){}
+  if (mins >= 1025 && !localStorage.getItem(closeKey)) {
+    marketCloseBell.currentTime = 0;
+    marketCloseBell.play().then(function() {
+      localStorage.setItem(closeKey, "1");
+    }).catch(function(err) {
+      console.warn("Falha sino fechamento:", err);
+    });
   }
+}
+
+function testCloseBell() {
+  unlockAudioOnce();
+  marketCloseBell.currentTime = 0;
+  marketCloseBell.play()
+    .then(function(){ notif("Sino de fechamento OK"); })
+    .catch(function(err){ console.warn("Teste do sino falhou:", err); notif("Falha ao tocar sino","err"); });
 }
 
 function getRefreshInterval() {
