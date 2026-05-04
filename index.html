@@ -2455,7 +2455,10 @@ function renderOrders() {
 
   // Update exec button text for after-hours
   var execEl=$("exec");
-  if (!open && !isIndex) {
+  if (qty <= 0) {
+    execEl.disabled=true; execEl.style.opacity="0.45"; execEl.textContent="INFORME A QUANTIDADE";
+  } else if (!open && !isIndex) {
+    execEl.disabled=false;
     if (side==="buy") {
       execEl.textContent=orderMode==="limit"?"AGENDAR COMPRA LIMITADA":"AGENDAR COMPRA";
     } else {
@@ -2463,8 +2466,7 @@ function renderOrders() {
     }
     execEl.style.opacity="0.75";
   } else {
-    updateExecBtn();
-    execEl.style.opacity="1";
+    execEl.disabled=false; updateExecBtn(); execEl.style.opacity="1";
   }
 
   // IBOV is index only
@@ -2716,6 +2718,8 @@ function doMarketOrder(tk, sd, q, isScheduled) {
 }
 
 function execOrder() {
+  qty = parseInt($("qinp").value, 10) || 0;
+  if (qty <= 0) { notif("Digite uma quantidade maior que zero","err"); $("qinp").focus(); return; }
   if (sel==="IBOV") { notif("IBOV e indice - nao e possivel operar","err"); return; }
   var p=prices[sel]; if (!p) { notif("Sem cotacao disponivel","err"); return; }
 
