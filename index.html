@@ -2329,10 +2329,17 @@ function drawEquityChart() {
   ctx.beginPath(); ctx.arc(lastX,lastY,3,0,Math.PI*2); ctx.fill();
 
   // Date labels
-  ctx.fillStyle="#2a5070"; ctx.font="8px 'JetBrains Mono',monospace"; ctx.textAlign="center";
-  var labelEvery = Math.max(1, Math.floor(equityHistory.length/5));
-  for (var m=0; m<equityHistory.length; m+=labelEvery) {
-    ctx.fillText(equityHistory[m].d, py(m), H-5);
+  ctx.fillStyle="#5a7a9a"; ctx.font="9px 'JetBrains Mono',monospace"; ctx.textAlign="center"; ctx.textBaseline="top";
+  var labelCount=Math.min(6,equityHistory.length);
+  for(var li=0;li<labelCount;li++){
+    var lidx=Math.round(li*(equityHistory.length-1)/Math.max(labelCount-1,1));
+    var lpt=equityHistory[lidx];
+    if(!lpt||!lpt.t)continue;
+    var ld=new Date(Number(lpt.t));
+    if(isNaN(ld.getTime()))continue;
+    var llabel=ld.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+    var lx=PAD_L+(lidx/Math.max(equityHistory.length-1,1))*CW;
+    ctx.fillText(llabel,lx,PAD_T+CH+6);
   }
 }
 
