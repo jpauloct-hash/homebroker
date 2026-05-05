@@ -2004,7 +2004,7 @@ function maybePlayMarketBells() {
   var mins = brt.getHours() * 60 + brt.getMinutes();
   var openKey = getBellDayKey("hb_bell_open");
   var closeKey = getBellDayKey("hb_bell_close");
-  if (mins >= 545 && !localStorage.getItem(openKey)) {
+  if (mins >= 605 && !localStorage.getItem(openKey)) {
     marketOpenBell.currentTime = 0;
     marketOpenBell.play().then(function() {
       localStorage.setItem(openKey, "1");
