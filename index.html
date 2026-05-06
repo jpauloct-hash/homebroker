@@ -2047,6 +2047,7 @@ function isMarketDataActive() {
 function startRefresh() {
   clearInterval(cdi);
   clearInterval(rfi);
+  rfi = null;
 
   var interval = getRefreshInterval();
 
