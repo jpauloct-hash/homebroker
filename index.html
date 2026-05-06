@@ -2045,67 +2045,51 @@ function isMarketDataActive() {
 }
 
 function startRefresh() {
-  clearInterval(cdi); clearInterval(rfi);
+  clearInterval(cdi);
+  clearInterval(rfi);
+
   var interval = getRefreshInterval();
-  if (interval > 0) {
+
+  function beginActiveRefresh(newInterval) {
+    clearInterval(rfi);
+    interval = newInterval;
     cd = interval;
     maybePlayMarketBells();
     fetchQ();
     rfi = setInterval(function() {
-      var newInterval = getRefreshInterval();
-      if (newInterval === 0) {
-        // Entered quiet hours  stop fetching, freeze prices
-        clearInterval(rfi);
+      var iv = getRefreshInterval();
+      if (iv === 0) {
+        clearInterval(rfi); rfi = null;
         setSts("frozen");
         $("hupd").textContent = "Fechamento: " + new Date().toLocaleTimeString("pt-BR");
         return;
       }
-      // Interval may have changed (e.g. prego -> ps)
-      if (newInterval !== interval) {
-        clearInterval(rfi);
-        interval = newInterval;
-        cd = interval;
-        rfi = setInterval(arguments.callee, interval*1000);
-      }
+      if (iv !== interval) { beginActiveRefresh(iv); return; }
       maybePlayMarketBells();
       fetchQ();
-    }, interval*1000);
-  } else {
-    // Frozen hours - fetch closing prices once then freeze
-    setSts("frozen");
-    setTimeout(function(){
-      var iv2 = getRefreshInterval();
-      if (iv2 === 0) {
-        // Still frozen - try to get last known prices
-        var urlA = BRAPI+"/quote/"+TICKERS_A.join(",")+
-          "?fundamental=false&token="+token;
-        fetch(urlA).then(function(r){ return r.json(); })
-          .then(function(data){
-            if(data && data.results) {
-              data.results.forEach(function(q){
-                if(q.symbol && q.regularMarketPrice)
-                  prices[q.symbol]=q.regularMarketPrice;
-              });
-              render();
-            }
-          }).catch(function(){}).finally(function(){
-            setSts("frozen");
-          });
-      }
-    }, 500);
+    }, interval * 1000);
   }
-  cdi = setInterval(function(){
+
+  if (interval > 0) {
+    beginActiveRefresh(interval);
+  } else {
+    setSts("frozen");
+  }
+
+  cdi = setInterval(function() {
     var iv = getRefreshInterval();
+    if (iv > 0 && !rfi) {
+      beginActiveRefresh(iv);
+    }
     if (iv === 0) {
       $("hcd").textContent = "";
     } else {
-      cd = cd<=1 ? iv : cd-1;
-      $("hcd").textContent = "Prox.: "+CD(cd);
+      cd = cd <= 1 ? iv : cd - 1;
+      $("hcd").textContent = "Prox.: " + CD(cd);
     }
   }, 1000);
 }
 
-//  Prego B3: 10:00-17:00 BRT, segsex 
 function getBRTDate() {
   // Returns a Date object in BRT (UTC-3)
   var now = new Date();
