@@ -1619,7 +1619,7 @@ var LS_GOAL   = "hb_goal_v1";
 var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
 
 //  State 
-var token = "TOKEN_BRAPI_AQUI"; // token centralizado Brapi
+var token = "7fzZFBceKppCEPxfSrXswz"; // token centralizado Brapi
 
 function loadState() { return loadStateForProfile(); }
 function saveState() {
@@ -1807,74 +1807,96 @@ function setSts(s) {
 
 function fetchQ() {
   setSts("loading");
-  var urlA    = BRAPI+"/quote/"+TICKERS_A.join(",")+"?fundamental=false&token="+token;
-  var urlB    = BRAPI+"/quote/"+TICKERS_B.join(",")+"?fundamental=false&token="+token;
-  var urlIbov   = BRAPI+"/quote/%5EBVSP?fundamental=false&token="+token;
-  var urlUsdBrl = BRAPI+"/quote/USDBRL=X?fundamental=false&token="+token;
 
-  Promise.all([
-    fetch(urlA).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
-    fetch(urlB).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
-    fetch(urlIbov).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
-    fetch(urlUsdBrl).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+  var urlA      = BRAPI + "/quote/" + TICKERS_A.join(",") + "?fundamental=false&token=" + token;
+  var urlB      = BRAPI + "/quote/" + TICKERS_B.join(",") + "?fundamental=false&token=" + token;
+  var urlIbov   = BRAPI + "/quote/%5EBVSP?fundamental=false&token=" + token;
+  var urlUsdBrl = BRAPI + "/quote/USDBRL=X?fundamental=false&token=" + token;
+
+  function fetchJson(url, label) {
+    return fetch(url).then(function(r) {
+      if (!r.ok) throw new Error(label + " HTTP " + r.status);
+      return r.json();
+    }).then(function(data) {
+      if (data && data.error) throw new Error(label + ": " + (data.message || "erro Brapi"));
+      return data;
+    });
+  }
+
+  Promise.allSettled([
+    fetchJson(urlA, "Lote A"),
+    fetchJson(urlB, "Lote B"),
+    fetchJson(urlIbov, "IBOV"),
+    fetchJson(urlUsdBrl, "USDBRL")
   ]).then(function(results) {
-    var dA = results[0], dB = results[1], dI = results[2], dU = results[3];
-    if (dA.error) throw new Error(dA.message||"Erro Brapi A");
-    if (dB.error) throw new Error(dB.message||"Erro Brapi B");
+    var okCount = 0;
 
-    function proc(q) {
-      prices[q.symbol] = q.regularMarketPrice;
-      chg[q.symbol]    = q.regularMarketChange || 0;
-      pct[q.symbol]    = q.regularMarketChangePercent || 0;
-    }
-    dA.results.forEach(proc);
-    dB.results.forEach(proc);
-    if (!dI.error && dI.results && dI.results.length) {
-      var ibov = dI.results[0];
-      prices["IBOV"] = ibov.regularMarketPrice;
-      chg["IBOV"]    = ibov.regularMarketChange || 0;
-      pct["IBOV"]    = ibov.regularMarketChangePercent || 0;
-    }
-    if (dU && !dU.error && dU.results && dU.results.length) {
-      var usd = dU.results[0];
-      prices["USDBRL"] = usd.regularMarketPrice;
-      chg["USDBRL"]    = usd.regularMarketChange || 0;
-      pct["USDBRL"]    = usd.regularMarketChangePercent || 0;
+    function applyBatch(data) {
+      if (!data || !data.results) return;
+      data.results.forEach(function(q) {
+        if (!q || !q.symbol) return;
+        if (typeof q.regularMarketPrice !== "undefined") prices[q.symbol] = q.regularMarketPrice;
+        if (typeof q.regularMarketChange !== "undefined") chg[q.symbol] = q.regularMarketChange;
+        if (typeof q.regularMarketChangePercent !== "undefined") pct[q.symbol] = q.regularMarketChangePercent;
+      });
+      okCount++;
     }
 
-    setSts("ok");
-    $("hupd").textContent = "Atualizado: "+new Date().toLocaleTimeString("pt-BR");
-    cd = REFRESH;
+    if (results[0].status === "fulfilled") applyBatch(results[0].value);
+    else console.error("Falha lote A:", results[0].reason);
 
-    // Registra ponto no histrico de patrimnio
-    var pv = portValue();
-    var te = bal + pv;
-    var now = new Date();
-    equityHistory.push({ t: now.getTime(), v: te, d: now.toLocaleDateString("pt-BR") });
-    saveEquityHistory();
+    if (results[1].status === "fulfilled") applyBatch(results[1].value);
+    else console.error("Falha lote B:", results[1].reason);
 
-    // Checa dividendos, ordens e prego
-    checkScheduledOrders();
-    checkDividends();
-    checkPending();
-    render();
-  }).catch(function(e) {
-    var msg = e.message || "Erro de rede";
-    // Check if we're in frozen hours - don't show error, just freeze
-    var iv = getRefreshInterval();
-    if (iv === 0) {
-      setSts("frozen");
-      return;
+    if (results[2].status === "fulfilled") {
+      var ibov = results[2].value;
+      if (ibov && ibov.results && ibov.results.length) {
+        var ib = ibov.results[0];
+        if (ib.regularMarketPrice) prices["IBOV"] = ib.regularMarketPrice;
+        if (ib.regularMarketChange !== undefined) chg["IBOV"] = ib.regularMarketChange;
+        if (ib.regularMarketChangePercent !== undefined) pct["IBOV"] = ib.regularMarketChangePercent;
+        okCount++;
+      }
+    } else console.error("Falha IBOV:", results[2].reason);
+
+    if (results[3].status === "fulfilled") {
+      var usd = results[3].value;
+      if (usd && usd.results && usd.results.length) {
+        var us = usd.results[0];
+        if (us.regularMarketPrice) prices["USDBRL"] = us.regularMarketPrice;
+        if (us.regularMarketChange !== undefined) chg["USDBRL"] = us.regularMarketChange;
+        if (us.regularMarketChangePercent !== undefined) pct["USDBRL"] = us.regularMarketChangePercent;
+        okCount++;
+      }
+    } else console.error("Falha USDBRL:", results[3].reason);
+
+    if (okCount > 0) {
+      $("hupd").textContent = "Atualizado: " + new Date().toLocaleTimeString("pt-BR");
+      cd = REFRESH;
+      setSts("ok");
+
+      // Registra ponto no histórico de patrimônio
+      var pv = portValue();
+      var te = bal + pv;
+      var now = new Date();
+      equityHistory.push({ t: now.getTime(), v: te });
+      saveEquityHistory();
+
+      checkScheduledOrders();
+      checkDividends();
+      checkPending();
+      render();
+    } else {
+      setSts("err");
+      $("hupd").textContent = "Falha na atualização";
     }
+  }).catch(function(err) {
+    console.error("Erro geral fetchQ:", err);
     setSts("err");
     $("hupd").textContent = "Falha na atualização";
   });
 }
 
-//  Smart refresh: adapts to market hours 
-// 10:00-17:00 BRT   every 1 min  (prego aberto)
-// 17:00-19:00 BRT   every 5 min  (ps-fechamento)
-// 19:00-10:00 BRT   parado        (cotaes congeladas no fechamento)
 function getRefreshInterval() {
   var brt = getBRTDate();
   var dow = brt.getDay();
