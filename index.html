@@ -2489,7 +2489,10 @@ function showSellableTickers() {
     var price=Number(prices[tk]||0);
     var row=document.createElement("div");
     row.className="ticker-result";
-    row.innerHTML='<div><div style="color:var(--bl);font-weight:700;font-size:12px">'+tk+'</div><div style="font-size:9px;color:var(--tx4)">Disponível: '+qtyOwned+' cotas</div></div><div style="text-align:right"><div style="font-size:11px;font-weight:700;color:var(--tx)">'+( price?R(price):"—")+'</div></div>';
+    row.innerHTML=
+      '<div><div style="color:var(--bl);font-weight:700;font-size:12px">'+tk+'</div>' +
+      '<div style="font-size:9px;color:var(--tx4)">Disponível: '+qtyOwned+' cotas</div></div>' +
+      '<div style="text-align:right"><div style="font-size:11px;font-weight:700;color:var(--tx)">'+(price?R(price):"—")+'</div></div>';
     row.onclick=function(){
       sel=tk; qty=qtyOwned; inp.value=tk;
       box.style.display="none";
@@ -3151,63 +3154,90 @@ function initNewsTape() {
 function initTickerSearch() {
   var input = $("ticker-search");
   var results = $("ticker-results");
-  if (!input) return;
+  if (!input || !results) return;
 
   input.addEventListener("input", function() {
     var q = input.value.trim().toUpperCase();
     results.innerHTML = "";
-    if (q.length < 1) { results.style.display="none"; return; }
 
-    var matches = DISPLAY_TICKERS.filter(function(t) {
-      return t.indexOf(q) === 0 || NAMES[t].toUpperCase().indexOf(q) >= 0;
-    }).slice(0, 6);
+    if (side === "sell" && q.length < 1) {
+      showSellableTickers();
+      return;
+    }
 
-    if (!matches.length) { results.style.display="none"; return; }
+    if (q.length < 1) {
+      results.style.display = "none";
+      return;
+    }
+
+    var sourceList = side === "sell"
+      ? Object.keys(port || {}).filter(function(t) {
+          return port[t] && Number(port[t].qty || 0) > 0;
+        })
+      : DISPLAY_TICKERS;
+
+    var matches = sourceList.filter(function(t) {
+      return t.indexOf(q) === 0 || (NAMES[t] && NAMES[t].toUpperCase().indexOf(q) >= 0);
+    }).slice(0, 8);
+
+    if (!matches.length) {
+      if (side === "sell" && q.length < 1) { showSellableTickers(); }
+      else { results.style.display = "none"; }
+      return;
+    }
 
     matches.forEach(function(t) {
-      var p = prices[t] || 0;
-      var c = pct[t] || 0;
+      var qtyOwned = Number((port[t] && port[t].qty) || 0);
+      var p = Number(prices[t] || 0);
+      var c = Number(pct[t] || 0);
       var el = document.createElement("div");
       el.className = "ticker-result";
-      el.innerHTML =
-        '<div>' +
-          '<span style="color:var(--bl);font-weight:700;font-size:13px;letter-spacing:1px">' + t + '</span>' +
-          '<span style="color:var(--tx4);font-size:10px;margin-left:8px">' + NAMES[t] + '</span>' +
-        '</div>' +
-        '<div style="text-align:right">' +
-          '<div style="font-weight:700;font-size:12px;color:' + (p>0?(c>=0?"var(--g)":"var(--r)"):"var(--tx3)") + '">' + (p>0?fr(p):"--") + '</div>' +
-          (p>0?'<div style="font-size:9px;color:' + (c>=0?"var(--g)":"var(--r)") + '">' + (c>=0?"+":"") + c.toFixed(2) + '%</div>':'') +
-        '</div>';
-      el.onclick = function() {
-        sel = t;
-        input.value = "";
-        results.style.display = "none";
-        render();
-        loadTV();
-        // Switch to order tab if not already there
-        document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
-        document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("on"); });
-        $("order-panel").classList.add("on");
-        document.querySelector(".tab[data-t='order']").classList.add("on");
-        $("pb").style.display = "none";
-      };
+
+      if (side === "sell") {
+        el.innerHTML =
+          '<div><div style="color:var(--bl);font-weight:700;font-size:12px;letter-spacing:1px">'+t+'</div>' +
+          '<div style="font-size:9px;color:var(--tx4)">Disponível: '+qtyOwned+' cotas</div></div>' +
+          '<div style="text-align:right"><div style="font-weight:700;font-size:11px;color:var(--tx)">'+(p>0?R(p):"--")+'</div></div>';
+        el.onclick = function() {
+          sel=t; qty=qtyOwned; input.value=t;
+          results.style.display="none";
+          if($("qinp"))$("qinp").value=qtyOwned;
+          renderOrders(); notif("Selecionado para venda: "+t);
+        };
+      } else {
+        el.innerHTML =
+          '<div><span style="color:var(--bl);font-weight:700;font-size:13px;letter-spacing:1px">'+t+'</span>' +
+          '<span style="color:var(--tx4);font-size:10px;margin-left:8px">'+(NAMES[t]||"")+'</span></div>' +
+          '<div style="text-align:right">' +
+          '<div style="font-weight:700;font-size:12px;color:'+(p>0?(c>=0?"var(--g)":"var(--r)"):"var(--tx3)")+'">'+(p>0?fr(p):"--")+'</div>' +
+          (p>0?'<div style="font-size:9px;color:'+(c>=0?"var(--g)":"var(--r)") + '">'+(c>=0?"+":"")+c.toFixed(2)+'%</div>':"")+
+          '</div>';
+        el.onclick = function() {
+          sel=t; input.value=""; results.style.display="none";
+          render(); loadTV();
+          document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
+          document.querySelectorAll(".panel").forEach(function(pn){pn.classList.remove("on");});
+          $("order-panel").classList.add("on");
+          document.querySelector(".tab[data-t='order']").classList.add("on");
+        };
+      }
       results.appendChild(el);
     });
     results.style.display = "block";
   });
 
-  // Close results when tapping outside
+  input.onfocus = function() {
+    if (side === "sell") showSellableTickers();
+  };
+
   document.addEventListener("touchstart", function(e) {
     if (!input.contains(e.target) && !results.contains(e.target)) {
       results.style.display = "none";
     }
-  }, {passive:true});
+  }, { passive: true });
 
-  // Auto uppercase
   input.addEventListener("keydown", function(e) {
-    if (e.key === "Enter" && results.children.length > 0) {
-      results.children[0].click();
-    }
+    if (e.key === "Enter" && results.children.length > 0) results.children[0].click();
   });
 }
 
