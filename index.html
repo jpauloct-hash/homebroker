@@ -58,11 +58,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 #tks-wrap{overflow:hidden;background:var(--bg2);border-bottom:1px solid var(--bd);flex-shrink:0;cursor:grab;user-select:none;-webkit-user-select:none;position:relative;}
 #tks-wrap:active{cursor:grabbing;}
 #tks{display:flex;gap:7px;padding:9px 14px;width:max-content;will-change:transform;}
-.tk{flex-shrink:0;background:transparent;border:1px solid var(--bd);border-radius:8px;padding:7px 11px;min-width:82px;text-align:center;transition:border-color .15s,background .15s;}
+.tk{flex-shrink:0;background:transparent;border:1px solid var(--bd);border-radius:8px;padding:8px 11px;min-width:82px;text-align:center;transition:border-color .15s,background .15s;}
 .tk.on{background:#0d2040;border-color:#1e4a80;}
 .tks{font-size:11px;font-weight:700;color:var(--tx2);}
 .tk.on .tks{color:var(--bl);}
 .tkp{font-size:13px;font-weight:700;color:var(--tx);}
+.tkv{font-size:14px;font-weight:700;line-height:1.1;}
 .tk.on .tkp{color:var(--tx);}
 #sb{padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 #tbr{background:var(--bg2);border-bottom:1px solid var(--bd);flex-shrink:0;position:relative;z-index:20;}
@@ -875,16 +876,11 @@ function getSoloHistoryRef() {
 }
 
 function normalizeEquityHistory(points) {
-  if (!Array.isArray(points)) return [];
-  return points.map(function(p) {
-    if (!p) return null;
-    var ts=getEquityPointTimestamp(p);
-    var val=typeof p.v!=="undefined"?Number(p.v):
-            typeof p.value!=="undefined"?Number(p.value):
-            typeof p.total!=="undefined"?Number(p.total):NaN;
-    if (isNaN(ts)||isNaN(val)) return null;
-    return {t:ts,v:val};
-  }).filter(function(p){return !!p;})
+  if(!Array.isArray(points))return[];
+  return points
+    .filter(function(p){return p&&typeof p.t!=="undefined"&&typeof p.v!=="undefined";})
+    .map(function(p){return{t:Number(p.t),v:Number(p.v)};})
+    .filter(function(p){return!isNaN(p.t)&&!isNaN(p.v);})
     .sort(function(a,b){return a.t-b.t;});
 }
 
@@ -1902,60 +1898,6 @@ function fetchQ() {
   });
 }
 
-// ── MARKET BELLS ─────────────────────────────────────────────────────────────
-var marketOpenBell = new Audio("abertura_6_toques_extraida_alt.mp3");
-var marketCloseBell = new Audio("fechamento_3_toques_extraido.mp3");
-marketOpenBell.preload = "auto";
-marketCloseBell.preload = "auto";
-
-var AUDIO_UNLOCKED = false;
-
-function getBellDayKey(prefix) {
-  var brt = getBRTDate();
-  var y = brt.getFullYear();
-  var m = String(brt.getMonth() + 1).padStart(2, "0");
-  var d = String(brt.getDate()).padStart(2, "0");
-  return prefix + "_" + y + "-" + m + "-" + d;
-}
-
-function unlockAudioOnce() {
-  if (AUDIO_UNLOCKED) return;
-  AUDIO_UNLOCKED = true;
-  try {
-    marketOpenBell.muted = true; marketCloseBell.muted = true;
-    marketOpenBell.play().then(function() { marketOpenBell.pause(); marketOpenBell.currentTime=0; marketOpenBell.muted=false; }).catch(function(){});
-    marketCloseBell.play().then(function() { marketCloseBell.pause(); marketCloseBell.currentTime=0; marketCloseBell.muted=false; }).catch(function(){});
-  } catch(e) {}
-}
-document.addEventListener("click", unlockAudioOnce, { once: true });
-document.addEventListener("touchstart", unlockAudioOnce, { once: true });
-
-function maybePlayMarketBells() {
-  if (!SFX_ENABLED) return;
-  if (!AUDIO_UNLOCKED) return;
-  var brt = getBRTDate(), dow = brt.getDay();
-  if (dow === 0 || dow === 6) return;
-  var mins = brt.getHours() * 60 + brt.getMinutes();
-  var openKey = getBellDayKey("hb_bell_open");
-  var closeKey = getBellDayKey("hb_bell_close");
-  // abertura simbólica do app às 10:05
-  if (mins >= 605 && !localStorage.getItem(openKey)) {
-    marketOpenBell.currentTime = 0;
-    marketOpenBell.play().then(function() { localStorage.setItem(openKey, "1"); }).catch(function(err) { console.warn("Falha sino abertura:", err); });
-  }
-  // fechamento simbólico do app às 17:05
-  if (mins >= 1025 && !localStorage.getItem(closeKey)) {
-    marketCloseBell.currentTime = 0;
-    marketCloseBell.play().then(function() { localStorage.setItem(closeKey, "1"); }).catch(function(err) { console.warn("Falha sino fechamento:", err); });
-  }
-}
-
-function testCloseBell() {
-  unlockAudioOnce();
-  marketCloseBell.currentTime = 0;
-  marketCloseBell.play().then(function(){ notif("Sino de fechamento OK"); }).catch(function(err){ console.warn("Teste falhou:", err); notif("Falha ao tocar sino","err"); });
-}
-
 function getRefreshInterval() {
   var brt = getBRTDate();
   var dow = brt.getDay();
@@ -1982,7 +1924,6 @@ function startRefresh() {
     interval = newInterval;
     cd = interval;
 
-    maybePlayMarketBells();
     fetchQ();
 
     rfi = setInterval(function() {
@@ -2001,7 +1942,6 @@ function startRefresh() {
         return;
       }
 
-      maybePlayMarketBells();
       fetchQ();
     }, interval * 1000);
   }
@@ -2238,23 +2178,6 @@ function checkPending() {
 }
 
 //  Equity Canvas Chart 
-function getEquityPointTimestamp(p) {
-  if (!p) return NaN;
-  if (typeof p.t !== "undefined" && !isNaN(Number(p.t))) return Number(p.t);
-  if (typeof p.ts !== "undefined" && !isNaN(Number(p.ts))) return Number(p.ts);
-  if (typeof p.time !== "undefined" && !isNaN(Number(p.time))) return Number(p.time);
-  if (p.date) { var d1=new Date(p.date); if (!isNaN(d1.getTime())) return d1.getTime(); }
-  if (p.dt) { var d2=new Date(p.dt); if (!isNaN(d2.getTime())) return d2.getTime(); }
-  return NaN;
-}
-
-function formatEquityLabel(p) {
-  var ts=getEquityPointTimestamp(p);
-  if (isNaN(ts)) return "";
-  var d=new Date(ts);
-  return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
-}
-
 function drawEquityChart() {
   var canvas = $("equity-chart");
   if (!canvas) return;
@@ -2339,21 +2262,12 @@ function drawEquityChart() {
   ctx.beginPath(); ctx.arc(lastX,lastY,3,0,Math.PI*2); ctx.fill();
 
   // Date labels
-  ctx.fillStyle = "#5a7a9a";
-  ctx.font = "9px 'JetBrains Mono', monospace";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  var labelCount = Math.min(6, equityHistory.length);
-  for (var li = 0; li < labelCount; li++) {
-    var lidx = Math.round(li * (equityHistory.length - 1) / Math.max(labelCount - 1, 1));
-    var lpt = equityHistory[lidx];
-    var llabel = formatEquityLabel(lpt);
-    if (!llabel) continue;
-    var lx = PAD_L + (lidx / Math.max(equityHistory.length - 1, 1)) * CW;
-    ctx.fillText(llabel, lx, PAD_T + CH + 6);
+  ctx.fillStyle="#2a5070"; ctx.font="8px 'JetBrains Mono',monospace"; ctx.textAlign="center";
+  var labelEvery = Math.max(1, Math.floor(equityHistory.length/5));
+  for (var m=0; m<equityHistory.length; m+=labelEvery) {
+    ctx.fillText(equityHistory[m].d, py(m), H-5);
   }
 }
-
 
 //  Render helpers 
 function portValue() {
@@ -2386,7 +2300,7 @@ function makeTkBtn(t) {
   b.className="tk"+(on?" on":"");
   b.dataset.sym=t;
   b.innerHTML='<div class="tks">'+t+'</div><div class="tkp">'+(p>0?fr(p):"...")+
-    '</div><div style="font-size:9px;font-weight:600;color:'+(c>=0?"var(--g)":"var(--r)")+'">'+(c>=0?"+":"")+c.toFixed(2)+'%</div>';
+    '</div><div class="tkv" style="color:'+(c>=0?"var(--g)":"var(--r)")+'">'+(c>=0?"+":"")+c.toFixed(2)+'%</div>';
   b.onclick=function(){ sel=t; render(); loadTV(); };
   return b;
 }
@@ -2528,51 +2442,6 @@ function cancelPending(id) {
   saveState(); renderPending(); notif("Ordem cancelada");
 }
 
-function goToSellFromPortfolio(tk) {
-  var pos=port[tk];
-  if(!pos||!pos.qty){notif("Sem posição para vender em "+tk,"err");return;}
-  sel=tk; side="sell"; qty=Number(pos.qty||0); orderMode="market";
-  document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
-  var orderTab=document.querySelector(".tab[data-t='order']");
-  if(orderTab)orderTab.classList.add("on");
-  document.querySelectorAll(".panel").forEach(function(p){p.classList.remove("on");});
-  if($("order-panel"))$("order-panel").classList.add("on");
-  if($("bbuy"))$("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);";
-  if($("bsel"))$("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
-  if($("ot-mkt"))$("ot-mkt").classList.add("on");
-  if($("ot-lmt"))$("ot-lmt").classList.remove("on");
-  if($("lmt-wrap"))$("lmt-wrap").style.display="none";
-  if($("lmt-price"))$("lmt-price").value="";
-  if($("qinp"))$("qinp").value=qty;
-  renderOrders();
-}
-
-function showSellableTickers() {
-  var box=$("ticker-results"), inp=$("ticker-search");
-  if(!box||!inp)return;
-  var owned=Object.keys(port||{}).filter(function(tk){return port[tk]&&Number(port[tk].qty||0)>0;});
-  box.innerHTML="";
-  if(!owned.length){
-    box.style.display="block";
-    box.innerHTML='<div class="ticker-result" style="color:var(--tx3);cursor:default">Nenhum ativo disponível para venda</div>';
-    return;
-  }
-  owned.forEach(function(tk){
-    var qtyOwned=Number((port[tk]&&port[tk].qty)||0);
-    var row=document.createElement("div");
-    row.className="ticker-result";
-    row.innerHTML='<div><div style="color:var(--bl);font-weight:700;font-size:12px">'+tk+'</div><div style="font-size:9px;color:var(--tx4)">Disponível: '+qtyOwned+' cotas</div></div>';
-    row.onclick=function(){
-      sel=tk; qty=qtyOwned; inp.value=tk;
-      box.style.display="none";
-      if($("qinp"))$("qinp").value=qtyOwned;
-      renderOrders();
-    };
-    box.appendChild(row);
-  });
-  box.style.display="block";
-}
-
 function renderPort() {
   var pv=portValue(), pnl=bal+pv-100000;
   $("pbal").textContent=R(bal); $("ppv").textContent=R(pv);
@@ -2599,9 +2468,17 @@ function renderPort() {
     sb2.style.cssText = "width:100%;padding:7px;background:rgba(240,64,96,.1);border:1px solid rgba(240,64,96,.35);border-radius:6px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px";
     sb2.textContent = "VENDER " + t;
     (function(tk, qty2){
-      sb2.onclick = function(e) {
-        e.preventDefault(); e.stopPropagation();
-        goToSellFromPortfolio(tk);
+      sb2.onclick = function(){
+        sel = tk; side = "sell"; qty = qty2;
+        document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("on"); });
+        document.querySelectorAll(".panel").forEach(function(p2){ p2.classList.remove("on"); });
+        if(b.dataset.t==="group"){renderGroupPanel(); b.classList.add("on"); $("group-panel").classList.add("on"); return;}
+        $(b.dataset.t+"-panel").classList.add("on");
+        $("pb").style.display = "none";
+        $("bsel").style.cssText = "background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
+        $("bbuy").style.cssText = "background:var(--bg3);color:var(--tx3);";
+        $("qinp").value = qty2;
+        updateExecBtn(); render();
       };
     })(t, pos.qty);
     e.appendChild(sb2);
@@ -3524,14 +3401,12 @@ function initApp() {
   $("lmt-price").oninput=function(){ renderOrders(); };
 
   $("bbuy").onclick=function() { side="buy"; $("bbuy").style.cssText="background:var(--g);color:#fff;box-shadow:0 0 20px rgba(0,200,150,.35);"; $("bsel").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
-  $("bsel").onclick = function() {
-    side="sell"; qty=0;
-    if($("qinp"))$("qinp").value="";
-    $("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);";
-    $("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);";
-    updateExecBtn(); renderOrders();
-    showSellableTickers();
-    if($("ticker-search"))$("ticker-search").focus();
+  $("bsel").onclick=function() { side="sell"; $("bsel").style.cssText="background:var(--r);color:#fff;box-shadow:0 0 20px rgba(240,64,96,.35);"; $("bbuy").style.cssText="background:var(--bg3);color:var(--tx3);"; updateExecBtn(); renderOrders(); };
+
+  $("qinp").oninput=function(e){
+    qty=parseInt(e.target.value)||0;
+    if(qty<0) qty=0;
+    renderOrders();
   };
   $("qclear").onclick=function(){
     qty=0; $("qinp").value=""; $("qinp").focus(); renderOrders();
