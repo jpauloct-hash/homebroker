@@ -235,19 +235,10 @@ body.matrix #pregao-cd{color:#38ff72!important;}
 #av-trigger{position:relative;width:36px;height:36px;border-radius:7px;border:1px solid var(--bd2);background:rgba(0,255,90,.08);cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:visible;flex-shrink:0;}
 #av-trigger .av-lvl{position:absolute;bottom:-4px;right:-4px;background:var(--g);color:#001b08;font-size:7px;font-weight:700;padding:1px 4px;border-radius:3px;line-height:1.4;}
 
-
-#matrix-rain-bg{
-  position:fixed;inset:0;z-index:0;
-  pointer-events:none;
-  display:none;
-}
-body.matrix #matrix-rain-bg{ display:block; }
-
 </style>
 </head>
 <body>
 <div id="app">
-<canvas id="matrix-rain-bg"></canvas>
 
 <!-- TOKEN -->
 <div id="ts" style="display:none">
@@ -756,7 +747,14 @@ body.matrix #matrix-rain-bg{ display:block; }
     <div id="aho-summary" style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--tx2)"></div>
     <div style="display:flex;gap:8px">
       <button id="aho-no" style="flex:1;padding:10px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Cancelar</button>
-      <button id="aho-yes" style="flex:2;padding:10px;border:none;border-radius:8px;ba
+      <button id="aho-yes" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:11px;font-weight:700">Agendar para abertura</button>
+    </div>
+  </div>
+</div>
+
+<div id="nf"></div>
+
+<script>
 // ── AUTH TAB TOGGLE ──────────────────────────────────────────
 function showAuthTab(tab) {
   var isLogin = tab === "login";
@@ -1814,11 +1812,6 @@ function applyTheme(t) {
     document.body.classList.add("matrix");
   }
   localStorage.setItem(LS_THEME, t);
-  if (t === 'matrix') {
-    window._matrixRainStart && window._matrixRainStart();
-  } else {
-    window._matrixRainStop && window._matrixRainStop();
-  }
   var db=document.getElementById("theme-dark"), lb=document.getElementById("theme-light"), mb=document.getElementById("theme-matrix");
   if (db) db.style.outline = t==="dark"?"2px solid #60a5fa":"none";
   if (lb) lb.style.outline = t==="light"?"2px solid #1a70c8":"none";
@@ -1871,9 +1864,6 @@ var tvWidget = null, tvScriptLoaded = false;
 var $ = function(id) { return document.getElementById(id); };
 
 applyTheme(localStorage.getItem(LS_THEME) || "dark");
-if (localStorage.getItem(LS_THEME) === 'matrix') {
-  window._matrixRainStart && window._matrixRainStart();
-}
 
 // ── SOUND ENGINE ──────────────────────────────────────────────────────────────
 var SFX_ENABLED = localStorage.getItem("hb_sfx") !== "0";
@@ -4190,40 +4180,6 @@ function _updateAvatar(){
   var hms=('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2)+':'+('0'+now.getSeconds()).slice(-2);
   document.getElementById('av-log').innerHTML=
     '<div class="ll">['+hms+'] PERFIL · NV '+lv.level+' · '+xpTotal.toFixed(0)+' XP</div>'+
-    '<div class="ll">[RANK] '+rk.name+' · WIN '+winRate+'%</div>'+
-    '> SISTEMA ESTÁVEL <span class="log-cur"></span>';
-}
-
-/* ══ MATRIX RAIN BACKGROUND ══ */
-(function(){
-  var cv=document.getElementById('matrix-rain-bg');
-  if(!cv)return;
-  var ctx=cv.getContext('2d');
-  var drops=[],interval;
-  var chars='01アイウエオカキクケコサシスセソタチツテトナニヌネノ∑∆∇Ω√∏';
-  function resize(){
-    cv.width=window.innerWidth; cv.height=window.innerHeight;
-    drops=[];
-    var cols=Math.floor(cv.width/16);
-    for(var i=0;i<cols;i++) drops[i]=Math.random()*-(cv.height/16);
-  }
-  function draw(){
-    ctx.fillStyle='rgba(2,6,2,.18)'; ctx.fillRect(0,0,cv.width,cv.height);
-    for(var i=0;i<drops.length;i++){
-      var y=drops[i]*16;
-      ctx.fillStyle='rgba(180,255,200,.9)'; ctx.font='13px monospace';
-      ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*16,y);
-      ctx.fillStyle='rgba(0,255,90,'+Math.max(0,.55-y/cv.height*.4)+')'; ctx.font='12px monospace';
-      ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*16,y-16);
-      if(y>cv.height&&Math.random()>.97)drops[i]=0;
-      drops[i]+=.35;
-    }
-  }
-  window._matrixRainStart=function(){ resize(); clearInterval(interval); interval=setInterval(draw,50); };
-  window._matrixRainStop=function(){ clearInterval(interval); ctx.clearRect(0,0,cv.width,cv.height); };
-  window.addEventListener('resize',function(){ if(document.body.classList.contains('matrix'))resize(); });
-})();
-L · NV '+lv.level+' · '+xpTotal.toFixed(0)+' XP</div>'+
     '<div class="ll">[RANK] '+rk.name+' · WIN '+winRate+'%</div>'+
     '> SISTEMA ESTÁVEL <span class="log-cur"></span>';
 }
