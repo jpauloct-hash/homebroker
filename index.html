@@ -235,6 +235,35 @@ body.matrix #pregao-cd{color:#38ff72!important;}
 #av-trigger{position:relative;width:36px;height:36px;border-radius:7px;border:1px solid var(--bd2);background:rgba(0,255,90,.08);cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:visible;flex-shrink:0;}
 #av-trigger .av-lvl{position:absolute;bottom:-4px;right:-4px;background:var(--g);color:#001b08;font-size:7px;font-weight:700;padding:1px 4px;border-radius:3px;line-height:1.4;}
 
+
+/* Avatar normal (dark/light) */
+.av-hero-normal{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:10px;position:relative;z-index:2;
+}
+.av-normal-circle{
+  width:88px;height:88px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:36px;font-weight:700;
+  background:linear-gradient(135deg,#1e4a80,#2563eb);
+  color:#fff;
+  box-shadow:0 4px 24px rgba(37,99,235,.4);
+  border:3px solid rgba(96,165,250,.4);
+  flex-shrink:0;
+}
+.av-normal-name{font-size:13px;font-weight:700;letter-spacing:2px;color:var(--tx);}
+
+/* Mostrar/ocultar hero conforme tema */
+.av-hero-matrix{display:none;}
+.av-hero-normal{display:flex;}
+
+body.matrix .av-hero-matrix{display:flex;}
+body.matrix .av-hero-normal{display:none;}
+
+/* Hero do canvas só no matrix */
+body.matrix .av-hero{background:transparent;}
+.av-hero{background:linear-gradient(180deg,var(--bg2),var(--bg3));border-bottom:1px solid var(--bd);}
+
 </style>
 </head>
 <body>
@@ -600,22 +629,28 @@ body.matrix #pregao-cd{color:#38ff72!important;}
   <div class="avatar-sheet">
     <div class="av-handle"></div>
     <div class="av-hero">
-      <canvas id="av-rain"></canvas>
-      <div class="av-scan"></div>
-      <span class="av-codename" id="av-codename">TRADER</span>
-      <div class="av-hero-content">
-        <svg viewBox="0 0 100 130" fill="none" width="110" height="140" style="filter:drop-shadow(0 0 28px rgba(0,255,90,.9)) drop-shadow(0 0 8px rgba(0,255,90,.6))">
-          <path d="M15 130 C12 100 10 80 14 65 C10 60 8 55 10 48 C14 32 28 20 50 18 C72 20 86 32 90 48 C92 55 90 60 86 65 C90 80 88 100 85 130Z" fill="rgba(0,40,12,.95)" stroke="rgba(0,255,90,.7)" stroke-width="1.5"/>
-          <ellipse cx="50" cy="46" rx="26" ry="28" fill="rgba(0,10,3,.9)" stroke="rgba(0,255,90,.5)" stroke-width="1"/>
-          <ellipse cx="50" cy="52" rx="18" ry="22" fill="rgba(0,5,2,.95)"/>
-          <ellipse cx="43" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
-          <ellipse cx="57" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
-          <path d="M32 24 C38 18 44 16 50 16 C56 16 62 18 68 24" stroke="rgba(0,255,90,.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-          <path d="M14 65 C8 72 6 85 8 100 L18 98 C16 86 16 74 20 68Z" fill="rgba(0,18,6,.8)" stroke="rgba(0,255,90,.2)" stroke-width="1"/>
-          <path d="M86 65 C92 72 94 85 92 100 L82 98 C84 86 84 74 80 68Z" fill="rgba(0,18,6,.8)" stroke="rgba(0,255,90,.2)" stroke-width="1"/>
-        </svg>
-      </div>
-    </div>
+  <!-- Apenas no tema Matrix -->
+  <canvas id="av-rain" style="position:absolute;inset:0;width:100%;height:100%;z-index:1;"></canvas>
+  <div class="av-scan"></div>
+  <span class="av-codename" id="av-codename">TRADER</span>
+  <div class="av-hero-content av-hero-matrix">
+    <svg viewBox="0 0 100 130" fill="none" width="110" height="140" style="filter:drop-shadow(0 0 28px rgba(0,255,90,.9)) drop-shadow(0 0 8px rgba(0,255,90,.6))">
+      <path d="M15 130 C12 100 10 80 14 65 C10 60 8 55 10 48 C14 32 28 20 50 18 C72 20 86 32 90 48 C92 55 90 60 86 65 C90 80 88 100 85 130Z" fill="rgba(0,40,12,.95)" stroke="rgba(0,255,90,.7)" stroke-width="1.5"/>
+      <ellipse cx="50" cy="46" rx="26" ry="28" fill="rgba(0,10,3,.9)" stroke="rgba(0,255,90,.5)" stroke-width="1"/>
+      <ellipse cx="50" cy="52" rx="18" ry="22" fill="rgba(0,5,2,.95)"/>
+      <ellipse cx="43" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
+      <ellipse cx="57" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
+      <path d="M32 24 C38 18 44 16 50 16 C56 16 62 18 68 24" stroke="rgba(0,255,90,.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M14 65 C8 72 6 85 8 100 L18 98 C16 86 16 74 20 68Z" fill="rgba(0,18,6,.8)" stroke="rgba(0,255,90,.2)" stroke-width="1"/>
+      <path d="M86 65 C92 72 94 85 92 100 L82 98 C84 86 84 74 80 68Z" fill="rgba(0,18,6,.8)" stroke="rgba(0,255,90,.2)" stroke-width="1"/>
+    </svg>
+  </div>
+  <!-- Nos temas dark e light -->
+  <div class="av-hero-normal">
+    <div class="av-normal-circle" id="av-normal-circle">?</div>
+    <div class="av-normal-name" id="av-normal-name">TRADER</div>
+  </div>
+</div>
     <div class="av-body">
       <div class="av-level-row">
         <div><div style="font-size:9px;color:var(--tx4);letter-spacing:2px">NÍVEL</div><div class="av-level-num" id="av-level">1</div></div>
@@ -4132,8 +4167,21 @@ function _updateAvatar(){
   document.getElementById('av-xp-fill').style.width=pct+'%';
   document.getElementById('av-xp-pct').textContent=pct+'% para o próximo nível';
 
+  // Codename + avatar normal
   var prof=typeof getCurrentProfile==='function'?getCurrentProfile():null;
-  if(prof){var pm=typeof getProfileMeta==='function'?getProfileMeta(prof):null;if(pm&&pm.displayName)document.getElementById('av-codename').textContent=pm.displayName.toUpperCase();}
+  var displayName='TRADER';
+  if(prof){
+    var pm=typeof getProfileMeta==='function'?getProfileMeta(prof):null;
+    if(pm&&pm.displayName) displayName=pm.displayName.toUpperCase();
+    else if(prof) displayName=prof.toUpperCase();
+  }
+  var cdEl=document.getElementById('av-codename');
+  if(cdEl) cdEl.textContent=displayName;
+  // Avatar normal (dark/light): inicial + nome
+  var circleEl=document.getElementById('av-normal-circle');
+  var nameEl=document.getElementById('av-normal-name');
+  if(circleEl) circleEl.textContent=displayName.charAt(0);
+  if(nameEl) nameEl.textContent=displayName;
 
   var ranks=[
     {min:1, icon:'🏅',name:'BRONZE I',  stars:'★',    sub:'Iniciante'},
