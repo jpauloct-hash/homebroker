@@ -1670,15 +1670,22 @@ function getCurrentProfile() {
 }
 
 function applyTheme(t) {
-  if (t === "light") document.documentElement.classList.add("light");
-  else document.documentElement.classList.remove("light");
+  document.documentElement.classList.remove("light","matrix");
+  document.body.classList.remove("light","matrix");
+  if (t === "light") {
+    document.documentElement.classList.add("light");
+    document.body.classList.add("light");
+  }
+  if (t === "matrix") {
+    document.documentElement.classList.add("matrix");
+    document.body.classList.add("matrix");
+  }
   localStorage.setItem(LS_THEME, t);
-  var db = document.getElementById("theme-dark");
-  var lb = document.getElementById("theme-light");
-  if (db) db.style.outline = t === "dark"  ? "2px solid #60a5fa" : "none";
-  if (lb) lb.style.outline = t === "light" ? "2px solid #1a70c8" : "none";
+  var db=document.getElementById("theme-dark"), lb=document.getElementById("theme-light"), mb=document.getElementById("theme-matrix");
+  if (db) db.style.outline = t==="dark"?"2px solid #60a5fa":"none";
+  if (lb) lb.style.outline = t==="light"?"2px solid #1a70c8":"none";
+  if (mb) mb.style.outline = t==="matrix"?"2px solid #00ff66":"none";
 }
-applyTheme(localStorage.getItem(LS_THEME) || "dark");
 var LS_NEWS   = "hb_news_v1";
 var LS_STATE  = "hb_state_v3";
 var LS_GOAL   = "hb_goal_v1";
@@ -1724,6 +1731,8 @@ var cd = REFRESH, cdi, rfi, nft;
 var tvWidget = null, tvScriptLoaded = false;
 
 var $ = function(id) { return document.getElementById(id); };
+
+applyTheme(localStorage.getItem(LS_THEME) || "dark");
 
 // ── SOUND ENGINE ──────────────────────────────────────────────────────────────
 var SFX_ENABLED = localStorage.getItem("hb_sfx") !== "0";
