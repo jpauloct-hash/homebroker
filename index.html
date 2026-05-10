@@ -131,6 +131,59 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 #pregao-cd{font-size:9px;color:var(--tx3);}
 /* After-hours order modal */
 
+
+/* ── TEMA MATRIX ───────────────────────────── */
+body.matrix{
+  --bg:#020602;--bg2:rgba(0,18,6,.92);--bg3:rgba(0,32,10,.72);
+  --bd:rgba(0,255,90,.28);--bd2:rgba(0,255,90,.55);
+  --tx:#d7ffe1;--tx2:#8cffaa;--tx3:#38ff72;--tx4:#0e7d35;
+  --g:#00ff66;--r:#ff3355;--a:#d7ff4f;--bl:#00ff66;
+  background:radial-gradient(circle at 50% -10%,rgba(0,255,90,.14),transparent 35%),linear-gradient(180deg,#020602,#000);
+}
+body.matrix::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.22;
+  background-image:linear-gradient(rgba(0,255,90,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,90,.05) 1px,transparent 1px);
+  background-size:22px 22px;
+}
+body.matrix::after{
+  content:"010101 110010 001101 101010 011001 100101";
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  color:rgba(0,255,90,.13);font-size:13px;letter-spacing:12px;line-height:22px;
+  word-break:break-all;animation:matrixRain 12s linear infinite;
+}
+@keyframes matrixRain{from{transform:translateY(-25%)}to{transform:translateY(25%)}}
+body.matrix #app,body.matrix #ma,body.matrix #ts,body.matrix #ps,body.matrix #gs{position:relative;z-index:1;}
+body.matrix #hdr,body.matrix #pregao-bar,body.matrix #tks-wrap,body.matrix #news-tape-wrap,
+body.matrix #sb,body.matrix #tbr,body.matrix .card,body.matrix .pbox,body.matrix .ac,
+body.matrix .ti,body.matrix .tcard,body.matrix .si{
+  background:rgba(0,15,5,.82)!important;border-color:rgba(0,255,90,.32)!important;
+  box-shadow:inset 0 0 18px rgba(0,255,90,.055),0 0 18px rgba(0,255,90,.08);
+}
+body.matrix .tab.on,body.matrix .pbb.on,body.matrix .ot-btn.on,body.matrix .pr.on,body.matrix .pr-set.on{
+  color:#001b08!important;background:linear-gradient(180deg,#00ff66,#00a83f)!important;
+  border-color:#00ff66!important;text-shadow:none;box-shadow:0 0 16px rgba(0,255,90,.55);
+}
+body.matrix .tab{color:rgba(140,255,170,.55);border-bottom-color:transparent;}
+body.matrix .tab.on{border-bottom-color:#00ff66;}
+body.matrix .tk{background:rgba(0,20,6,.75);border-color:rgba(0,255,90,.28);box-shadow:inset 0 0 12px rgba(0,255,90,.05);}
+body.matrix .tk.on{background:rgba(0,255,90,.10);border-color:rgba(0,255,90,.75);}
+body.matrix input,body.matrix .tinp,body.matrix .sinp,body.matrix .qi{
+  background:#020902!important;border-color:rgba(0,255,90,.35)!important;
+  color:#9cffb8!important;box-shadow:inset 0 0 12px rgba(0,255,90,.08);
+}
+body.matrix button{text-transform:uppercase;}
+body.matrix .tbtn,body.matrix #s-save,body.matrix #tape-save,body.matrix #exec{
+  background:linear-gradient(135deg,#003b16,#00ff66)!important;color:#001b08!important;
+  box-shadow:0 0 20px rgba(0,255,90,.35)!important;
+}
+body.matrix #hp,body.matrix #spr,body.matrix #ssym,body.matrix #hb,body.matrix #hpv{
+  text-shadow:0 0 10px rgba(0,255,90,.75);
+}
+body.matrix #news-tape-wrap{background:#000!important;}
+body.matrix .news-tape-item{color:#8cffaa!important;}
+body.matrix #pregao-sts.pregao-closed{color:#ff3355!important;text-shadow:0 0 10px rgba(255,51,85,.6);}
+body.matrix #pregao-cd{color:#38ff72!important;}
+
 </style>
 </head>
 <body>
@@ -491,6 +544,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div style="display:flex;gap:6px">
         <button id="theme-dark" style="padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--bd2);background:#090d16;color:#dde8f5">Escuro</button>
         <button id="theme-light" style="padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--bd2);background:#ffffff;color:#1a2a3a">Claro</button>
+      <button id="theme-matrix" onclick="applyTheme('matrix')" style="padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid #00ff66;background:#001b08;color:#00ff66">MATRIX</button>
       </div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
