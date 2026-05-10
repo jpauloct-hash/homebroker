@@ -265,6 +265,9 @@ body.matrix #av-trigger{background:rgba(0,255,90,.08);}
 body.matrix #av-trigger .av-lvl{background:var(--g);color:#001b08;}
 body.matrix .av-hero-matrix{display:flex;}
 body.matrix .av-hero-normal{display:none;}
+body.matrix #av-hoodie{
+  filter:drop-shadow(0 0 18px rgba(0,255,90,.85)) drop-shadow(0 0 6px rgba(0,255,90,.5));
+}
 
 
 </style>
@@ -636,18 +639,18 @@ body.matrix .av-hero-normal{display:none;}
   <canvas id="av-rain" style="position:absolute;inset:0;width:100%;height:100%;z-index:1;"></canvas>
   <div class="av-scan"></div>
   <span class="av-codename" id="av-codename">TRADER</span>
-  <div class="av-hero-content av-hero-matrix">
-    <svg viewBox="0 0 100 130" fill="none" width="110" height="140" style="filter:drop-shadow(0 0 28px rgba(0,255,90,.9)) drop-shadow(0 0 8px rgba(0,255,90,.6))">
-      <path d="M15 130 C12 100 10 80 14 65 C10 60 8 55 10 48 C14 32 28 20 50 18 C72 20 86 32 90 48 C92 55 90 60 86 65 C90 80 88 100 85 130Z" fill="rgba(0,40,12,.95)" stroke="rgba(0,255,90,.7)" stroke-width="1.5"/>
-      <ellipse cx="50" cy="46" rx="26" ry="28" fill="rgba(0,10,3,.9)" stroke="rgba(0,255,90,.5)" stroke-width="1"/>
-      <ellipse cx="50" cy="52" rx="18" ry="22" fill="rgba(0,5,2,.95)"/>
-      <ellipse cx="43" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
-      <ellipse cx="57" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
-      <path d="M32 24 C38 18 44 16 50 16 C56 16 62 18 68 24" stroke="rgba(0,255,90,.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-      <path d="M14 65 C8 72 6 85 8 100 L18 98 C16 86 16 74 20 68Z" fill="rgba(0,18,6,.8)" stroke="rgba(0,255,90,.2)" stroke-width="1"/>
-      <path d="M86 65 C92 72 94 85 92 100 L82 98 C84 86 84 74 80 68Z" fill="rgba(0,18,6,.8)" stroke="rgba(0,255,90,.2)" stroke-width="1"/>
-    </svg>
-  </div>
+  <!-- SVG solto, posicionado pelo JS -->
+  <svg id="av-hoodie" viewBox="0 0 100 130" fill="none"
+    style="position:absolute;z-index:4;pointer-events:none;opacity:0;width:72px;height:auto;transition:opacity .12s ease;">
+    <path d="M15 130 C12 100 10 80 14 65 C10 60 8 55 10 48 C14 32 28 20 50 18 C72 20 86 32 90 48 C92 55 90 60 86 65 C90 80 88 100 85 130Z" fill="rgba(0,40,12,.95)" stroke="rgba(0,255,90,.7)" stroke-width="1.5"/>
+    <ellipse cx="50" cy="46" rx="26" ry="28" fill="rgba(0,10,3,.9)" stroke="rgba(0,255,90,.5)" stroke-width="1"/>
+    <ellipse cx="50" cy="52" rx="18" ry="22" fill="rgba(0,5,2,.95)"/>
+    <ellipse cx="43" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
+    <ellipse cx="57" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
+    <path d="M32 24 C38 18 44 16 50 16 C56 16 62 18 68 24" stroke="rgba(0,255,90,.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M14 65 C8 72 6 85 8 100 L18 98 C16 86 16 74 20 68Z" fill="rgba(0,18,6,.8)" stroke="rgba(0,255,90,.2)" stroke-width="1"/>
+    <path d="M86 65 C92 72 94 85 92 100 L82 98 C84 86 84 74 80 68Z" fill="rgba(0,18,6,.8)" stroke="rgba(0,255,90,.2)" stroke-width="1"/>
+  </svg>
   <!-- Nos temas dark e light -->
   <div class="av-hero-normal">
     <div class="av-normal-circle" id="av-normal-circle">?</div>
@@ -4128,16 +4131,82 @@ function _startAvRain(){
 }
 function _stopAvRain(){ clearInterval(_avRain); }
 
+/* ══ HOODIE GHOST ══ */
+var _hoodieT=null, _hoodieG=null;
+
+function _hoodieStop(){
+  clearTimeout(_hoodieT); clearTimeout(_hoodieG);
+  var h=document.getElementById('av-hoodie');
+  if(h){h.style.opacity='0';h.style.transform='';}
+}
+
+function _hoodieGlitch(el,cb){
+  var steps=3+Math.floor(Math.random()*4),i=0;
+  function tick(){
+    if(i>=steps){el.style.transform='';el.style.filter='drop-shadow(0 0 18px rgba(0,255,90,.85))';if(cb)cb();return;}
+    var dx=(Math.random()-.5)*24,dy=(Math.random()-.5)*10;
+    el.style.transform='translate('+dx+'px,'+dy+'px) scaleX('+(i%2===0?.88:1.08)+')';
+    el.style.filter=i%2===0
+      ?'drop-shadow(-3px 0 rgba(255,0,80,.9)) drop-shadow(3px 0 rgba(0,255,90,.7))'
+      :'drop-shadow(0 0 22px rgba(0,255,90,1))';
+    i++;
+    _hoodieG=setTimeout(tick,40+Math.random()*55);
+  }
+  tick();
+}
+
+function _hoodieAnimate(){
+  if(!document.body.classList.contains('matrix'))return;
+  var panel=document.getElementById('avatar-panel');
+  if(!panel||!panel.classList.contains('on'))return;
+  var h=document.getElementById('av-hoodie');
+  var hero=h&&h.closest('.av-hero');
+  if(!h||!hero)return;
+  var W=hero.offsetWidth,H=hero.offsetHeight,hw=72,hh=94;
+  var x=8+Math.random()*(W-hw-16);
+  var y=4+Math.random()*(H-hh-8);
+  h.style.left=x+'px'; h.style.top=y+'px'; h.style.transform='';
+  var op=(.45+Math.random()*.45).toFixed(2);
+  h.style.transition='opacity .14s ease'; h.style.opacity=op;
+  var stay=500+Math.random()*1800;
+  if(Math.random()>.45){
+    _hoodieG=setTimeout(function(){
+      _hoodieGlitch(h,function(){
+        if(Math.random()>.5){
+          h.style.transition='opacity .06s ease'; h.style.opacity='0';
+          _hoodieT=setTimeout(function(){
+            var x2=8+Math.random()*(W-hw-16), y2=4+Math.random()*(H-hh-8);
+            h.style.left=x2+'px'; h.style.top=y2+'px';
+            h.style.transition='opacity .1s ease';
+            h.style.opacity=(.5+Math.random()*.4).toFixed(2);
+          },90);
+        }
+      });
+    },stay*(.2+Math.random()*.4));
+  }
+  _hoodieT=setTimeout(function(){
+    clearTimeout(_hoodieG);
+    h.style.transition='opacity .08s ease'; h.style.opacity='0';
+    _hoodieT=setTimeout(_hoodieAnimate,150+Math.random()*1100);
+  },stay);
+}
+
+/* ══ ABRIR / FECHAR PAINEL ══ */
 function openAvatarPanel(){
   document.getElementById('avatar-panel').classList.add('on');
   document.body.style.overflow='hidden';
-  _startAvRain();
-  _updateAvatar();
+  _startAvRain&&_startAvRain();
+  if(document.body.classList.contains('matrix')){
+    setTimeout(_hoodieAnimate,400);
+  }
+  _updateAvatar&&_updateAvatar();
 }
+
 function closeAvatarPanel(){
   document.getElementById('avatar-panel').classList.remove('on');
   document.body.style.overflow='';
-  _stopAvRain();
+  _stopAvRain&&_stopAvRain();
+  _hoodieStop();
 }
 
 function _calcLevel(xpTotal){
