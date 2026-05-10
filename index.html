@@ -191,7 +191,8 @@ body.matrix #pregao-cd{color:#38ff72!important;}
 .avatar-sheet{width:100%;max-width:480px;margin:0 auto;background:#020e04;border:1px solid var(--bd2);border-bottom:none;border-radius:18px 18px 0 0;padding:0 0 40px;animation:slideup .28s cubic-bezier(.22,.68,0,1.2);max-height:92dvh;overflow-y:auto;}
 .av-handle{width:40px;height:4px;background:var(--bd2);border-radius:2px;margin:12px auto 10px;}
 .av-hero{position:relative;height:190px;overflow:hidden;}
-.av-hero canvas{position:absolute;inset:0;width:100%;height:100%;}
+.av-hero canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1;}
+.av-hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;}
 .av-scan{position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(0,255,90,.04),transparent);animation:avscan 2.5s linear infinite;}
 @keyframes avscan{from{transform:translateY(-100%)}to{transform:translateY(100%)}}
 .av-hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;}
@@ -603,8 +604,8 @@ body.matrix #pregao-cd{color:#38ff72!important;}
       <div class="av-scan"></div>
       <span class="av-codename" id="av-codename">TRADER</span>
       <div class="av-hero-content">
-        <svg viewBox="0 0 100 130" fill="none" width="110" height="140" style="filter:drop-shadow(0 0 20px rgba(0,255,90,.55))">
-          <path d="M15 130 C12 100 10 80 14 65 C10 60 8 55 10 48 C14 32 28 20 50 18 C72 20 86 32 90 48 C92 55 90 60 86 65 C90 80 88 100 85 130Z" fill="rgba(0,20,6,.85)" stroke="rgba(0,255,90,.35)" stroke-width="1.2"/>
+        <svg viewBox="0 0 100 130" fill="none" width="110" height="140" style="filter:drop-shadow(0 0 28px rgba(0,255,90,.9)) drop-shadow(0 0 8px rgba(0,255,90,.6))">
+          <path d="M15 130 C12 100 10 80 14 65 C10 60 8 55 10 48 C14 32 28 20 50 18 C72 20 86 32 90 48 C92 55 90 60 86 65 C90 80 88 100 85 130Z" fill="rgba(0,40,12,.95)" stroke="rgba(0,255,90,.7)" stroke-width="1.5"/>
           <ellipse cx="50" cy="46" rx="26" ry="28" fill="rgba(0,10,3,.9)" stroke="rgba(0,255,90,.5)" stroke-width="1"/>
           <ellipse cx="50" cy="52" rx="18" ry="22" fill="rgba(0,5,2,.95)"/>
           <ellipse cx="43" cy="52" rx="2.5" ry="1.5" fill="rgba(0,255,90,.15)"/>
