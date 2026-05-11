@@ -1130,9 +1130,20 @@ function loadSoloHistoryFromFirebase() {
     var data=snap.val();
     var points=Array.isArray(data)?data:[];
     points=normalizeEquityHistory(points);
-    equityHistory=points;
-    localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(points));
-    return points;
+    // Filter out contaminated points from group sessions
+    // Solo initialBal is typically 100000; reject points clearly from another context
+    var soloInit=Number(initialBal||100000);
+    var maxReasonable=Math.max(soloInit*50, 500000);
+    var cleaned=points.filter(function(p){return p.v<=maxReasonable;});
+    // If we removed points, save cleaned version back to Firebase
+    if(cleaned.length!==points.length){
+      equityHistory=cleaned;
+      saveSoloHistoryToFirebase();
+    } else {
+      equityHistory=cleaned;
+    }
+    localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(cleaned));
+    return cleaned;
   });
 }
 
@@ -1890,14 +1901,13 @@ function loadEquityHistory() {
 }
 function saveEquityHistory() {
   if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
-
   if (isInGroupContext()) {
-    // Group: use a group-specific localStorage key so solo is never contaminated
+    // group: never touch solo localStorage or solo Firebase
     var grpKey = "hb_eq_grp_" + currentRoomId + "_" + (currentUser&&currentUser.uid||"anon");
     localStorage.setItem(grpKey, JSON.stringify(equityHistory));
     saveGroupHistoryToFirebase(currentRoomId);
   } else {
-    // Solo: use the solo-specific key and save to Firebase
+    // solo: save to solo localStorage and solo Firebase
     localStorage.setItem(getProfileKey(LS_EQUITY), JSON.stringify(equityHistory));
     saveSoloHistoryToFirebase();
   }
@@ -2463,7 +2473,6 @@ function drawEquityChart() {
   canvas.width = W * dpr; canvas.height = H * dpr;
   canvas.style.width = W+"px"; canvas.style.height = H+"px";
   var ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.setTransform(dpr,0,0,dpr,0,0);
 
   ctx.fillStyle="#090d16"; ctx.fillRect(0,0,W,H);
