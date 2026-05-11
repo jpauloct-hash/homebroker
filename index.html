@@ -2473,118 +2473,116 @@ function drawEquityChart() {
   var ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-
   ctx.fillStyle="#090d16"; ctx.fillRect(0,0,W,H);
 
-  // ── Aggregate to daily: keep last point of each calendar day ─────────────
+  // Aggregate: last point per calendar day
   var dailyMap = {};
-
-  // Pin start: inject initialBal at firstTradeDate if available
-  if (firstTradeDate) {
-    var startMs = new Date(firstTradeDate).getTime();
-    if (!isNaN(startMs)) {
-      var sk = new Date(startMs);
-      var startKey = sk.getFullYear()+"-"+sk.getMonth()+"-"+sk.getDate();
-      dailyMap[startKey] = { t: startMs, v: Number(initialBal||100000) };
-    }
-  }
-
   (equityHistory || []).forEach(function(p) {
     if (!p || !p.t || isNaN(p.v)) return;
     var d = new Date(Number(p.t));
-    var key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
-    // Allow real points to overwrite the injected start point on the same day
-    if (!dailyMap[key] || Number(p.t) > dailyMap[key].t) {
+    var key = d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();
+    if (!dailyMap[key] || Number(p.t) > dailyMap[key].t)
       dailyMap[key] = { t: Number(p.t), v: Number(p.v) };
-    }
   });
-  var daily = Object.values(dailyMap).sort(function(a,b){ return a.t - b.t; });
+
+  var sorted = Object.values(dailyMap).sort(function(a,b){return a.t-b.t;});
+
+  // Fill missing weekdays with previous day value
+  var daily = [];
+  if (sorted.length > 0) {
+    daily.push(sorted[0]);
+    for (var di=1; di<sorted.length; di++) {
+      var prev = sorted[di-1], curr = sorted[di];
+      var d = new Date(prev.t); d.setDate(d.getDate()+1);
+      while (d.getTime() < curr.t) {
+        var dow = d.getDay();
+        if (dow!==0 && dow!==6)
+          daily.push({t:d.getTime(), v:prev.v});
+        d.setDate(d.getDate()+1);
+      }
+      daily.push(curr);
+    }
+  }
 
   if (daily.length < 2) {
-    ctx.fillStyle="#1a3050"; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="center";
+    ctx.fillStyle="#6b8cae"; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="center";
     ctx.fillText("Aguardando dados suficientes...", W/2, H/2);
     return;
   }
 
-  var PAD_L=8, PAD_R=52, PAD_T=10, PAD_B=22;
+  var PAD_L=8, PAD_R=56, PAD_T=10, PAD_B=22;
   var CW=W-PAD_L-PAD_R, CH=H-PAD_T-PAD_B;
   var n = daily.length;
-
-  var vals = daily.map(function(p){ return p.v; });
-  var minV = Math.min.apply(null, vals) * 0.998;
-  var maxV = Math.max.apply(null, vals) * 1.002;
-
-  if (goal.target) {
-    var goalVal = initialBal * (1 + goal.target/100);
-    if (goalVal > maxV) maxV = goalVal * 1.002;
-    if (goalVal < minV) minV = goalVal * 0.998;
+  var vals = daily.map(function(p){return p.v;});
+  var minV = Math.min.apply(null,vals)*0.998;
+  var maxV = Math.max.apply(null,vals)*1.002;
+  if (goal && goal.target) {
+    var goalVal = initialBal*(1+goal.target/100);
+    if (goalVal>maxV) maxV=goalVal*1.002;
+    if (goalVal<minV) minV=goalVal*0.998;
   }
-  var range = maxV - minV || 1;
+  var range = maxV-minV || 1;
 
-  function px(v) { return PAD_T + CH * (1 - (v - minV) / range); }
-  function py(i) { return PAD_L + CW * (i / (n - 1)); }
+  function px(v){return PAD_T+CH*(1-(v-minV)/range);}
+  function py(i){return PAD_L+CW*(i/(n-1));}
 
-  // Grid
-  ctx.strokeStyle="#0f1e30"; ctx.lineWidth=0.5;
-  for (var i=0; i<=4; i++) {
-    var y = PAD_T + (CH/4)*i;
-    ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(W-PAD_R,y); ctx.stroke();
-    var val = maxV - (range/4)*i;
-    ctx.fillStyle="#2a5070"; ctx.font="8px 'JetBrains Mono',monospace"; ctx.textAlign="left";
-    ctx.fillText(val>=1000?Math.round(val/1000)+"k":Math.round(val), W-PAD_R+4, y+3);
+  // Grid lines + Y labels (bright)
+  ctx.lineWidth=0.5;
+  for (var gi=0; gi<=4; gi++) {
+    var gy = PAD_T+(CH/4)*gi;
+    ctx.strokeStyle="rgba(255,255,255,.07)";
+    ctx.beginPath(); ctx.moveTo(PAD_L,gy); ctx.lineTo(W-PAD_R,gy); ctx.stroke();
+    var gval = maxV-(range/4)*gi;
+    ctx.fillStyle="#8fb8d8"; ctx.font="bold 9px 'JetBrains Mono',monospace"; ctx.textAlign="left";
+    var label = gval>=1000000?(gval/1000000).toFixed(2)+"M":gval>=1000?Math.round(gval/1000)+"k":Math.round(gval)+"";
+    ctx.fillText(label, W-PAD_R+4, gy+3);
   }
 
   // Goal line
-  if (goal.target) {
+  if (goal && goal.target) {
     var gv = initialBal*(1+goal.target/100);
-    var gy = px(gv);
-    ctx.strokeStyle="rgba(245,158,11,.5)"; ctx.lineWidth=1; ctx.setLineDash([4,4]);
-    ctx.beginPath(); ctx.moveTo(PAD_L,gy); ctx.lineTo(W-PAD_R,gy); ctx.stroke();
+    var gly = px(gv);
+    ctx.strokeStyle="rgba(245,158,11,.7)"; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(PAD_L,gly); ctx.lineTo(W-PAD_R,gly); ctx.stroke();
     ctx.setLineDash([]);
     if ($("legend-goal")) $("legend-goal").style.display="flex";
   }
 
   // Area fill
+  var isUp = daily[n-1].v >= daily[0].v;
+  var lineColor = isUp ? "#00d8a0" : "#ff4466";
   var grad = ctx.createLinearGradient(0,PAD_T,0,PAD_T+CH);
-  grad.addColorStop(0,"rgba(0,200,150,.25)");
-  grad.addColorStop(1,"rgba(0,200,150,0)");
+  grad.addColorStop(0, isUp?"rgba(0,216,160,.3)":"rgba(255,68,102,.3)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
   ctx.beginPath();
-  ctx.moveTo(py(0), px(daily[0].v));
-  for (var j=1; j<n; j++) ctx.lineTo(py(j), px(daily[j].v));
-  ctx.lineTo(py(n-1), PAD_T+CH);
-  ctx.lineTo(py(0), PAD_T+CH);
-  ctx.closePath();
-  ctx.fillStyle=grad; ctx.fill();
+  ctx.moveTo(py(0),px(daily[0].v));
+  for (var j=1;j<n;j++) ctx.lineTo(py(j),px(daily[j].v));
+  ctx.lineTo(py(n-1),PAD_T+CH); ctx.lineTo(py(0),PAD_T+CH);
+  ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
 
   // Line
-  ctx.strokeStyle="#00c896"; ctx.lineWidth=1.5; ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.moveTo(py(0), px(daily[0].v));
-  for (var k=1; k<n; k++) ctx.lineTo(py(k), px(daily[k].v));
+  ctx.strokeStyle=lineColor; ctx.lineWidth=2; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(py(0),px(daily[0].v));
+  for (var k=1;k<n;k++) ctx.lineTo(py(k),px(daily[k].v));
   ctx.stroke();
 
   // Last dot
-  ctx.fillStyle="#00c896";
-  ctx.beginPath(); ctx.arc(py(n-1), px(daily[n-1].v), 3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle=lineColor;
+  ctx.beginPath(); ctx.arc(py(n-1),px(daily[n-1].v),3.5,0,Math.PI*2); ctx.fill();
 
-  // X axis: one label per day
-  ctx.fillStyle="#5a7a9a";
-  ctx.font="9px 'JetBrains Mono', monospace";
-  ctx.textAlign="center";
-  ctx.textBaseline="top";
-  var labelCount = Math.min(6, n);
-  for (var li=0; li<labelCount; li++) {
-    var lidx = Math.round(li * (n-1) / Math.max(labelCount-1, 1));
+  // X labels (bright)
+  ctx.fillStyle="#8fb8d8"; ctx.font="bold 9px 'JetBrains Mono',monospace";
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  var lc = Math.min(6,n);
+  for (var li=0;li<lc;li++) {
+    var lidx = Math.round(li*(n-1)/Math.max(lc-1,1));
     var lpt = daily[lidx];
-    var d2 = new Date(lpt.t);
-    var llabel = ("0"+d2.getDate()).slice(-2)+"/"+("0"+(d2.getMonth()+1)).slice(-2);
-    var lx = PAD_L + (lidx / Math.max(n-1,1)) * CW;
-    ctx.fillText(llabel, lx, PAD_T+CH+6);
+    var ld = new Date(lpt.t);
+    var llbl = ("0"+ld.getDate()).slice(-2)+"/"+ ("0"+(ld.getMonth()+1)).slice(-2);
+    ctx.fillText(llbl, PAD_L+(lidx/Math.max(n-1,1))*CW, PAD_T+CH+6);
   }
 }
 
-
-//  Render helpers 
 function portValue() {
   var v=0; Object.keys(port).forEach(function(t){ v+=port[t].qty*(prices[t]||0); }); return v;
 }
