@@ -1130,19 +1130,18 @@ function loadSoloHistoryFromFirebase() {
     var data=snap.val();
     var points=Array.isArray(data)?data:[];
     points=normalizeEquityHistory(points);
-    // Filter out contaminated points from group sessions
-    // Solo initialBal is typically 100000; reject points clearly from another context
+    // Filter out points contaminated from group sessions
     var soloInit=Number(initialBal||100000);
-    var maxReasonable=Math.max(soloInit*50, 500000);
+    var maxReasonable=Math.max(soloInit*20, 500000);
     var cleaned=points.filter(function(p){return p.v<=maxReasonable;});
-    // If we removed points, save cleaned version back to Firebase
-    if(cleaned.length!==points.length){
-      equityHistory=cleaned;
-      saveSoloHistoryToFirebase();
-    } else {
-      equityHistory=cleaned;
-    }
+    equityHistory=cleaned;
+    // Always write cleaned version to localStorage so loadEquityHistory() never reads garbage
     localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(cleaned));
+    localStorage.setItem(getProfileKey(LS_EQUITY),JSON.stringify(cleaned));
+    // If points were removed, persist cleaned version back to Firebase
+    if(cleaned.length!==points.length){
+      saveSoloHistoryToFirebase();
+    }
     return cleaned;
   });
 }
@@ -1902,13 +1901,12 @@ function loadEquityHistory() {
 function saveEquityHistory() {
   if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
   if (isInGroupContext()) {
-    // group: never touch solo localStorage or solo Firebase
-    var grpKey = "hb_eq_grp_" + currentRoomId + "_" + (currentUser&&currentUser.uid||"anon");
+    var grpKey="hb_eq_grp_"+currentRoomId+"_"+(currentUser&&currentUser.uid||"anon");
     localStorage.setItem(grpKey, JSON.stringify(equityHistory));
     saveGroupHistoryToFirebase(currentRoomId);
   } else {
-    // solo: save to solo localStorage and solo Firebase
     localStorage.setItem(getProfileKey(LS_EQUITY), JSON.stringify(equityHistory));
+    localStorage.setItem(getProfileKey("hb_eqhist_v1"), JSON.stringify(equityHistory));
     saveSoloHistoryToFirebase();
   }
 }
