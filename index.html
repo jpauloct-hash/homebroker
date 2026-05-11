@@ -1890,8 +1890,15 @@ function loadEquityHistory() {
 }
 function saveEquityHistory() {
   if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
-  localStorage.setItem(getProfileKey(LS_EQUITY), JSON.stringify(equityHistory));
-  if (getCurrentProfile() === getSoloProfileId()) {
+
+  if (isInGroupContext()) {
+    // Group: use a group-specific localStorage key so solo is never contaminated
+    var grpKey = "hb_eq_grp_" + currentRoomId + "_" + (currentUser&&currentUser.uid||"anon");
+    localStorage.setItem(grpKey, JSON.stringify(equityHistory));
+    saveGroupHistoryToFirebase(currentRoomId);
+  } else {
+    // Solo: use the solo-specific key and save to Firebase
+    localStorage.setItem(getProfileKey(LS_EQUITY), JSON.stringify(equityHistory));
     saveSoloHistoryToFirebase();
   }
 }
