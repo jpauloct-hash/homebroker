@@ -1243,7 +1243,11 @@ function pushEquityPoint() {
   equityHistory=Array.isArray(equityHistory)?equityHistory:[];
   equityHistory.push({t:now,v:total});
   if(equityHistory.length>90)equityHistory=equityHistory.slice(-90);
-  localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(equityHistory));
+  // Use context-aware key: solo and group get separate localStorage entries
+  var cacheKey = isInGroupContext()
+    ? "hb_eqhist_v1_grp_" + currentRoomId + "_" + (currentUser&&currentUser.uid||"anon")
+    : getProfileKey("hb_eqhist_v1");
+  localStorage.setItem(cacheKey, JSON.stringify(equityHistory));
   saveCurrentContextToFirebase();
 }
 
