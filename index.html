@@ -1476,10 +1476,13 @@ function switchToProfile(profileId) {
       return loadGroupHistoryFromFirebase(meta.roomId, profileId);
     }).then(function() {
       if (thisSwitch !== roomSwitchToken) return;
-      goal = loadGoal();
+      goal = {
+        endDate: (currentRoomData && currentRoomData.endDate) || "",
+        target: Number((currentRoomData && currentRoomData.targetPct) || 0)
+      };
       setActiveScreen("ma");
       updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
-      notif("Perfil: "+meta.displayName);
+      notif("Perfil: " + meta.displayName);
     }).catch(function(err) {
       console.error("Erro ao carregar grupo:", err);
       notif("Erro ao carregar carteira do grupo","err");
@@ -1502,7 +1505,6 @@ function switchToProfile(profileId) {
 
 function renderGroupPanel() {
   clearSoloGroupSubscriptions();
-  updateContextActionsUI();
   var soloView=$("group-solo-view"), roomView=$("group-room-view"), noRoom=$("group-noroom");
   if(!soloView||!roomView||!noRoom)return;
 
