@@ -1243,15 +1243,50 @@ function saveCurrentContextToFirebase() {
 
 
 function pushEquityPoint() {
-  var total=bal+portValue();
-  var now=Date.now();
-  equityHistory=Array.isArray(equityHistory)?equityHistory:[];
-  equityHistory.push({t:now,v:total});
-  if(equityHistory.length>90)equityHistory=equityHistory.slice(-90);
-  // Use context-aware key: solo and group get separate localStorage entries
+  var total = bal + portValue();
+  var now = Date.now();
+
+  equityHistory = Array.isArray(equityHistory) ? equityHistory : [];
+
+  var d = new Date(now);
+  var dayKey =
+    d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
+
+  var replaced = false;
+
+  for (var i = equityHistory.length - 1; i >= 0; i--) {
+    var p = equityHistory[i];
+    if (!p || typeof p.t === "undefined") continue;
+
+    var pd = new Date(Number(p.t));
+    var pKey =
+      pd.getFullYear() + "-" +
+      String(pd.getMonth() + 1).padStart(2, "0") + "-" +
+      String(pd.getDate()).padStart(2, "0");
+
+    if (pKey === dayKey) {
+      equityHistory[i] = { t: now, v: total };
+      replaced = true;
+      break;
+    }
+
+    if (Number(p.t) < now) break;
+  }
+
+  if (!replaced) {
+    equityHistory.push({ t: now, v: total });
+  }
+
+  equityHistory.sort(function(a, b) {
+    return Number(a.t) - Number(b.t);
+  });
+
   var cacheKey = isInGroupContext()
-    ? "hb_eqhist_v1_grp_" + currentRoomId + "_" + (currentUser&&currentUser.uid||"anon")
+    ? "hb_eqhist_v1_grp_" + currentRoomId + "_" + (currentUser && currentUser.uid || "anon")
     : getProfileKey("hb_eqhist_v1");
+
   localStorage.setItem(cacheKey, JSON.stringify(equityHistory));
   saveCurrentContextToFirebase();
 }
@@ -1899,9 +1934,10 @@ function loadEquityHistory() {
   try { return JSON.parse(localStorage.getItem(getProfileKey(LS_EQUITY))||"[]"); } catch(e) { return []; }
 }
 function saveEquityHistory() {
-  if (equityHistory.length > 90) equityHistory = equityHistory.slice(-90);
+  equityHistory = Array.isArray(equityHistory) ? equityHistory : [];
+
   if (isInGroupContext()) {
-    var grpKey="hb_eq_grp_"+currentRoomId+"_"+(currentUser&&currentUser.uid||"anon");
+    var grpKey = "hb_eq_grp_" + currentRoomId + "_" + (currentUser && currentUser.uid || "anon");
     localStorage.setItem(grpKey, JSON.stringify(equityHistory));
     saveGroupHistoryToFirebase(currentRoomId);
   } else {
