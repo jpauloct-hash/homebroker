@@ -2759,7 +2759,7 @@ function goToSellFromPortfolio(tk) {
   renderOrders();
 }
 function renderPort() {
-  var pv=portValue(), pnl=bal+pv-100000;
+  var pv=portValue(), pnl=bal+pv-initialBal;
   $("pbal").textContent=R(bal); $("ppv").textContent=R(pv);
   $("pdiv").textContent=R(totalDiv);
   $("pres").textContent=(pnl>=0?"+":"")+R(pnl); $("pres").style.color=pnl>=0?"var(--g)":"var(--r)";
