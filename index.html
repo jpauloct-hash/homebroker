@@ -1124,24 +1124,31 @@ function normalizeEquityHistory(points) {
 }
 
 function loadSoloHistoryFromFirebase() {
-  var ref=getSoloHistoryRef();
-  if(!ref)return Promise.resolve([]);
-  return ref.once("value").then(function(snap){
-    var data=snap.val();
-    var points=Array.isArray(data)?data:[];
-    points=normalizeEquityHistory(points);
-    // Filter out points contaminated from group sessions
-    var soloInit=Number(initialBal||100000);
-    var maxReasonable=Math.max(soloInit*20, 500000);
-    var cleaned=points.filter(function(p){return p.v<=maxReasonable;});
-    equityHistory=cleaned;
-    // Always write cleaned version to localStorage so loadEquityHistory() never reads garbage
-    localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(cleaned));
-    localStorage.setItem(getProfileKey(LS_EQUITY),JSON.stringify(cleaned));
-    // If points were removed, persist cleaned version back to Firebase
-    if(cleaned.length!==points.length){
-      saveSoloHistoryToFirebase();
+  var ref = getSoloHistoryRef();
+  if (!ref) return Promise.resolve([]);
+
+  return ref.once("value").then(function(snap) {
+    var data = snap.val();
+    var points = Array.isArray(data) ? data : [];
+    points = normalizeEquityHistory(points);
+
+    var soloInit = Number(initialBal || 100000);
+    var maxReasonable = Math.max(soloInit * 20, 500000);
+    var cleaned = points.filter(function(p) {
+      return p && !isNaN(Number(p.v)) && p.v <= maxReasonable;
+    });
+
+    equityHistory = cleaned;
+
+    localStorage.setItem(getProfileKey("hb_eqhist_v1"), JSON.stringify(cleaned));
+    localStorage.setItem(getProfileKey(LS_EQUITY), JSON.stringify(cleaned));
+
+    if (cleaned.length !== points.length) {
+      return ref.set(cleaned).then(function() {
+        return cleaned;
+      });
     }
+
     return cleaned;
   });
 }
@@ -1508,14 +1515,19 @@ function switchToProfile(profileId) {
   if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
   currentRoomId = ""; currentRoomData = null;
   if (currentUser) localStorage.removeItem("hb_active_room_"+currentUser.uid);
-  var st2 = loadState();
-  bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
-  divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
-  initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
-  goal=loadGoal(); equityHistory=loadEquityHistory();
-  setActiveScreen("ma");
-  updateAuthIdentityUI(); render(); renderGroupPanel();
-  notif("Perfil: "+(meta?meta.displayName:profileId));
+  return loadSoloFromFirebase().then(function() {
+    return loadSoloHistoryFromFirebase().catch(function() {
+      equityHistory = loadEquityHistory();
+    });
+  }).then(function() {
+    goal = loadGoal();
+    setActiveScreen("ma");
+    updateAuthIdentityUI();
+    render();
+    renderGroupPanel();
+    updateContextActionsUI();
+    notif("Perfil: " + (meta ? meta.displayName : profileId));
+  });
 }
 
 
