@@ -1222,7 +1222,6 @@ function loadGroupHistoryFromFirebase(roomId, profileId) {
 function saveGroupHistoryToFirebase(roomId) {
   var ref=getGroupHistoryRef(roomId);if(!ref)return Promise.resolve();
   var points=normalizeEquityHistory(equityHistory||[]);
-  localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(points));
   return ref.set(points);
 }
 function isCurrentProfileGroup() {
