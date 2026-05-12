@@ -2531,28 +2531,67 @@ function drawEquityChart() {
       dailyMap[key] = { t: Number(p.t), v: Number(p.v) };
   });
 
-  var sorted = Object.values(dailyMap).sort(function(a,b){return a.t-b.t;});
+  var sorted = Object.values(dailyMap).sort(function(a, b){ return a.t - b.t; });
 
   // Fill missing weekdays with previous day value
   var daily = [];
   if (sorted.length > 0) {
     daily.push(sorted[0]);
-    for (var di=1; di<sorted.length; di++) {
-      var prev = sorted[di-1], curr = sorted[di];
-      var d = new Date(prev.t); d.setDate(d.getDate()+1);
+
+    for (var di = 1; di < sorted.length; di++) {
+      var prev = sorted[di - 1];
+      var curr = sorted[di];
+
+      var d = new Date(prev.t);
+      d.setDate(d.getDate() + 1);
+
       while (d.getTime() < curr.t) {
         var dow = d.getDay();
-        if (dow!==0 && dow!==6)
-          daily.push({t:d.getTime(), v:prev.v});
-        d.setDate(d.getDate()+1);
+
+        if (dow !== 0 && dow !== 6) {
+          daily.push({
+            t: d.getTime(),
+            v: prev.v
+          });
+        }
+
+        d.setDate(d.getDate() + 1);
       }
+
       daily.push(curr);
     }
   }
 
+  // Se ainda não houver 2 dias diferentes, usa pontos intradiários
   if (daily.length < 2) {
-    ctx.fillStyle="#6b8cae"; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="center";
-    ctx.fillText("Aguardando dados suficientes...", W/2, H/2);
+    daily = (equityHistory || [])
+      .filter(function(p) {
+        return p && typeof p.t !== "undefined" && !isNaN(Number(p.t)) && !isNaN(Number(p.v));
+      })
+      .map(function(p) {
+        return {
+          t: Number(p.t),
+          v: Number(p.v)
+        };
+      })
+      .sort(function(a, b) {
+        return a.t - b.t;
+      });
+  }
+
+  // Se tiver só 1 ponto, cria um segundo ponto artificial para desenhar uma linha reta
+  if (daily.length === 1) {
+    daily.unshift({
+      t: daily[0].t - 60 * 60 * 1000,
+      v: daily[0].v
+    });
+  }
+
+  if (daily.length < 2) {
+    ctx.fillStyle = "#6b8cae";
+    ctx.font = "10px 'JetBrains Mono',monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Faça uma atualização ou operação para iniciar o gráfico", W / 2, H / 2);
     return;
   }
 
@@ -4096,6 +4135,17 @@ if (token) {
     divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
     initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
     goal=loadGoal(); equityHistory=loadEquityHistory();
+
+    if (!Array.isArray(equityHistory)) equityHistory = [];
+
+    if (equityHistory.length === 0) {
+      equityHistory.push({
+        t: Date.now(),
+        v: bal + portValue()
+      });
+      saveEquityHistory();
+    }
+
     initApp();
   } else {
     showProfileScreen();
