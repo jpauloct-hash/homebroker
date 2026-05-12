@@ -1329,8 +1329,6 @@ var _lp=0;function maybePushStats(){if(!currentRoomId||!getIdentityUid())return;
 // ── MY GROUPS FROM FIREBASE ──────────────────────────────────────────────────
 function loadMyGroupsFromFirebase() {
   var uid = getIdentityUid();
-  var ref = getUserRoomsRef();
-
   if (!uid || !fbDb) return Promise.resolve([]);
 
   var groupsMap = {};
@@ -1340,11 +1338,11 @@ function loadMyGroupsFromFirebase() {
     groupsMap[g.roomId] = Object.assign(groupsMap[g.roomId] || {}, g);
   }
 
-  function groupFromUserRooms(roomId, x) {
+  function normalizeUserRoom(roomId, x) {
     x = x || {};
     return {
       roomId: roomId,
-      roomName: x.roomName || roomId,
+      roomName: x.roomName || x.name || roomId,
       initialBal: Number(x.initialBal || 100000),
       endDate: x.endDate || "",
       targetPct: Number(x.targetPct || 0),
@@ -1354,15 +1352,73 @@ function loadMyGroupsFromFirebase() {
     };
   }
 
-  function localGroupMetas() {
-    var arr = [];
+  function normalizeRoom(roomId, room) {
+    room = room || {};
+    return {
+      roomId: roomId,
+      roomName: room.name || roomId,
+      initialBal: Number(room.initialBal || 100000),
+      endDate: room.endDate || "",
+      targetPct: Number(room.targetPct || 0),
+      memberName: getIdentityName(),
+      createdAt: Number(room.createdAt || 0),
+      createdBy: room.createdBy || ""
+    };
+  }
 
+  function repairUserRooms(group) {
+    if (!group || !group.roomId) return Promise.resolve();
+
+    return fbDb.ref("userRooms/" + uid + "/" + group.roomId).update({
+      roomName: group.roomName || group.roomId,
+      initialBal: Number(group.initialBal || 100000),
+      endDate: group.endDate || "",
+      targetPct: Number(group.targetPct || 0),
+      memberName: group.memberName || getIdentityName(),
+      createdAt: Number(group.createdAt || Date.now()),
+      createdBy: group.createdBy || ""
+    }).catch(function(err) {
+      console.error("Falha ao reparar userRooms:", group.roomId, err);
+    });
+  }
+
+  // 1) Caminho principal: índice userRooms/{uid}
+  var pUserRooms = fbDb.ref("userRooms/" + uid).once("value").then(function(snap) {
+    var data = snap.val() || {};
+
+    Object.keys(data).forEach(function(roomId) {
+      addGroup(normalizeUserRoom(roomId, data[roomId]));
+    });
+  }).catch(function(err) {
+    console.error("Erro lendo userRooms:", err);
+  });
+
+  // 2) Fallback: varre rooms e pega grupos onde o usuário é membro ou criador
+  var pRooms = fbDb.ref("rooms").once("value").then(function(snap) {
+    var rooms = snap.val() || {};
+
+    Object.keys(rooms).forEach(function(roomId) {
+      var room = rooms[roomId] || {};
+      var members = room.members || {};
+      var isMember = !!members[uid];
+      var isCreator = room.createdBy === uid;
+
+      if (isMember || isCreator) {
+        addGroup(normalizeRoom(roomId, room));
+      }
+    });
+  }).catch(function(err) {
+    console.error("Erro lendo rooms:", err);
+  });
+
+  // 3) Fallback local: perfis grupo_ salvos no localStorage
+  function readLocalGroupProfiles() {
     try {
       getProfiles().forEach(function(profileId) {
         var meta = getProfileMeta(profileId);
 
         if (meta && meta.type === "group" && meta.roomId) {
-          arr.push({
+          addGroup({
             roomId: meta.roomId,
             roomName: meta.roomName || meta.roomId,
             initialBal: Number(meta.initialBal || 100000),
@@ -1375,58 +1431,13 @@ function loadMyGroupsFromFirebase() {
         }
       });
     } catch (e) {
-      console.error("Erro ao ler grupos locais:", e);
+      console.error("Erro lendo grupos locais:", e);
     }
-
-    return arr;
   }
 
-  function repairUserRoomIfPossible(group) {
-    if (!group || !group.roomId) return Promise.resolve();
+  return Promise.all([pUserRooms, pRooms]).then(function() {
+    readLocalGroupProfiles();
 
-    return fbDb.ref("rooms/" + group.roomId).once("value").then(function(snap) {
-      if (!snap.exists()) return;
-
-      var room = snap.val() || {};
-      var members = room.members || {};
-
-      if (!members[uid]) return;
-
-      var payload = {
-        roomName: room.name || group.roomName || group.roomId,
-        initialBal: Number(room.initialBal || group.initialBal || 100000),
-        endDate: room.endDate || group.endDate || "",
-        targetPct: Number(room.targetPct || group.targetPct || 0),
-        memberName: group.memberName || getIdentityName(),
-        createdAt: Number(room.createdAt || group.createdAt || Date.now()),
-        createdBy: room.createdBy || group.createdBy || ""
-      };
-
-      addGroup(groupFromUserRooms(group.roomId, payload));
-
-      return fbDb.ref("userRooms/" + uid + "/" + group.roomId).set(payload);
-    }).catch(function(err) {
-      console.error("Falha ao reparar userRooms para grupo " + group.roomId, err);
-    });
-  }
-
-  var pUserRooms = ref
-    ? ref.once("value").then(function(snap) {
-        var data = snap.val() || {};
-
-        Object.keys(data).forEach(function(roomId) {
-          addGroup(groupFromUserRooms(roomId, data[roomId]));
-        });
-      })
-    : Promise.resolve();
-
-  return pUserRooms.then(function() {
-    var localGroups = localGroupMetas();
-
-    localGroups.forEach(addGroup);
-
-    return Promise.all(localGroups.map(repairUserRoomIfPossible));
-  }).then(function() {
     var list = Object.values(groupsMap);
 
     list.sort(function(a, b) {
@@ -1434,7 +1445,11 @@ function loadMyGroupsFromFirebase() {
     });
 
     myGroupsCache = list;
-    return list;
+
+    // Repara o índice userRooms para não depender do fallback na próxima vez
+    return Promise.all(list.map(repairUserRooms)).then(function() {
+      return list;
+    });
   });
 }
 
