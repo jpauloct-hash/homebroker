@@ -1587,29 +1587,99 @@ function loadMyGroupsFromFirebase() {
 }
 
 function loadGroupSummaryFromFirebase(roomId) {
-  var uid=getIdentityUid();
-  if(!uid||!fbDb||!roomId)return Promise.resolve(null);
+  var uid = getIdentityUid();
+  if (!uid || !fbDb || !roomId) return Promise.resolve(null);
+
   return Promise.all([
-    fbDb.ref("groupPortfolios/"+roomId+"/"+uid).once("value"),
-    fbDb.ref("rooms/"+roomId+"/members").once("value")
-  ]).then(function(results){
-    var portData=results[0].val()||null;
-    var members=results[1].val()||{};
-    if(!portData)return null;
-    var cash=Number(portData.cash||0);
-    var positions=portData.positions||{};
-    var totalPositions=0;
-    Object.keys(positions).forEach(function(k){
-      var p=positions[k]||{};
-      totalPositions+=Number(p.qty||0)*Number(p.avgPrice||0);
+    fbDb.ref("groupPortfolios/" + roomId + "/" + uid).once("value"),
+    fbDb.ref("rooms/" + roomId + "/members").once("value"),
+    fbDb.ref("rooms/" + roomId).once("value")
+  ]).then(function(results) {
+    var portData = results[0].val() || null;
+    var members = results[1].val() || {};
+    var roomData = results[2].val() || {};
+
+    if (!portData) return null;
+
+    var cash = Number(portData.cash || 0);
+    var positions = portData.positions || {};
+    var totalPositions = 0;
+
+    Object.keys(positions).forEach(function(tk) {
+      var p = positions[tk] || {};
+      var qty = Number(p.qty || 0);
+
+      // Usa cotação atual. Se não tiver cotação, cai para preço médio.
+      var marketPrice = Number(prices[tk] || 0);
+      var avgPrice = Number(p.avgPrice || 0);
+      var px = marketPrice > 0 ? marketPrice : avgPrice;
+
+      totalPositions += qty * px;
     });
-    var total=cash+totalPositions;
-    var initialBal=Number(portData.initialBal||100000);
-    var pct=initialBal>0?((total-initialBal)/initialBal*100):0;
-    var ranking=Object.values(members).sort(function(a,b){return Number(b.pct||0)-Number(a.pct||0);});
-    var myName=getIdentityName();
-    var myPos=ranking.findIndex(function(x){return(x.uid&&x.uid===uid)||(x.name===myName);});
-    return{total:total,pct:pct,pos:myPos>=0?myPos+1:null,totalMembers:ranking.length};
+
+    var total = cash + totalPositions;
+
+    var initialBal = Number(
+      portData.initialBal ||
+      roomData.initialBal ||
+      100000
+    );
+
+    var pct = initialBal > 0 ? ((total - initialBal) / initialBal * 100) : 0;
+
+    // Monta ranking usando total/pct dos membros, mas substitui o usuário atual
+    // pelo cálculo fresco feito acima.
+    var memberArr = Object.keys(members).map(function(memberUid) {
+      var m = members[memberUid] || {};
+
+      if (memberUid === uid || m.uid === uid) {
+        m = Object.assign({}, m, {
+          uid: uid,
+          total: total,
+          pct: pct,
+          name: m.name || getIdentityName()
+        });
+      }
+
+      return m;
+    });
+
+    if (!memberArr.length) {
+      memberArr = [{
+        uid: uid,
+        name: getIdentityName(),
+        total: total,
+        pct: pct
+      }];
+    }
+
+    memberArr.sort(function(a, b) {
+      return Number(b.pct || 0) - Number(a.pct || 0);
+    });
+
+    var myName = getIdentityName();
+
+    var myPos = memberArr.findIndex(function(x) {
+      return (x.uid && x.uid === uid) || (x.name === myName);
+    });
+
+    // Já aproveita para atualizar o nó members com o valor correto
+    fbDb.ref("rooms/" + roomId + "/members/" + uid).update({
+      uid: uid,
+      name: getIdentityName(),
+      total: total,
+      pct: pct,
+      updatedAt: Date.now()
+    }).catch(function(err) {
+      console.error("Falha ao atualizar resumo do membro:", err);
+    });
+
+    return {
+      total: total,
+      pct: pct,
+      pos: myPos >= 0 ? myPos + 1 : null,
+      totalMembers: memberArr.length
+    };
   });
 }
 
@@ -2800,7 +2870,16 @@ function checkPending() {
     changed=true;
   }
   pending = keep;
-  if (changed) saveState();
+  if (changed) {
+    saveState();
+
+    if (isInGroupContext()) {
+      pushEquityPoint();
+      pushMyStats();
+    }
+
+    render();
+  }
 }
 
 //  Equity Canvas Chart 
@@ -3308,7 +3387,14 @@ function doMarketOrder(tk, sd, q, isScheduled) {
     (function(){var pos2=port[tk]||{avgPrice:p};if((p-pos2.avgPrice)>=0)sfxHitPlate();else sfxHitDirt();})(); notif("Venda executada: "+q+" "+tk+" @ "+R(p));
   }
   if (trd.length>200) trd.pop();
-  saveState(); render();
+  saveState();
+
+  if (isInGroupContext()) {
+    pushEquityPoint();
+    pushMyStats();
+  }
+
+  render();
 }
 
 function execOrder() {
