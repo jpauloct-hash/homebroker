@@ -951,35 +951,110 @@ function deleteCurrentGroup() {
 }
 
 
+function rememberCurrentGroupForSoloList() {
+  var uid = getIdentityUid();
+  if (!uid || !currentRoomId) return Promise.resolve();
+
+  var roomId = currentRoomId;
+  var room = currentRoomData || {};
+
+  var group = {
+    roomId: roomId,
+    roomName: room.name || room.roomName || roomId,
+    initialBal: Number(room.initialBal || initialBal || 100000),
+    endDate: room.endDate || "",
+    targetPct: Number(room.targetPct || 0),
+    memberName: getIdentityName(),
+    createdAt: Number(room.createdAt || Date.now()),
+    createdBy: room.createdBy || ""
+  };
+
+  upsertMyRoomLocal(group);
+
+  var pid = "grupo_" + roomId + "_" + getIdentityName();
+
+  setProfileMeta(pid, {
+    profileId: pid,
+    displayName: getIdentityName(),
+    type: "group",
+    roomId: roomId,
+    roomName: group.roomName,
+    initialBal: group.initialBal,
+    endDate: group.endDate,
+    targetPct: group.targetPct,
+    createdAt: group.createdAt,
+    createdBy: group.createdBy
+  });
+
+  addProfileIfMissing(pid);
+
+  if (!fbDb) return Promise.resolve();
+
+  return fbDb.ref("userRooms/" + uid + "/" + roomId).update({
+    roomName: group.roomName,
+    initialBal: group.initialBal,
+    endDate: group.endDate,
+    targetPct: group.targetPct,
+    memberName: group.memberName,
+    createdAt: group.createdAt,
+    createdBy: group.createdBy
+  }).catch(function(err) {
+    console.error("Não consegui reparar userRooms antes de voltar ao solo:", err);
+  });
+}
+
 function switchToSoloProfile() {
-  var soloId=ensureSoloProfile(); if(!soloId)return;
-  currentRoomId=""; currentRoomData=null;
-  localStorage.removeItem("hb_room_id");
-  // keep hb_active_room_ so group can be resumed later
-  if(groupUnsubscribe){groupUnsubscribe();groupUnsubscribe=null;}
-  clearSoloGroupSubscriptions();
-  localStorage.setItem(LS_PROFILE, soloId);
-  setActiveScreen("ma");
-  loadSoloFromFirebase().then(function(){
-    return loadSoloHistoryFromFirebase().catch(function(){equityHistory=loadEquityHistory();});
-  }).then(function(){
-    goal=loadGoal(); updateAuthIdentityUI(); render(); updateContextActionsUI();
-    // load groups without blocking solo return
-    return loadMyGroupsFromFirebase().then(function(){
-      renderGroupPanel();
-    }).catch(function(err){
-      console.error("Erro ao carregar meus grupos no solo:",err);
-      renderGroupPanel();
+  var soloId = ensureSoloProfile();
+  if (!soloId) return;
+
+  rememberCurrentGroupForSoloList().then(function() {
+    currentRoomId = "";
+    currentRoomData = null;
+
+    localStorage.removeItem("hb_room_id");
+
+    if (groupUnsubscribe) {
+      groupUnsubscribe();
+      groupUnsubscribe = null;
+    }
+
+    clearSoloGroupSubscriptions();
+
+    localStorage.setItem(LS_PROFILE, soloId);
+    setActiveScreen("ma");
+
+    return loadSoloFromFirebase();
+  }).then(function() {
+    return loadSoloHistoryFromFirebase().catch(function() {
+      equityHistory = loadEquityHistory();
     });
-  }).catch(function(err){
-    console.error("Erro ao voltar para solo:",err);
-    // fallback: enter solo anyway
-    try{
-      goal=loadGoal(); updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
-      notif("Voltou ao solo (fallback local)","err");
-    }catch(e2){
-      console.error("Fallback do solo falhou:",e2);
-      notif("Erro ao voltar ao solo","err");
+  }).then(function() {
+    goal = loadGoal();
+
+    updateAuthIdentityUI();
+    render();
+    updateContextActionsUI();
+
+    return loadMyGroupsFromFirebase();
+  }).then(function() {
+    renderGroupPanel();
+  }).catch(function(err) {
+    console.error("Erro ao voltar para solo:", err);
+
+    try {
+      currentRoomId = "";
+      currentRoomData = null;
+
+      goal = loadGoal();
+      updateAuthIdentityUI();
+      render();
+      updateContextActionsUI();
+      renderGroupPanel();
+
+      notif("Voltou ao solo com fallback local", "err");
+    } catch (e2) {
+      console.error("Fallback do solo falhou:", e2);
+      notif("Erro ao voltar ao solo", "err");
     }
   });
 }
@@ -1725,8 +1800,37 @@ function switchToProfile(profileId) {
     var thisSwitch = ++roomSwitchToken;
     joinRoom(meta.roomId).then(function(room) {
       if (thisSwitch !== roomSwitchToken) return;
-      currentRoomData = room; meta.roomName = room.name; setProfileMeta(profileId, meta);
-      return loadGroupPortfolioFromFirebase(meta.roomId, profileId);
+
+      currentRoomData = room;
+      meta.roomName = room.name;
+      setProfileMeta(profileId, meta);
+
+      upsertMyRoomLocal({
+        roomId: meta.roomId,
+        roomName: room.name || meta.roomName || meta.roomId,
+        initialBal: Number(room.initialBal || 100000),
+        endDate: room.endDate || "",
+        targetPct: Number(room.targetPct || 0),
+        memberName: meta.displayName || getIdentityName(),
+        createdAt: Number(room.createdAt || Date.now()),
+        createdBy: room.createdBy || ""
+      });
+
+      addProfileIfMissing(profileId);
+
+      return fbDb.ref("userRooms/" + getIdentityUid() + "/" + meta.roomId).update({
+        roomName: room.name || meta.roomName || meta.roomId,
+        initialBal: Number(room.initialBal || 100000),
+        endDate: room.endDate || "",
+        targetPct: Number(room.targetPct || 0),
+        memberName: meta.displayName || getIdentityName(),
+        createdAt: Number(room.createdAt || Date.now()),
+        createdBy: room.createdBy || ""
+      }).catch(function(err) {
+        console.error("Falha ao reparar userRooms no switchToProfile:", err);
+      }).then(function() {
+        return loadGroupPortfolioFromFirebase(meta.roomId, profileId);
+      });
     }).then(function() {
       if (thisSwitch !== roomSwitchToken) return;
       return loadGroupHistoryFromFirebase(meta.roomId, profileId);
