@@ -1327,117 +1327,158 @@ function pushMyStats(){
 }
 var _lp=0;function maybePushStats(){if(!currentRoomId||!getIdentityUid())return;var n=Date.now();if(n-_lp>60000){_lp=n;pushMyStats();}}
 // ── MY GROUPS FROM FIREBASE ──────────────────────────────────────────────────
+function getMyRoomsLocalKey() {
+  var uid = getIdentityUid();
+  return "hb_my_rooms_" + (uid || "anon");
+}
+
+function loadMyRoomsLocalIndex() {
+  try {
+    return JSON.parse(localStorage.getItem(getMyRoomsLocalKey()) || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveMyRoomsLocalIndex(data) {
+  localStorage.setItem(getMyRoomsLocalKey(), JSON.stringify(data || {}));
+}
+
+function upsertMyRoomLocal(group) {
+  if (!group || !group.roomId) return;
+
+  var data = loadMyRoomsLocalIndex();
+
+  data[group.roomId] = {
+    roomId: group.roomId,
+    roomName: group.roomName || group.name || group.roomId,
+    initialBal: Number(group.initialBal || 100000),
+    endDate: group.endDate || "",
+    targetPct: Number(group.targetPct || 0),
+    memberName: group.memberName || getIdentityName(),
+    createdAt: Number(group.createdAt || Date.now()),
+    createdBy: group.createdBy || ""
+  };
+
+  saveMyRoomsLocalIndex(data);
+}
+
+function addProfileIfMissing(profileId) {
+  if (!profileId) return;
+
+  var profiles = getProfiles();
+
+  if (profiles.indexOf(profileId) === -1) {
+    profiles.push(profileId);
+    localStorage.setItem("hb_profiles_v1", JSON.stringify(profiles));
+  }
+}
+
 function loadMyGroupsFromFirebase() {
   var uid = getIdentityUid();
-  if (!uid || !fbDb) return Promise.resolve([]);
+
+  if (!uid) return Promise.resolve([]);
 
   var groupsMap = {};
 
   function addGroup(g) {
     if (!g || !g.roomId) return;
-    groupsMap[g.roomId] = Object.assign(groupsMap[g.roomId] || {}, g);
-  }
 
-  function normalizeUserRoom(roomId, x) {
-    x = x || {};
-    return {
-      roomId: roomId,
-      roomName: x.roomName || x.name || roomId,
-      initialBal: Number(x.initialBal || 100000),
-      endDate: x.endDate || "",
-      targetPct: Number(x.targetPct || 0),
-      memberName: x.memberName || getIdentityName(),
-      createdAt: Number(x.createdAt || 0),
-      createdBy: x.createdBy || ""
-    };
-  }
-
-  function normalizeRoom(roomId, room) {
-    room = room || {};
-    return {
-      roomId: roomId,
-      roomName: room.name || roomId,
-      initialBal: Number(room.initialBal || 100000),
-      endDate: room.endDate || "",
-      targetPct: Number(room.targetPct || 0),
-      memberName: getIdentityName(),
-      createdAt: Number(room.createdAt || 0),
-      createdBy: room.createdBy || ""
-    };
-  }
-
-  function repairUserRooms(group) {
-    if (!group || !group.roomId) return Promise.resolve();
-
-    return fbDb.ref("userRooms/" + uid + "/" + group.roomId).update({
-      roomName: group.roomName || group.roomId,
-      initialBal: Number(group.initialBal || 100000),
-      endDate: group.endDate || "",
-      targetPct: Number(group.targetPct || 0),
-      memberName: group.memberName || getIdentityName(),
-      createdAt: Number(group.createdAt || Date.now()),
-      createdBy: group.createdBy || ""
-    }).catch(function(err) {
-      console.error("Falha ao reparar userRooms:", group.roomId, err);
+    groupsMap[g.roomId] = Object.assign(groupsMap[g.roomId] || {}, {
+      roomId: g.roomId,
+      roomName: g.roomName || g.name || g.roomId,
+      initialBal: Number(g.initialBal || 100000),
+      endDate: g.endDate || "",
+      targetPct: Number(g.targetPct || 0),
+      memberName: g.memberName || getIdentityName(),
+      createdAt: Number(g.createdAt || Date.now()),
+      createdBy: g.createdBy || ""
     });
   }
 
-  // 1) Caminho principal: índice userRooms/{uid}
+  // 1) Fallback local forte: índice próprio
+  var localRooms = loadMyRoomsLocalIndex();
+
+  Object.keys(localRooms).forEach(function(roomId) {
+    addGroup(localRooms[roomId]);
+  });
+
+  // 2) Fallback local antigo: perfis grupo_...
+  try {
+    getProfiles().forEach(function(profileId) {
+      var meta = getProfileMeta(profileId);
+
+      if (meta && meta.type === "group" && meta.roomId) {
+        addGroup({
+          roomId: meta.roomId,
+          roomName: meta.roomName || meta.roomId,
+          initialBal: Number(meta.initialBal || 100000),
+          endDate: meta.endDate || "",
+          targetPct: Number(meta.targetPct || 0),
+          memberName: meta.displayName || getIdentityName(),
+          createdAt: Number(meta.createdAt || Date.now()),
+          createdBy: meta.createdBy || ""
+        });
+      }
+    });
+  } catch (e) {
+    console.error("Erro lendo perfis locais de grupo:", e);
+  }
+
+  if (!fbDb) {
+    var onlyLocal = Object.values(groupsMap);
+    myGroupsCache = onlyLocal;
+    return Promise.resolve(onlyLocal);
+  }
+
+  // 3) Caminho oficial: userRooms/{uid}
   var pUserRooms = fbDb.ref("userRooms/" + uid).once("value").then(function(snap) {
     var data = snap.val() || {};
 
     Object.keys(data).forEach(function(roomId) {
-      addGroup(normalizeUserRoom(roomId, data[roomId]));
+      var x = data[roomId] || {};
+
+      addGroup({
+        roomId: roomId,
+        roomName: x.roomName || x.name || roomId,
+        initialBal: Number(x.initialBal || 100000),
+        endDate: x.endDate || "",
+        targetPct: Number(x.targetPct || 0),
+        memberName: x.memberName || getIdentityName(),
+        createdAt: Number(x.createdAt || Date.now()),
+        createdBy: x.createdBy || ""
+      });
     });
   }).catch(function(err) {
     console.error("Erro lendo userRooms:", err);
   });
 
-  // 2) Fallback: varre rooms e pega grupos onde o usuário é membro ou criador
+  // 4) Fallback Firebase: tenta ler rooms, mas não depende disso
   var pRooms = fbDb.ref("rooms").once("value").then(function(snap) {
     var rooms = snap.val() || {};
 
     Object.keys(rooms).forEach(function(roomId) {
       var room = rooms[roomId] || {};
       var members = room.members || {};
-      var isMember = !!members[uid];
-      var isCreator = room.createdBy === uid;
 
-      if (isMember || isCreator) {
-        addGroup(normalizeRoom(roomId, room));
+      if (members[uid] || room.createdBy === uid) {
+        addGroup({
+          roomId: roomId,
+          roomName: room.name || roomId,
+          initialBal: Number(room.initialBal || 100000),
+          endDate: room.endDate || "",
+          targetPct: Number(room.targetPct || 0),
+          memberName: getIdentityName(),
+          createdAt: Number(room.createdAt || Date.now()),
+          createdBy: room.createdBy || ""
+        });
       }
     });
   }).catch(function(err) {
-    console.error("Erro lendo rooms:", err);
+    console.error("Erro lendo rooms. Provável regra do Firebase bloqueando leitura geral:", err);
   });
 
-  // 3) Fallback local: perfis grupo_ salvos no localStorage
-  function readLocalGroupProfiles() {
-    try {
-      getProfiles().forEach(function(profileId) {
-        var meta = getProfileMeta(profileId);
-
-        if (meta && meta.type === "group" && meta.roomId) {
-          addGroup({
-            roomId: meta.roomId,
-            roomName: meta.roomName || meta.roomId,
-            initialBal: Number(meta.initialBal || 100000),
-            endDate: meta.endDate || "",
-            targetPct: Number(meta.targetPct || 0),
-            memberName: meta.displayName || getIdentityName(),
-            createdAt: Number(meta.createdAt || 0),
-            createdBy: meta.createdBy || ""
-          });
-        }
-      });
-    } catch (e) {
-      console.error("Erro lendo grupos locais:", e);
-    }
-  }
-
   return Promise.all([pUserRooms, pRooms]).then(function() {
-    readLocalGroupProfiles();
-
     var list = Object.values(groupsMap);
 
     list.sort(function(a, b) {
@@ -1446,8 +1487,25 @@ function loadMyGroupsFromFirebase() {
 
     myGroupsCache = list;
 
-    // Repara o índice userRooms para não depender do fallback na próxima vez
-    return Promise.all(list.map(repairUserRooms)).then(function() {
+    // Salva localmente para não sumir na próxima abertura
+    list.forEach(upsertMyRoomLocal);
+
+    // Repara userRooms quando possível
+    var repairs = list.map(function(g) {
+      return fbDb.ref("userRooms/" + uid + "/" + g.roomId).update({
+        roomName: g.roomName || g.roomId,
+        initialBal: Number(g.initialBal || 100000),
+        endDate: g.endDate || "",
+        targetPct: Number(g.targetPct || 0),
+        memberName: g.memberName || getIdentityName(),
+        createdAt: Number(g.createdAt || Date.now()),
+        createdBy: g.createdBy || ""
+      }).catch(function(err) {
+        console.error("Falha ao reparar userRooms:", g.roomId, err);
+      });
+    });
+
+    return Promise.all(repairs).then(function() {
       return list;
     });
   });
@@ -1516,10 +1574,33 @@ function showCreateRoom() {
     if (currentUser) localStorage.setItem("hb_active_room_" + currentUser.uid, roomId);
 
     var pid = "grupo_" + roomId + "_" + getIdentityName();
+
     setProfileMeta(pid, {
-      profileId: pid, displayName: getIdentityName(),
-      type: "group", roomId: roomId, roomName: n
+      profileId: pid,
+      displayName: getIdentityName(),
+      type: "group",
+      roomId: roomId,
+      roomName: n,
+      initialBal: b,
+      endDate: d,
+      targetPct: t,
+      createdBy: getIdentityUid(),
+      createdAt: Date.now()
     });
+
+    addProfileIfMissing(pid);
+
+    upsertMyRoomLocal({
+      roomId: roomId,
+      roomName: n,
+      initialBal: b,
+      endDate: d,
+      targetPct: t,
+      memberName: getIdentityName(),
+      createdAt: Date.now(),
+      createdBy: getIdentityUid()
+    });
+
     localStorage.setItem("hb_profile_v1", pid);
 
     return fbDb.ref("rooms/" + roomId + "/members/" + getIdentityUid()).set({
@@ -1569,6 +1650,20 @@ function joinGroupAsGuest() {
     }).catch(function(e){console.error("userRooms write failed:",e);});
     var profileId="grupo_"+currentRoomId+"_"+name;
     setProfileMeta(profileId,{profileId:profileId,displayName:name,type:"group",roomId:currentRoomId,roomName:currentRoomData.name||currentRoomId});
+
+    addProfileIfMissing(profileId);
+
+    upsertMyRoomLocal({
+      roomId: currentRoomId,
+      roomName: currentRoomData.name || currentRoomId,
+      initialBal: Number(currentRoomData.initialBal || 100000),
+      endDate: currentRoomData.endDate || "",
+      targetPct: Number(currentRoomData.targetPct || 0),
+      memberName: name,
+      createdAt: Number(currentRoomData.createdAt || Date.now()),
+      createdBy: currentRoomData.createdBy || ""
+    });
+
     var profs=getProfiles();
     if(profs.indexOf(profileId)===-1){profs.push(profileId);localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));}
     localStorage.setItem("hb_profile_v1",profileId);
