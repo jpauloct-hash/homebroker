@@ -4778,18 +4778,66 @@ function _calcLevel(xpTotal){
 }
 
 function _updateAvatar(){
-  var trades=typeof trd!=='undefined'?trd:[];
-  var saldo=typeof bal!=='undefined'?bal:100000;
-  var init=typeof initialBal!=='undefined'?initialBal:100000;
-  var firstD=typeof firstTradeDate!=='undefined'?firstTradeDate:'';
-  var portObj=typeof port!=='undefined'?port:{};
+  var trades = typeof trd !== "undefined" && Array.isArray(trd) ? trd : [];
+  var cash = typeof bal !== "undefined" ? Number(bal || 0) : 0;
+  var init = typeof initialBal !== "undefined" ? Number(initialBal || 100000) : 100000;
+  var firstD = typeof firstTradeDate !== "undefined" ? firstTradeDate : "";
+  var portObj = typeof port !== "undefined" && port ? port : {};
 
-  var numTrades=trades.length;
-  var wins=trades.filter(function(t){return t.pnl>0;}).length;
-  var winRate=numTrades>0?Math.round(wins/numTrades*100):0;
-  var rentPct=(saldo-init)/init*100;
-  var dias=firstD?Math.max(1,Math.floor((Date.now()-new Date(firstD).getTime())/86400000)):0;
-  var temPosicao=Object.keys(portObj).length>0;
+  var carteira = 0;
+
+  if (typeof portValue === "function") {
+    carteira = Number(portValue() || 0);
+  } else {
+    Object.keys(portObj).forEach(function(tk) {
+      var p = portObj[tk] || {};
+      var qtd = Number(p.qty || 0);
+      var precoAtual = Number(prices && prices[tk] ? prices[tk] : 0);
+      var precoMedio = Number(p.avgPrice || 0);
+      var preco = precoAtual > 0 ? precoAtual : precoMedio;
+
+      carteira += qtd * preco;
+    });
+  }
+
+  var patrimonioAtual = cash + carteira;
+
+  if (!init || init <= 0) {
+    if (currentRoomData && currentRoomData.initialBal) {
+      init = Number(currentRoomData.initialBal || 100000);
+    } else {
+      init = 100000;
+    }
+  }
+
+  var numTrades = trades.length;
+
+  // Só conta vitória em operações que realmente tenham P&L realizado
+  var closedTrades = trades.filter(function(t) {
+    return typeof t.pnl !== "undefined" && !isNaN(Number(t.pnl));
+  });
+
+  var wins = closedTrades.filter(function(t) {
+    return Number(t.pnl || 0) > 0;
+  }).length;
+
+  var losses = closedTrades.filter(function(t) {
+    return Number(t.pnl || 0) < 0;
+  }).length;
+
+  var winRate = closedTrades.length > 0
+    ? Math.round(wins / closedTrades.length * 100)
+    : 0;
+
+  var rentPct = init > 0
+    ? ((patrimonioAtual - init) / init * 100)
+    : 0;
+
+  var dias = firstD
+    ? Math.max(1, Math.floor((Date.now() - new Date(firstD).getTime()) / 86400000))
+    : 0;
+
+  var temPosicao = Object.keys(portObj).length > 0;
 
   var xpTotal=numTrades*100+wins*50+Math.max(0,rentPct)*5;
   var lv=_calcLevel(xpTotal);
