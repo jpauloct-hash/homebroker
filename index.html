@@ -4839,7 +4839,11 @@ function _updateAvatar(){
 
   var temPosicao = Object.keys(portObj).length > 0;
 
-  var xpTotal=numTrades*100+wins*50+Math.max(0,rentPct)*5;
+  var xpTotal =
+    numTrades * 100 +
+    wins * 80 +
+    Math.max(0, rentPct) * 10 +
+    dias * 5;
   var lv=_calcLevel(xpTotal);
   var pct=Math.round(lv.curr/lv.needed*100);
 
