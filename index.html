@@ -1029,6 +1029,8 @@ function switchToSoloProfile() {
       equityHistory = loadEquityHistory();
     });
   }).then(function() {
+    ensureInitialEquityPoint(initialBal);
+
     goal = loadGoal();
 
     updateAuthIdentityUI();
@@ -1316,52 +1318,129 @@ function saveCurrentContextToFirebase() {
 }
 
 
+function getLocalDateKey(ts) {
+  var d = ts ? new Date(ts) : new Date();
+
+  return (
+    d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0")
+  );
+}
+
+function dateKeyToTimestamp(key) {
+  // Meio-dia evita problemas de fuso/virada de dia
+  var parts = String(key || "").split("-");
+  if (parts.length !== 3) return Date.now();
+
+  return new Date(
+    Number(parts[0]),
+    Number(parts[1]) - 1,
+    Number(parts[2]),
+    12, 0, 0, 0
+  ).getTime();
+}
+
+function portfolioValueWithFallback() {
+  var total = 0;
+
+  Object.keys(port || {}).forEach(function(tk) {
+    var pos = port[tk] || {};
+    var qty = Number(pos.qty || 0);
+    var marketPrice = Number(prices && prices[tk] ? prices[tk] : 0);
+    var avgPrice = Number(pos.avgPrice || 0);
+
+    // Se ainda não tiver cotação carregada, usa preço médio para não zerar a carteira
+    var px = marketPrice > 0 ? marketPrice : avgPrice;
+
+    total += qty * px;
+  });
+
+  return total;
+}
+
+function currentEquityValue() {
+  return Number(bal || 0) + portfolioValueWithFallback();
+}
+
 function pushEquityPoint() {
-  var total = bal + portValue();
-  var now = Date.now();
+  var todayKey = getLocalDateKey(Date.now());
+  var total = currentEquityValue();
+
+  if (!isFinite(total) || total <= 0) return;
 
   equityHistory = Array.isArray(equityHistory) ? equityHistory : [];
 
-  var d = new Date(now);
-  var dayKey =
-    d.getFullYear() + "-" +
-    String(d.getMonth() + 1).padStart(2, "0") + "-" +
-    String(d.getDate()).padStart(2, "0");
+  var found = false;
 
-  var replaced = false;
+  for (var i = 0; i < equityHistory.length; i++) {
+    var p = equityHistory[i] || {};
+    var key = p.dateKey || getLocalDateKey(Number(p.t || Date.now()));
 
-  for (var i = equityHistory.length - 1; i >= 0; i--) {
-    var p = equityHistory[i];
-    if (!p || typeof p.t === "undefined") continue;
-
-    var pd = new Date(Number(p.t));
-    var pKey =
-      pd.getFullYear() + "-" +
-      String(pd.getMonth() + 1).padStart(2, "0") + "-" +
-      String(pd.getDate()).padStart(2, "0");
-
-    if (pKey === dayKey) {
-      equityHistory[i] = { t: now, v: total };
-      replaced = true;
+    if (key === todayKey) {
+      equityHistory[i] = {
+        dateKey: todayKey,
+        t: dateKeyToTimestamp(todayKey),
+        v: total,
+        updatedAt: Date.now()
+      };
+      found = true;
       break;
     }
-
-    if (Number(p.t) < now) break;
   }
 
-  if (!replaced) {
-    equityHistory.push({ t: now, v: total });
+  if (!found) {
+    equityHistory.push({
+      dateKey: todayKey,
+      t: dateKeyToTimestamp(todayKey),
+      v: total,
+      updatedAt: Date.now()
+    });
   }
 
   equityHistory.sort(function(a, b) {
-    return Number(a.t) - Number(b.t);
+    return Number(a.t || 0) - Number(b.t || 0);
   });
 
-  var cacheKey = isInGroupContext()
-    ? "hb_eqhist_v1_grp_" + currentRoomId + "_" + (currentUser && currentUser.uid || "anon")
-    : getProfileKey("hb_eqhist_v1");
+  // Remove duplicidades por dia
+  var map = {};
+  equityHistory.forEach(function(p) {
+    if (!p) return;
 
-  localStorage.setItem(cacheKey, JSON.stringify(equityHistory));
+    var key = p.dateKey || getLocalDateKey(Number(p.t || Date.now()));
+
+    map[key] = {
+      dateKey: key,
+      t: dateKeyToTimestamp(key),
+      v: Number(p.v || 0),
+      updatedAt: Number(p.updatedAt || p.t || Date.now())
+    };
+  });
+
+  equityHistory = Object.values(map).sort(function(a, b) {
+    return Number(a.t || 0) - Number(b.t || 0);
+  });
+
+  saveEquityHistory();
+  saveCurrentContextToFirebase();
+}
+
+function ensureInitialEquityPoint(initialValue) {
+  equityHistory = Array.isArray(equityHistory) ? equityHistory : [];
+
+  if (equityHistory.length > 0) return;
+
+  var todayKey = getLocalDateKey(Date.now());
+  var value = Number(initialValue || initialBal || currentEquityValue() || 100000);
+
+  equityHistory.push({
+    dateKey: todayKey,
+    t: dateKeyToTimestamp(todayKey),
+    v: value,
+    updatedAt: Date.now()
+  });
+
+  saveEquityHistory();
   saveCurrentContextToFirebase();
 }
 
@@ -1760,6 +1839,7 @@ function showCreateRoom() {
     }).then(function() {
       return loadGroupHistoryFromFirebase(roomId, pid);
     }).then(function() {
+      ensureInitialEquityPoint(initialBal);
       setActiveScreen("ma");
       updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
       notif("Grupo criado com sucesso!");
@@ -1816,6 +1896,7 @@ function joinGroupAsGuest() {
   }).then(function(){
     return loadGroupHistoryFromFirebase(currentRoomId,getCurrentProfile());
   }).then(function(){
+    ensureInitialEquityPoint(initialBal);
     $("gs").style.display="none";
     clearInviteFromUrl();
     pushMyStats();
@@ -1906,6 +1987,7 @@ function switchToProfile(profileId) {
       return loadGroupHistoryFromFirebase(meta.roomId, profileId);
     }).then(function() {
       if (thisSwitch !== roomSwitchToken) return;
+      ensureInitialEquityPoint(initialBal);
       goal = {
         endDate: (currentRoomData && currentRoomData.endDate) || "",
         target: Number((currentRoomData && currentRoomData.targetPct) || 0)
@@ -1927,6 +2009,8 @@ function switchToProfile(profileId) {
       equityHistory = loadEquityHistory();
     });
   }).then(function() {
+    ensureInitialEquityPoint(initialBal);
+
     goal = loadGoal();
     setActiveScreen("ma");
     updateAuthIdentityUI();
@@ -2579,6 +2663,8 @@ function fetchQ() {
       equityHistory.push({ t: now.getTime(), v: te });
       saveEquityHistory();
 
+      pushEquityPoint();
+
       checkScheduledOrders();
       checkDividends();
       checkPending();
@@ -2913,75 +2999,33 @@ function drawEquityChart() {
 
   // Aggregate: last point per calendar day
   var dailyMap = {};
+
   (equityHistory || []).forEach(function(p) {
-    if (!p || !p.t || isNaN(p.v)) return;
-    var d = new Date(Number(p.t));
-    var key = d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();
-    if (!dailyMap[key] || Number(p.t) > dailyMap[key].t)
-      dailyMap[key] = { t: Number(p.t), v: Number(p.v) };
+    if (!p || isNaN(Number(p.v))) return;
+
+    var key = p.dateKey || getLocalDateKey(Number(p.t || Date.now()));
+
+    dailyMap[key] = {
+      dateKey: key,
+      t: dateKeyToTimestamp(key),
+      v: Number(p.v || 0),
+      updatedAt: Number(p.updatedAt || p.t || 0)
+    };
   });
 
-  var sorted = Object.values(dailyMap).sort(function(a, b){ return a.t - b.t; });
-
-  // Fill missing weekdays with previous day value
-  var daily = [];
-  if (sorted.length > 0) {
-    daily.push(sorted[0]);
-
-    for (var di = 1; di < sorted.length; di++) {
-      var prev = sorted[di - 1];
-      var curr = sorted[di];
-
-      var d = new Date(prev.t);
-      d.setDate(d.getDate() + 1);
-
-      while (d.getTime() < curr.t) {
-        var dow = d.getDay();
-
-        if (dow !== 0 && dow !== 6) {
-          daily.push({
-            t: d.getTime(),
-            v: prev.v
-          });
-        }
-
-        d.setDate(d.getDate() + 1);
-      }
-
-      daily.push(curr);
-    }
-  }
-
-  // Se ainda não houver 2 dias diferentes, usa pontos intradiários
-  if (daily.length < 2) {
-    daily = (equityHistory || [])
-      .filter(function(p) {
-        return p && typeof p.t !== "undefined" && !isNaN(Number(p.t)) && !isNaN(Number(p.v));
-      })
-      .map(function(p) {
-        return {
-          t: Number(p.t),
-          v: Number(p.v)
-        };
-      })
-      .sort(function(a, b) {
-        return a.t - b.t;
-      });
-  }
-
-  // Se tiver só 1 ponto, cria um segundo ponto artificial para desenhar uma linha reta
-  if (daily.length === 1) {
-    daily.unshift({
-      t: daily[0].t - 60 * 60 * 1000,
-      v: daily[0].v
+  var daily = Object.values(dailyMap)
+    .filter(function(p) {
+      return p && isFinite(p.v) && p.v > 0;
+    })
+    .sort(function(a, b) {
+      return Number(a.t || 0) - Number(b.t || 0);
     });
-  }
 
   if (daily.length < 2) {
     ctx.fillStyle = "#6b8cae";
     ctx.font = "10px 'JetBrains Mono',monospace";
     ctx.textAlign = "center";
-    ctx.fillText("Faça uma atualização ou operação para iniciar o gráfico", W / 2, H / 2);
+    ctx.fillText("Aguardando pelo menos 2 fechamentos diários...", W / 2, H / 2);
     return;
   }
 
