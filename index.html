@@ -1210,6 +1210,7 @@ function loadSoloHistoryFromFirebase() {
     var data = snap.val();
     var points = Array.isArray(data) ? data : [];
     points = normalizeEquityHistory(points);
+    points = sanitizeEquityHistory(points);
 
     equityHistory = points;
 
@@ -1293,6 +1294,7 @@ function loadGroupHistoryFromFirebase(roomId, profileId) {
   return ref.once("value").then(function(snap){
     var data=snap.val();
     var points=normalizeEquityHistory(Array.isArray(data)?data:[]);
+    points=sanitizeEquityHistory(points);
     equityHistory=points;
     localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(points));
     return points;
@@ -1404,24 +1406,8 @@ function pushEquityPoint() {
     return Number(a.t || 0) - Number(b.t || 0);
   });
 
-  // Remove duplicidades por dia
-  var map = {};
-  equityHistory.forEach(function(p) {
-    if (!p) return;
-
-    var key = p.dateKey || getLocalDateKey(Number(p.t || Date.now()));
-
-    map[key] = {
-      dateKey: key,
-      t: dateKeyToTimestamp(key),
-      v: Number(p.v || 0),
-      updatedAt: Number(p.updatedAt || p.t || Date.now())
-    };
-  });
-
-  equityHistory = Object.values(map).sort(function(a, b) {
-    return Number(a.t || 0) - Number(b.t || 0);
-  });
+  // Saneia: remove pontos ruins e mantém 1 fechamento por dia
+  equityHistory = sanitizeEquityHistory(equityHistory);
 
   saveEquityHistory();
   saveCurrentContextToFirebase();
@@ -1444,6 +1430,36 @@ function ensureInitialEquityPoint(initialValue) {
 
   saveEquityHistory();
   saveCurrentContextToFirebase();
+}
+
+// Remove pontos ruins (valor implausível) e reduz a 1 fechamento por dia
+function sanitizeEquityHistory(points) {
+  if (!Array.isArray(points)) return [];
+
+  var base = Number(initialBal || 100000);
+  var floor = base > 0 ? base * 0.2 : 0; // descarta valores abaixo de 20% do saldo inicial
+
+  var map = {};
+
+  points.forEach(function(p) {
+    if (!p) return;
+
+    var v = Number(p.v);
+    if (!isFinite(v) || v <= 0 || v < floor) return;
+
+    var key = p.dateKey || getLocalDateKey(Number(p.t || Date.now()));
+
+    map[key] = {
+      dateKey: key,
+      t: dateKeyToTimestamp(key),
+      v: v,
+      updatedAt: Number(p.updatedAt || p.t || Date.now())
+    };
+  });
+
+  return Object.values(map).sort(function(a, b) {
+    return Number(a.t || 0) - Number(b.t || 0);
+  });
 }
 
 
@@ -2676,13 +2692,7 @@ function fetchQ() {
       cd = REFRESH;
       setSts("ok");
 
-      // Registra ponto no histórico de patrimônio
-      var pv = portValue();
-      var te = bal + pv;
-      var now = new Date();
-      equityHistory.push({ t: now.getTime(), v: te });
-      saveEquityHistory();
-
+      // Registra o fechamento do dia (1 ponto/dia, marcado a mercado)
       pushEquityPoint();
 
       checkScheduledOrders();
@@ -4435,6 +4445,8 @@ function initApp() {
     divs=[]; totalDiv=0; checkedDivDate=""; equityHistory=[];
     firstTradeDate="";
     saveState(); saveEquityHistory();
+    ensureInitialEquityPoint(newBal);
+    saveCurrentContextToFirebase();
     $("cfm").classList.remove("on"); render();
     notif("Simulador resetado! Saldo: "+R(newBal));
   };
@@ -4599,13 +4611,7 @@ if (token) {
 
     if (!Array.isArray(equityHistory)) equityHistory = [];
 
-    if (equityHistory.length === 0) {
-      equityHistory.push({
-        t: Date.now(),
-        v: bal + portValue()
-      });
-      saveEquityHistory();
-    }
+    ensureInitialEquityPoint(bal + portValue());
 
     initApp();
   } else {
