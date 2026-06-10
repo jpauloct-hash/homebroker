@@ -901,6 +901,7 @@ function leaveGroupById(roomId) {
       if(k.indexOf("hb_state_v3_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
       if(k.indexOf("hb_goal_v1_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
     });
+    removeMyRoomLocal(roomId);
     if(currentUser&&currentRoomId===roomId)localStorage.removeItem("hb_active_room_"+currentUser.uid);
     myGroupsCache=(myGroupsCache||[]).filter(function(g){return g.roomId!==roomId;});
     if(currentRoomId===roomId){notif("Você saiu do grupo "+roomName);return switchToSoloProfile();}
@@ -933,6 +934,7 @@ function deleteGroupById(roomId) {
       if(k.indexOf("hb_state_v3_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
       if(k.indexOf("hb_goal_v1_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
     });
+    removeMyRoomLocal(roomId);
     if(currentUser&&currentRoomId===roomId)localStorage.removeItem("hb_active_room_"+currentUser.uid);
     myGroupsCache=(myGroupsCache||[]).filter(function(g){return g.roomId!==roomId;});
     if(currentRoomId===roomId){notif("Grupo "+roomName+" excluído");return switchToSoloProfile();}
@@ -1515,6 +1517,24 @@ function upsertMyRoomLocal(group) {
   };
 
   saveMyRoomsLocalIndex(data);
+}
+
+function removeMyRoomLocal(roomId) {
+  if (!roomId) return;
+
+  var data = loadMyRoomsLocalIndex();
+
+  if (data && Object.prototype.hasOwnProperty.call(data, roomId)) {
+    delete data[roomId];
+    saveMyRoomsLocalIndex(data);
+  }
+
+  // Limpa caches de histórico de patrimônio do grupo
+  var uid = getIdentityUid();
+  Object.keys(localStorage).forEach(function(k) {
+    if (k.indexOf("hb_eqhist_v1_grp_" + roomId + "_") === 0) localStorage.removeItem(k);
+    if (uid && k === "hb_eq_grp_" + roomId + "_" + uid) localStorage.removeItem(k);
+  });
 }
 
 function addProfileIfMissing(profileId) {
