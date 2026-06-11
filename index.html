@@ -2344,6 +2344,7 @@ var BRAPI   = "https://tgp-proxy.jpauloct.workers.dev/api"; // proxy Cloudflare 
 var REFRESH = 60; // 1 minuto
 
 var LS_TOKEN  = "hb_token_v6";
+var token = localStorage.getItem(LS_TOKEN) || ""; // token interno legado de convite; nao e o token da brapi
 var LS_FONT   = "hb_font_v1";
 var FONT_SCALES = [0.82, 0.88, 0.94, 1.0, 1.08, 1.16, 1.25];
 var fontIdx = 3; // default = 1.0
