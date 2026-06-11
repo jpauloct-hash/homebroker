@@ -1128,7 +1128,7 @@ function getSoloPortfolioRef() {
 function buildSoloPayloadFromMemory() {
   return {cash:bal||0,positions:port||{},trades:trd||[],pendingOrders:pending||[],
     dividends:divs||{},totalDiv:totalDiv||0,initialBal:initialBal||100000,
-    firstTradeDate:firstTradeDate||"",updatedAt:Date.now()};
+    firstTradeDate:firstTradeDate||"",lastYieldDate:lastYieldDate||"",updatedAt:Date.now()};
 }
 
 function applySoloPayloadToMemory(data) {
@@ -1141,6 +1141,7 @@ function applySoloPayloadToMemory(data) {
   totalDiv=Number(data.totalDiv||0);
   initialBal=Number(data.initialBal||100000);
   firstTradeDate=data.firstTradeDate||"";
+  lastYieldDate=data.lastYieldDate||"";
 }
 
 function syncSoloToLocalCache() {
@@ -1148,7 +1149,7 @@ function syncSoloToLocalCache() {
   localStorage.setItem("hb_state_v3_"+soloId,JSON.stringify({
     bal:bal||0,port:port||{},trd:trd||[],pending:pending||[],
     divs:divs||{},totalDiv:totalDiv||0,checkedDivDate:checkedDivDate||"",
-    initialBal:initialBal||100000,firstTradeDate:firstTradeDate||""
+    initialBal:initialBal||100000,firstTradeDate:firstTradeDate||"",lastYieldDate:lastYieldDate||""
   }));
 }
 
@@ -1249,7 +1250,7 @@ function getGroupHistoryRef(roomId) {
 function buildGroupPayloadFromMemory() {
   return {cash:bal||0,positions:port||{},trades:trd||[],pendingOrders:pending||[],
     dividends:divs||{},totalDiv:totalDiv||0,initialBal:initialBal||100000,
-    firstTradeDate:firstTradeDate||"",updatedAt:Date.now()};
+    firstTradeDate:firstTradeDate||"",lastYieldDate:lastYieldDate||"",updatedAt:Date.now()};
 }
 function applyGroupPayloadToMemory(data) {
   data=data||{};
@@ -1257,13 +1258,14 @@ function applyGroupPayloadToMemory(data) {
   pending=data.pendingOrders||[]; divs=data.dividends||{};
   totalDiv=Number(data.totalDiv||0); initialBal=Number(data.initialBal||100000);
   firstTradeDate=data.firstTradeDate||"";
+  lastYieldDate=data.lastYieldDate||"";
 }
 function syncGroupToLocalCache(profileId) {
   if(!profileId)return;
   localStorage.setItem("hb_state_v3_"+profileId,JSON.stringify({
     bal:bal||0,port:port||{},trd:trd||[],pending:pending||[],
     divs:divs||{},totalDiv:totalDiv||0,checkedDivDate:checkedDivDate||"",
-    initialBal:initialBal||100000,firstTradeDate:firstTradeDate||""
+    initialBal:initialBal||100000,firstTradeDate:firstTradeDate||"",lastYieldDate:lastYieldDate||""
   }));
 }
 function loadGroupPortfolioFromFirebase(roomId, profileId) {
@@ -2441,16 +2443,17 @@ function loadStateForProfile() {
       totalDiv:       s.totalDiv || 0,
       checkedDivDate: s.checkedDivDate || "",
       initialBal:     s.initialBal || 100000,
-      firstTradeDate: s.firstTradeDate || ""
+      firstTradeDate: s.firstTradeDate || "",
+      lastYieldDate:  s.lastYieldDate || ""
     };
-  } catch(e) { return {bal:100000,port:{},trd:[],pending:[],divs:[],totalDiv:0,checkedDivDate:"",initialBal:100000,firstTradeDate:""}; }
+  } catch(e) { return {bal:100000,port:{},trd:[],pending:[],divs:[],totalDiv:0,checkedDivDate:"",initialBal:100000,firstTradeDate:"",lastYieldDate:""}; }
 }
 
 function saveStateForProfile() {
   localStorage.setItem(getProfileKey("hb_state_v3"), JSON.stringify({
     bal:bal, port:port, trd:trd, pending:pending,
     divs:divs, totalDiv:totalDiv, checkedDivDate:checkedDivDate,
-    initialBal:initialBal, firstTradeDate:firstTradeDate
+    initialBal:initialBal, firstTradeDate:firstTradeDate, lastYieldDate:lastYieldDate
   }));
 }
 
@@ -2540,6 +2543,7 @@ var bal = st.bal, port = st.port, trd = st.trd, pending = st.pending;
 var divs = st.divs, totalDiv = st.totalDiv, checkedDivDate = st.checkedDivDate;
 var initialBal = st.initialBal || 100000;  // saldo inicial do simulador
 var firstTradeDate = st.firstTradeDate || ""; // data da primeira compra
+var lastYieldDate = st.lastYieldDate || ""; // último crédito de rendimento Selic do caixa
 var goal = loadGoal();
 var equityHistory = loadEquityHistory();
 
@@ -2773,6 +2777,8 @@ function fetchQ() {
       pushEquityPoint();
 
       checkScheduledOrders();
+      processRetroactiveOrders();
+      creditDailyYield();
       checkDividends();
       checkPending();
       render();
@@ -2925,12 +2931,16 @@ setInterval(updatePregaoBar, 1000);
 // Check if scheduled orders should fire at prego open
 function checkScheduledOrders() {
   if (!isPregaoOpen()) return;
+  var brt = getBRTDate();
+  var minsNow = brt.getHours()*60 + brt.getMinutes();
+  var isLate = minsNow > 610; // depois de 10:10 BRT = perdeu a abertura
   var toActivate=[], keep=[];
   pending.forEach(function(o) {
     if (o.scheduled) {
       // Convert scheduled order to active limit order
       var activated = JSON.parse(JSON.stringify(o));
       delete activated.scheduled;
+      if (activated.market && isLate) activated.activatedLate = true; // executa retro ao preço de abertura
       toActivate.push(activated);
     } else keep.push(o);
   });
@@ -2954,6 +2964,119 @@ function showAHO(orderObj) {
     orderObj.qty+' cotas - '+type+'<br>'+
     '<span style="color:var(--a);font-size:10px">Agendada para: '+nextPregaoDateStr()+' as 10:00</span>';
   $("aho-modal").style.display="flex";
+}
+
+//  Rendimento do caixa (Selic diária) 
+var LS_SELIC = "hb_selic_v1"; // cache {rate, date}
+
+function fetchSelicRate() {
+  // Usa cache do dia se existir
+  try {
+    var cached = JSON.parse(localStorage.getItem(LS_SELIC) || "null");
+    var todayKey = getLocalDateKey(Date.now());
+    if (cached && cached.date === todayKey && isFinite(Number(cached.rate)) && Number(cached.rate) > 0) {
+      return Promise.resolve(Number(cached.rate));
+    }
+  } catch(e) {}
+
+  return fetch(BRAPI + "/v2/prime-rate?country=brazil")
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var list = d && (d["prime-rate"] || d.primeRate || d.results);
+      if (!Array.isArray(list) || !list.length) throw new Error("Selic indisponível");
+      var last = list[list.length - 1];
+      var rate = Number(last.value || last.rate || 0);
+      if (!isFinite(rate) || rate <= 0) throw new Error("Selic inválida");
+      localStorage.setItem(LS_SELIC, JSON.stringify({ rate: rate, date: getLocalDateKey(Date.now()) }));
+      return rate;
+    })
+    .catch(function(err){
+      // Fallback: última taxa cacheada (mesmo de dias anteriores)
+      try {
+        var c = JSON.parse(localStorage.getItem(LS_SELIC) || "null");
+        if (c && isFinite(Number(c.rate)) && Number(c.rate) > 0) return Number(c.rate);
+      } catch(e) {}
+      console.error("Selic indisponível e sem cache:", err);
+      return null;
+    });
+}
+
+function countBusinessDaysBetween(fromKey, toKey) {
+  // Conta dias úteis em (fromKey, toKey] — exclusivo no início, inclusivo no fim
+  var count = 0;
+  var cursor = fromKey;
+  var guard = 0;
+  while (cursor < toKey && guard < 4000) {
+    guard++;
+    cursor = nextDateKey(cursor);
+    if (isBusinessDayKey(cursor)) count++;
+  }
+  return count;
+}
+
+function creditDailyYield() {
+  var todayKey = getLocalDateKey(Date.now());
+
+  // Primeira execução: marca hoje como base, sem crédito retroativo
+  if (!lastYieldDate) {
+    lastYieldDate = todayKey;
+    saveState();
+    return Promise.resolve();
+  }
+
+  if (lastYieldDate >= todayKey) return Promise.resolve(); // já creditado hoje
+
+  var nDays = countBusinessDaysBetween(lastYieldDate, todayKey);
+  if (nDays <= 0) {
+    // Só fim de semana no intervalo: avança o marcador sem creditar
+    lastYieldDate = todayKey;
+    saveState();
+    return Promise.resolve();
+  }
+
+  if (!isFinite(bal) || bal <= 0) {
+    // Sem caixa para render: avança o marcador
+    lastYieldDate = todayKey;
+    saveState();
+    return Promise.resolve();
+  }
+
+  return fetchSelicRate().then(function(annualRate){
+    if (annualRate === null) return; // sem taxa, tenta de novo na próxima (não avança marcador)
+
+    // Taxa diária útil: (1 + Selic a.a.)^(1/252) - 1
+    var daily = Math.pow(1 + annualRate / 100, 1 / 252) - 1;
+    // Juros compostos pelos dias úteis acumulados
+    var amount = bal * (Math.pow(1 + daily, nDays) - 1);
+    amount = Math.round(amount * 100) / 100; // centavos
+
+    if (amount > 0) {
+      bal += amount;
+      totalDiv += amount;
+      divs.unshift({
+        id: "SELIC_" + todayKey,
+        ticker: "SELIC",
+        qty: nDays,
+        rate: annualRate,
+        value: amount,
+        date: todayKey,
+        tm: new Date().toLocaleTimeString("pt-BR"),
+        note: "Rendimento do caixa (" + nDays + " dia" + (nDays > 1 ? "s" : "") + " útil" + (nDays > 1 ? "eis" : "") + " a " + annualRate.toFixed(2).replace(".", ",") + "% a.a.)"
+      });
+      notif("Rendimento do caixa: +" + R(amount) + " (Selic " + annualRate.toFixed(2).replace(".", ",") + "% a.a.)");
+      if (typeof sfxDividend === "function") { try { sfxDividend(); } catch(e) {} }
+    }
+
+    lastYieldDate = todayKey;
+    saveState();
+
+    if (isInGroupContext()) {
+      pushEquityPoint();
+      pushMyStats();
+    }
+
+    render();
+  });
 }
 
 //  Dividendos 
@@ -3018,6 +3141,155 @@ function checkDividends() {
 }
 
 //  Ordens pendentes 
+//  Execução retroativa (Fase A) 
+// Busca candles intradiários do dia (5min) com cache por sessão/dia
+var _intradayCache = {};
+
+function fetchIntraday(ticker) {
+  var key = ticker + "_" + getLocalDateKey(Date.now());
+  if (_intradayCache[key]) return Promise.resolve(_intradayCache[key]);
+
+  return fetch(BRAPI + "/quote/" + ticker + "?range=1d&interval=5m")
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var res = d && d.results && d.results[0];
+      var candles = res && res.historicalDataPrice;
+      if (!Array.isArray(candles) || !candles.length) return null;
+      var clean = candles.filter(function(c){
+        return c && isFinite(Number(c.close)) && Number(c.close) > 0;
+      });
+      if (!clean.length) return null;
+      _intradayCache[key] = clean;
+      return clean;
+    })
+    .catch(function(err){
+      console.error("Intraday indisponível para " + ticker + ":", err);
+      return null;
+    });
+}
+
+// Processa, de forma assíncrona:
+//  a) market agendadas que perderam a abertura -> executa ao preço de abertura do dia
+//  b) limitadas -> preenchimento retroativo ao preço-limite se a mín/máx do dia cruzou (1 checagem/dia por ordem)
+var _retroRunning = false;
+
+function processRetroactiveOrders() {
+  if (_retroRunning) return;
+  if (!pending.length) return;
+  if (!isPregaoOpen()) return;
+
+  var todayKey = getLocalDateKey(Date.now());
+
+  var lateMarket = pending.filter(function(o){ return o.market && o.activatedLate; });
+  var limitToCheck = pending.filter(function(o){
+    return !o.scheduled && !o.market && o.lp && o.retroCheck !== todayKey;
+  });
+
+  if (!lateMarket.length && !limitToCheck.length) return;
+
+  _retroRunning = true;
+  var anyChange = false;
+
+  // Dedup de tickers para buscar o intradiário uma vez só por papel
+  var tickers = {};
+  lateMarket.forEach(function(o){ tickers[o.tk] = true; });
+  limitToCheck.forEach(function(o){ tickers[o.tk] = true; });
+
+  var fetches = Object.keys(tickers).map(function(tk){
+    return fetchIntraday(tk).then(function(candles){ return { tk: tk, candles: candles }; });
+  });
+
+  Promise.all(fetches).then(function(results){
+    var byTicker = {};
+    results.forEach(function(r){ byTicker[r.tk] = r.candles; });
+
+    // a) Market agendadas atrasadas: preço de abertura (primeiro candle do dia)
+    lateMarket.forEach(function(o){
+      var stillPending = pending.some(function(p){ return p.id === o.id; });
+      if (!stillPending) return;
+
+      var candles = byTicker[o.tk];
+      var openPrice = null;
+      if (candles && candles.length) {
+        var first = candles[0];
+        openPrice = Number(first.open || first.close || 0);
+      }
+
+      pending = pending.filter(function(p){ return p.id !== o.id; });
+
+      if (openPrice && openPrice > 0) {
+        doMarketOrder(o.tk, o.side, o.qty, true, openPrice, "Agendada @ abertura");
+      } else {
+        // Fallback: sem intradiário, executa ao preço corrente (comportamento antigo)
+        doMarketOrder(o.tk, o.side, o.qty, true);
+      }
+      anyChange = true;
+    });
+
+    // b) Limitadas: mín/máx do dia cruzou o limite enquanto o app esteve fechado
+    limitToCheck.forEach(function(o){
+      var live = pending.filter(function(p){ return p.id === o.id; })[0];
+      if (!live) return; // já executou ao vivo nesse meio-tempo
+
+      live.retroCheck = todayKey; // marca a checagem do dia (executando ou não)
+
+      var candles = byTicker[o.tk];
+      if (!candles || !candles.length) return;
+
+      var dayLow = Infinity, dayHigh = -Infinity;
+      candles.forEach(function(c){
+        var lo = Number(c.low || c.close), hi = Number(c.high || c.close);
+        if (isFinite(lo) && lo > 0 && lo < dayLow) dayLow = lo;
+        if (isFinite(hi) && hi > 0 && hi > dayHigh) dayHigh = hi;
+      });
+
+      var crossed = (live.side==="buy" && dayLow <= live.lp) ||
+                    (live.side==="sell" && dayHigh >= live.lp);
+      if (!crossed) { anyChange = true; return; } // só o retroCheck mudou; persiste
+
+      pending = pending.filter(function(p){ return p.id !== live.id; });
+      fillLimitOrder(live, live.lp, "Lim retro @ " + fr(live.lp));
+      anyChange = true;
+    });
+
+    if (anyChange) {
+      saveState();
+      if (isInGroupContext()) {
+        pushEquityPoint();
+        pushMyStats();
+      }
+      render();
+    }
+  }).catch(function(err){
+    console.error("Erro na execução retroativa:", err);
+  }).then(function(){
+    _retroRunning = false;
+  });
+}
+
+// Executa o preenchimento de uma ordem limitada a um preço dado.
+// Retorna: "filled" | "cancelled" (sem saldo/posição) — em ambos a ordem sai da fila.
+function fillLimitOrder(o, execPrice, noteText) {
+  var tot = execPrice * o.qty;
+  if (o.side==="buy") {
+    if (tot>bal) { notif("Ordem cancelada - saldo insuf. ("+o.tk+")", "err"); return "cancelled"; }
+    bal -= tot;
+    if (port[o.tk]) { var x=port[o.tk],nq=x.qty+o.qty; port[o.tk]={qty:nq,avgPrice:(x.qty*x.avgPrice+tot)/nq}; }
+    else port[o.tk] = {qty:o.qty,avgPrice:execPrice};
+    if (!firstTradeDate) firstTradeDate=new Date().toISOString().split("T")[0];
+  } else {
+    var pos2 = port[o.tk]; if (!pos2||pos2.qty<o.qty) { return "cancelled"; }
+    bal += tot;
+    var nq2b=pos2.qty-o.qty; if(nq2b===0) delete port[o.tk]; else port[o.tk]={qty:nq2b,avgPrice:pos2.avgPrice};
+  }
+  trd.unshift({id:Date.now(),tk:o.tk,tp:o.side==="buy"?"C":"V",qty:o.qty,pr:execPrice,tot:tot,
+    tm:new Date().toLocaleTimeString("pt-BR"),note:noteText||("Lim @ "+fr(o.lp))});
+  if (trd.length>200) trd.pop();
+  playTradeSound("limit");
+  sfxShot(); notif("Ordem limitada executada: "+o.qty+" "+o.tk+" @ "+R(execPrice));
+  return "filled";
+}
+
 function checkPending() {
   if (!pending.length) return;
   if (!isPregaoOpen()) return; // so executa durante pregao
@@ -3028,6 +3300,9 @@ function checkPending() {
 
     var p = prices[o.tk];
     if (!p) { keep.push(o); continue; }
+
+    // Market agendada que perdeu a abertura: a execução retroativa cuida (preço de abertura)
+    if (o.market && o.activatedLate) { keep.push(o); continue; }
 
     // Market order agendada: executa imediatamente
     if (o.market) {
@@ -3042,24 +3317,7 @@ function checkPending() {
     var hit = (o.side==="buy" && p<=o.lp) || (o.side==="sell" && p>=o.lp);
     if (!hit) { keep.push(o); continue; }
 
-    var execPrice = p; // executa no preco de mercado quando atingir o limite
-    var tot = execPrice * o.qty;
-    if (o.side==="buy") {
-      if (tot>bal) { notif("Ordem cancelada - saldo insuf. ("+o.tk+")", "err"); changed=true; continue; }
-      bal -= tot;
-      if (port[o.tk]) { var x=port[o.tk],nq=x.qty+o.qty; port[o.tk]={qty:nq,avgPrice:(x.qty*x.avgPrice+tot)/nq}; }
-      else port[o.tk] = {qty:o.qty,avgPrice:execPrice};
-      if (!firstTradeDate) firstTradeDate=new Date().toISOString().split("T")[0];
-    } else {
-      var pos2 = port[o.tk]; if (!pos2||pos2.qty<o.qty) { changed=true; continue; }
-      bal += tot;
-      var nq2b=pos2.qty-o.qty; if(nq2b===0) delete port[o.tk]; else port[o.tk]={qty:nq2b,avgPrice:pos2.avgPrice};
-    }
-    trd.unshift({id:Date.now(),tk:o.tk,tp:o.side==="buy"?"C":"V",qty:o.qty,pr:execPrice,tot:tot,
-      tm:new Date().toLocaleTimeString("pt-BR"),note:"Lim @ "+fr(o.lp)});
-    if (trd.length>200) trd.pop();
-    playTradeSound("limit");
-    sfxShot(); notif("Ordem limitada executada: "+o.qty+" "+o.tk+" @ "+R(execPrice));
+    fillLimitOrder(o, p); // "filled" ou "cancelled": nos dois casos a ordem sai da fila
     changed=true;
   }
   pending = keep;
@@ -3474,10 +3732,15 @@ function renderHist() {
     ds.style.display="block"; dl.innerHTML="";
     divs.forEach(function(d) {
       var e=document.createElement("div"); e.className="div-item";
+      var isYield = d.ticker === "SELIC";
+      var badge = isYield ? "RENDIMENTO" : "DIVIDENDO";
+      var detail = isYield
+        ? (d.note || ("Caixa a "+fr(d.rate)+"% a.a."))
+        : (d.qty+' cotas x R$'+fr(d.rate));
       e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
-        '<span class="bdg" style="background:rgba(0,200,150,.15);color:var(--g)">DIVIDENDO</span>'+
+        '<span class="bdg" style="background:rgba(0,200,150,.15);color:var(--g)">'+badge+'</span>'+
         '<span style="color:var(--bl);font-weight:700;font-size:12px">'+d.ticker+'</span></div>'+
-        '<div style="font-size:9px;color:var(--tx4)">'+d.qty+' cotas x R$'+fr(d.rate)+'</div></div>'+
+        '<div style="font-size:9px;color:var(--tx4)">'+detail+'</div></div>'+
         '<div style="text-align:right"><div style="font-weight:700;font-size:12px;color:var(--g)">+'+R(d.value)+'</div>'+
         '<div style="font-size:9px;color:var(--tx4)">'+d.date+'</div></div>';
       dl.appendChild(e);
@@ -3516,8 +3779,10 @@ function render() {
 }
 
 //  Trading 
-function doMarketOrder(tk, sd, q, isScheduled) {
-  var p = prices[tk]; if (!p) { notif("Sem cotacao","err"); return; }
+function doMarketOrder(tk, sd, q, isScheduled, priceOverride, noteText) {
+  var p = (isFinite(priceOverride) && priceOverride > 0) ? priceOverride : prices[tk];
+  if (!p) { notif("Sem cotacao","err"); return; }
+  var orderNote = noteText || (isScheduled ? "Agendada" : "");
   var tot = p*q;
   if (sd==="buy") {
     if (tot>bal) { notif("Saldo insuficiente","err"); return; }
@@ -3526,7 +3791,7 @@ function doMarketOrder(tk, sd, q, isScheduled) {
     else port[tk]={qty:q,avgPrice:p};
     trd.unshift({id:Date.now(),tk:tk,tp:"C",qty:q,pr:p,tot:tot,
       tm:new Date().toLocaleTimeString("pt-BR"),
-      note:isScheduled?"Agendada":""});
+      note:orderNote});
     if (!firstTradeDate) { firstTradeDate=new Date().toISOString().split("T")[0]; }
     playTradeSound("buy");
     sfxBoltShot(); notif("Compra executada: "+q+" "+tk+" @ "+R(p));
@@ -3536,7 +3801,7 @@ function doMarketOrder(tk, sd, q, isScheduled) {
     var nq2=pos.qty-q; if(nq2===0) delete port[tk]; else port[tk]={qty:nq2,avgPrice:pos.avgPrice};
     trd.unshift({id:Date.now(),tk:tk,tp:"V",qty:q,pr:p,tot:tot,
       tm:new Date().toLocaleTimeString("pt-BR"),
-      note:isScheduled?"Agendada":""});
+      note:orderNote});
     playTradeSound("sell");
     (function(){var pos2=port[tk]||{avgPrice:p};if((p-pos2.avgPrice)>=0)sfxHitPlate();else sfxHitDirt();})(); notif("Venda executada: "+q+" "+tk+" @ "+R(p));
   }
@@ -4340,6 +4605,7 @@ function enterProfile(name) {
   bal = st2.bal; port = st2.port; trd = st2.trd; pending = st2.pending;
   divs = st2.divs; totalDiv = st2.totalDiv; checkedDivDate = st2.checkedDivDate;
   initialBal = st2.initialBal; firstTradeDate = st2.firstTradeDate;
+  lastYieldDate = st2.lastYieldDate || "";
   goal = loadGoal();
   equityHistory = loadEquityHistory();
   $("ps").style.display = "none";
@@ -4523,7 +4789,7 @@ function initApp() {
     if (!newBal||newBal<1000) { notif("Saldo minimo: R$ 1.000,00","err"); return; }
     bal=newBal; initialBal=newBal; port={}; trd=[]; pending=[];
     divs=[]; totalDiv=0; checkedDivDate=""; equityHistory=[];
-    firstTradeDate="";
+    firstTradeDate=""; lastYieldDate="";
     saveState(); saveEquityHistory();
     ensureInitialEquityPoint(newBal);
     saveCurrentContextToFirebase();
@@ -4687,6 +4953,7 @@ if (token) {
     bal=st2.bal; port=st2.port; trd=st2.trd; pending=st2.pending;
     divs=st2.divs; totalDiv=st2.totalDiv; checkedDivDate=st2.checkedDivDate;
     initialBal=st2.initialBal; firstTradeDate=st2.firstTradeDate;
+    lastYieldDate=st2.lastYieldDate||"";
     goal=loadGoal(); equityHistory=loadEquityHistory();
 
     if (!Array.isArray(equityHistory)) equityHistory = [];
