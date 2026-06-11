@@ -2273,20 +2273,20 @@ var TICKERS = ["PETR4","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","
 var ALL_TAPE_TICKERS = [
   // Ibovespa mais negociados
   "PETR4","PETR3","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3",
-  "B3SA3","EMBJ3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","ELET3","ELET6",
+  "B3SA3","EMBJ3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","AXIA3","BBSE3",
   "HAPV3","TOTS3","CPLE6","ENEV3","CSAN3","LREN3","MGLU3","NTCO3","BEEF3","BRFS3",
   "CYRE3","EVEN3","FLRY3","GGBR4","GOAU4","HYPE3","IRBR3","JBSS3","KLBN11","MRVE3",
   "MULT3","POMO4","QUAL3","RAIL3","SBSP3","TAEE11","TIMS3","TRPL4","USIM5","YDUQ3",
   // ETFs populares
   "BOVA11","SMAL11","IVVB11","DOLA11","BBSD11","GOLD11","HASH11","PIBB11","SPXI11","EURP11",
   // BDRs mais negociados
-  "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34"
+  "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34","COCA34"
 ];
 var ALL_TAPE_NAMES = {
   PETR4:"Petrobras PN",PETR3:"Petrobras ON",VALE3:"Vale ON",ITUB4:"Itau PN",BBDC4:"Bradesco PN",
   BBAS3:"Banco Brasil ON",ABEV3:"Ambev ON",WEGE3:"WEG ON",RENT3:"Localiza ON",PRIO3:"PetroReconcavo ON",
   B3SA3:"B3 ON",EMBJ3:"Embraer ON",RADL3:"Raia Drogasil ON",SUZB3:"Suzano ON",VIVT3:"Vivo ON",
-  EQTL3:"Equatorial ON",RDOR3:"Rede DOr ON",UGPA3:"Ultrapar ON",ELET3:"Eletrobras ON",ELET6:"Eletrobras PNB",
+  EQTL3:"Equatorial ON",RDOR3:"Rede DOr ON",UGPA3:"Ultrapar ON",AXIA3:"Axia Energia ON",BBSE3:"BB Seguridade ON",
   HAPV3:"Hapvida ON",TOTS3:"Totvs ON",CPLE6:"Copel PNB",ENEV3:"Eneva ON",CSAN3:"Cosan ON",
   LREN3:"Lojas Renner ON",MGLU3:"Magazine Luiza ON",NTCO3:"Grupo Boticario ON",BEEF3:"Minerva ON",BRFS3:"BRF ON",
   CYRE3:"Cyrela ON",EVEN3:"Even ON",FLRY3:"Fleury ON",GGBR4:"Gerdau PN",GOAU4:"Metalurgica Gerdau PN",
@@ -2298,7 +2298,7 @@ var ALL_TAPE_NAMES = {
   SPXI11:"ETF S&P500 BRL",EURP11:"ETF Europa",
   BERK34:"Berkshire BDR",AAPL34:"Apple BDR",AMZO34:"Amazon BDR",GOGL34:"Google BDR",
   MSFT34:"Microsoft BDR",NVDC34:"Nvidia BDR",TSLA34:"Tesla BDR",META34:"Meta BDR",
-  NFLX34:"Netflix BDR",GOOGL34:"Alphabet BDR"
+  NFLX34:"Netflix BDR",GOOGL34:"Alphabet BDR",COCA34:"Coca-Cola BDR"
 };
 
 // Load tape tickers from localStorage or use defaults
@@ -2307,6 +2307,10 @@ function loadTapeTickers() {
   try {
     var saved = JSON.parse(localStorage.getItem("hb_tape_v1") || "null");
     if (Array.isArray(saved) && saved.length > 0) {
+      // Migração: ELET3/ELET6 viraram AXIA3 (Axia Energia, Novo Mercado jun/2026)
+      saved = saved.map(function(t){ return (t === "ELET3" || t === "ELET6") ? "AXIA3" : t; });
+      // Remove duplicatas preservando a ordem
+      saved = saved.filter(function(t, i){ return saved.indexOf(t) === i; });
       // Always ensure IBOV and USDBRL are first, remove duplicates
       var filtered = saved.filter(function(t){ return PINNED_TICKERS.indexOf(t) === -1; });
       return PINNED_TICKERS.concat(filtered);
@@ -4169,7 +4173,7 @@ function buildTapePicker() {
   var segments = [
     { label: "ACOES IBOVESPA", color: "var(--bl)", tickers: [
       "PETR4","PETR3","VALE3","ITUB4","BBDC4","BBAS3","ABEV3","WEGE3","RENT3","PRIO3",
-      "B3SA3","EMBJ3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","ELET3","ELET6",
+      "B3SA3","EMBJ3","RADL3","SUZB3","VIVT3","EQTL3","RDOR3","UGPA3","AXIA3","BBSE3",
       "HAPV3","TOTS3","CPLE6","ENEV3","CSAN3","LREN3","MGLU3","BEEF3","BRFS3","CYRE3",
       "FLRY3","GGBR4","GOAU4","HYPE3","JBSS3","KLBN11","MRVE3","MULT3","RAIL3","SBSP3",
       "TAEE11","TIMS3","TRPL4","USIM5","YDUQ3","NTCO3","POMO4"
@@ -4178,7 +4182,7 @@ function buildTapePicker() {
       "BOVA11","SMAL11","IVVB11","DOLA11","GOLD11","HASH11","PIBB11","SPXI11","BBSD11","EURP11"
     ]},
     { label: "BDRs", color: "#a78bfa", tickers: [
-      "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34"
+      "BERK34","AAPL34","AMZO34","GOGL34","MSFT34","NVDC34","TSLA34","META34","NFLX34","GOOGL34","COCA34"
     ]}
   ];
 
