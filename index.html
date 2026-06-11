@@ -1211,6 +1211,7 @@ function loadSoloHistoryFromFirebase() {
     var points = Array.isArray(data) ? data : [];
     points = normalizeEquityHistory(points);
     points = sanitizeEquityHistory(points);
+    points = fillBusinessDayGaps(points);
 
     equityHistory = points;
 
@@ -1295,6 +1296,7 @@ function loadGroupHistoryFromFirebase(roomId, profileId) {
     var data=snap.val();
     var points=normalizeEquityHistory(Array.isArray(data)?data:[]);
     points=sanitizeEquityHistory(points);
+    points=fillBusinessDayGaps(points);
     equityHistory=points;
     localStorage.setItem(getProfileKey("hb_eqhist_v1"),JSON.stringify(points));
     return points;
@@ -1409,6 +1411,9 @@ function pushEquityPoint() {
   // Saneia: remove pontos ruins e mantém 1 fechamento por dia
   equityHistory = sanitizeEquityHistory(equityHistory);
 
+  // Preenche dias úteis ausentes com carry-forward (dias passados congelados)
+  equityHistory = fillBusinessDayGaps(equityHistory);
+
   saveEquityHistory();
   saveCurrentContextToFirebase();
 }
@@ -1460,6 +1465,72 @@ function sanitizeEquityHistory(points) {
   return Object.values(map).sort(function(a, b) {
     return Number(a.t || 0) - Number(b.t || 0);
   });
+}
+
+// Dia útil = segunda a sexta (mesmo critério do pregão no app)
+function isBusinessDayKey(key) {
+  var ts = dateKeyToTimestamp(key);
+  var dow = new Date(ts).getDay(); // 0=Dom, 6=Sáb
+  return dow !== 0 && dow !== 6;
+}
+
+// Avança 1 dia em uma chave "YYYY-MM-DD"
+function nextDateKey(key) {
+  var ts = dateKeyToTimestamp(key);
+  var d = new Date(ts);
+  d.setDate(d.getDate() + 1);
+  return getLocalDateKey(d.getTime());
+}
+
+// Preenche os dias úteis ausentes entre o primeiro ponto e hoje,
+// repetindo o último fechamento conhecido (carry-forward).
+// Fins de semana são ignorados. Dias passados ficam congelados.
+function fillBusinessDayGaps(points) {
+  if (!Array.isArray(points) || points.length === 0) return points || [];
+
+  var sorted = points.slice().sort(function(a, b) {
+    return Number(a.t || 0) - Number(b.t || 0);
+  });
+
+  var byKey = {};
+  sorted.forEach(function(p) {
+    var key = p.dateKey || getLocalDateKey(Number(p.t || Date.now()));
+    byKey[key] = p;
+  });
+
+  var firstKey = sorted[0].dateKey || getLocalDateKey(Number(sorted[0].t || Date.now()));
+  var todayKey = getLocalDateKey(Date.now());
+
+  var out = [];
+  var lastValue = null;
+  var cursor = firstKey;
+  var guard = 0; // trava de segurança (máx ~10 anos)
+
+  while (cursor <= todayKey && guard < 4000) {
+    guard++;
+
+    if (isBusinessDayKey(cursor)) {
+      if (byKey[cursor]) {
+        // Ponto real do dia
+        out.push(byKey[cursor]);
+        lastValue = Number(byKey[cursor].v);
+      } else if (lastValue !== null) {
+        // Carry-forward: repete o último fechamento conhecido
+        out.push({
+          dateKey: cursor,
+          t: dateKeyToTimestamp(cursor),
+          v: lastValue,
+          updatedAt: Date.now(),
+          filled: true
+        });
+      }
+    }
+
+    if (cursor === todayKey) break;
+    cursor = nextDateKey(cursor);
+  }
+
+  return out;
 }
 
 
@@ -2269,7 +2340,7 @@ var TVSYM = {
 var TICKERS_A = TICKERS.slice(0, 10); // batch 1
 var TICKERS_B = TICKERS.slice(10);    // batch 2
 
-var BRAPI   = "https://brapi.dev/api";
+var BRAPI   = "https://tgp-proxy.jpauloct.workers.dev/api"; // proxy Cloudflare (token fica no servidor)
 var REFRESH = 60; // 1 minuto
 
 var LS_TOKEN  = "hb_token_v6";
@@ -2428,7 +2499,7 @@ var LS_GOAL   = "hb_goal_v1";
 var LS_EQUITY = "hb_equity_v1"; // historico patrimonio
 
 //  State 
-var token = "7fzZFBceKppCEPxfSrXswz"; // token centralizado Brapi
+// Token da brapi agora fica guardado como secret no Cloudflare Worker (tgp-proxy)
 
 function loadState() { return loadStateForProfile(); }
 function saveState() {
@@ -2625,10 +2696,10 @@ function setSts(s) {
 function fetchQ() {
   setSts("loading");
 
-  var urlA      = BRAPI + "/quote/" + TICKERS_A.join(",") + "?fundamental=false&token=" + token;
-  var urlB      = BRAPI + "/quote/" + TICKERS_B.join(",") + "?fundamental=false&token=" + token;
-  var urlIbov   = BRAPI + "/quote/%5EBVSP?fundamental=false&token=" + token;
-  var urlUsdBrl = BRAPI + "/quote/USDBRL=X?fundamental=false&token=" + token;
+  var urlA      = BRAPI + "/quote/" + TICKERS_A.join(",") + "?fundamental=false";
+  var urlB      = BRAPI + "/quote/" + TICKERS_B.join(",") + "?fundamental=false";
+  var urlIbov   = BRAPI + "/quote/%5EBVSP?fundamental=false";
+  var urlUsdBrl = BRAPI + "/quote/USDBRL=X?fundamental=false";
 
   function fetchJson(url, label) {
     return fetch(url).then(function(r) {
@@ -2890,7 +2961,7 @@ function checkDividends() {
 
   // Busca dividendos de todos os ativos em carteira
   var promises = held.map(function(ticker) {
-    return fetch(BRAPI+"/quote/"+ticker+"?dividends=true&token="+token)
+    return fetch(BRAPI+"/quote/"+ticker+"?dividends=true")
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (d.error || !d.results || !d.results.length) return null;
@@ -3030,7 +3101,10 @@ function drawEquityChart() {
   // Aggregate: last point per calendar day
   var dailyMap = {};
 
-  (equityHistory || []).forEach(function(p) {
+  // Preenche dias úteis ausentes para exibição contínua dia após dia
+  var filledHistory = fillBusinessDayGaps(sanitizeEquityHistory(equityHistory || []));
+
+  (filledHistory || []).forEach(function(p) {
     if (!p || isNaN(Number(p.v))) return;
 
     var key = p.dateKey || getLocalDateKey(Number(p.t || Date.now()));
