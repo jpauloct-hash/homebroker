@@ -1038,6 +1038,7 @@ function switchToSoloProfile() {
     updateAuthIdentityUI();
     render();
     updateContextActionsUI();
+    subscribeOwnPortfolioRealtime();
 
     return loadMyGroupsFromFirebase();
   }).then(function() {
@@ -1324,6 +1325,68 @@ function saveCurrentContextToFirebase() {
   }
   return Promise.resolve();
 }
+
+//  Listener em tempo real: aplica execuções feitas pelo SERVIDOR (Fase B) 
+// O Worker (cron) marca lastServerExec ao executar ordens. O app só aplica
+// o payload quando esse campo muda — escritas do próprio app nunca o alteram,
+// então não há loop nem dupla execução.
+var _portfolioSubRef = null;
+var _portfolioSubHandler = null;
+var _lastServerExecSeen = 0;
+
+function subscribeOwnPortfolioRealtime() {
+  // Desliga o listener anterior (troca de perfil/contexto)
+  if (_portfolioSubRef && _portfolioSubHandler) {
+    try { _portfolioSubRef.off("value", _portfolioSubHandler); } catch(e) {}
+    _portfolioSubRef = null; _portfolioSubHandler = null;
+  }
+
+  if (!fbDb || !currentUser) return;
+
+  var ref = isInGroupContext()
+    ? getGroupPortfolioRef(currentRoomId)
+    : getSoloPortfolioRef();
+  if (!ref) return;
+
+  _lastServerExecSeen = 0; // recalibra no primeiro snapshot do novo contexto
+
+  _portfolioSubHandler = function(snap) {
+    var data = snap.val();
+    if (!data) return;
+
+    var serverExec = Number(data.lastServerExec || 0);
+
+    // Primeiro snapshot: só calibra a referência, sem aplicar
+    if (_lastServerExecSeen === 0) {
+      _lastServerExecSeen = serverExec || 1;
+      return;
+    }
+
+    if (!serverExec || serverExec <= _lastServerExecSeen) return; // nada novo do servidor
+
+    _lastServerExecSeen = serverExec;
+
+    // Aplica o estado vindo do servidor
+    if (isInGroupContext()) {
+      applyGroupPayloadToMemory(data);
+      syncGroupToLocalCache(getCurrentProfile());
+    } else {
+      applySoloPayloadToMemory(data);
+      syncSoloToLocalCache();
+    }
+
+    notif("Ordem(ns) executada(s) pelo servidor");
+    if (typeof playTradeSound === "function") { try { playTradeSound("limit"); } catch(e) {} }
+
+    pushEquityPoint();
+    if (isInGroupContext()) pushMyStats();
+    render();
+  };
+
+  _portfolioSubRef = ref;
+  ref.on("value", _portfolioSubHandler);
+}
+
 
 
 function getLocalDateKey(ts) {
@@ -2103,6 +2166,7 @@ function switchToProfile(profileId) {
       };
       setActiveScreen("ma");
       updateAuthIdentityUI(); render(); renderGroupPanel(); updateContextActionsUI();
+      subscribeOwnPortfolioRealtime();
       notif("Perfil: " + meta.displayName);
     }).catch(function(err) {
       console.error("Erro ao carregar grupo:", err);
@@ -2125,6 +2189,7 @@ function switchToProfile(profileId) {
     updateAuthIdentityUI();
     render();
     updateContextActionsUI();
+    subscribeOwnPortfolioRealtime();
 
     loadMyGroupsFromFirebase().then(function() {
       renderGroupPanel();
@@ -4653,6 +4718,8 @@ function renderSettingsProfiles() {
 
 function initApp() {
   $("ts").style.display="none"; $("ma").style.display="flex";
+
+  subscribeOwnPortfolioRealtime(); // ouve execuções do servidor (Fase B)
 
   document.querySelectorAll(".tab").forEach(function(b) {
     b.onclick = function() {
