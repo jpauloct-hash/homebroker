@@ -11,6 +11,12 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TGP">
+<meta name="theme-color" content="#0a0e16">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <title>Trading GP</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
@@ -5400,6 +5406,17 @@ function _updateAvatar(){
     '<div class="ll">['+hms+'] PERFIL · NV '+lv.level+' · '+xpTotal.toFixed(0)+' XP</div>'+
     '<div class="ll">[RANK] '+rk.name+' · WIN '+winRate+'%</div>'+
     '> SISTEMA ESTÁVEL <span class="log-cur"></span>';
+}
+
+//  PWA: registro do service worker 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function() {
+    navigator.serviceWorker.register("sw.js").then(function(reg) {
+      console.log("PWA: service worker registrado", reg.scope);
+    }).catch(function(err) {
+      console.error("PWA: falha ao registrar service worker", err);
+    });
+  });
 }
 </script>
 </body>
