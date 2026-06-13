@@ -866,6 +866,11 @@ function doAuthLogout() {
   if (!fbAuth) return;
   if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
   if (typeof clearSoloGroupSubscriptions==="function") clearSoloGroupSubscriptions();
+  // Encerra explicitamente o listener da carteira (Fase B) para não vazar entre sessões
+  if (_portfolioSubRef && _portfolioSubHandler) {
+    try { _portfolioSubRef.off("value", _portfolioSubHandler); } catch(e) {}
+    _portfolioSubRef = null; _portfolioSubHandler = null; _lastServerExecSeen = 0;
+  }
   currentUser=null; currentRoomId=""; currentRoomData=null;
   fbAuth.signOut().then(function() { showAuthScreen(); }).catch(function(err){ console.error("Erro ao sair:",err); });
 }
@@ -893,6 +898,13 @@ function updateContextActionsUI() {
 function leaveGroupById(roomId) {
   var uid=getIdentityUid();
   if(!uid||!roomId||!fbDb)return Promise.resolve();
+
+  // Problema 8: sair exige internet
+  if(rtdbConnected !== true){
+    notif("Conecte-se à internet para sair do grupo.","err");
+    return Promise.resolve();
+  }
+
   var group=(myGroupsCache||[]).find(function(g){return g.roomId===roomId;});
   var roomName=group?group.roomName:roomId;
   return Promise.all([
@@ -901,50 +913,70 @@ function leaveGroupById(roomId) {
     fbDb.ref("groupHistory/"+roomId+"/"+uid).remove(),
     fbDb.ref("userRooms/"+uid+"/"+roomId).remove()
   ]).then(function(){
-    var profs=getProfiles().filter(function(p){var m=getProfileMeta(p);return!(m&&m.type==="group"&&m.roomId===roomId);});
-    localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));
-    Object.keys(localStorage).forEach(function(k){
-      if(k.indexOf("hb_state_v3_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
-      if(k.indexOf("hb_goal_v1_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
-    });
-    removeMyRoomLocal(roomId);
-    if(currentUser&&currentRoomId===roomId)localStorage.removeItem("hb_active_room_"+currentUser.uid);
-    myGroupsCache=(myGroupsCache||[]).filter(function(g){return g.roomId!==roomId;});
+    groupListGen++; // invalida cargas em andamento
+    return cleanupOwnRoomResidues(roomId,{remoteAllowed:false,removeLegacyProfile:true});
+    // remoteAllowed:false pois já apagamos os nós remotos acima
+  }).then(function(){
     if(currentRoomId===roomId){notif("Você saiu do grupo "+roomName);return switchToSoloProfile();}
     notif("Você saiu do grupo "+roomName); renderGroupPanel();
+  }).catch(function(err){
+    console.error("Falha ao sair do grupo:",err);
+    notif("Não foi possível sair do grupo. Tente novamente.","err");
+    renderGroupPanel();
   });
 }
 
 function deleteGroupById(roomId) {
   var uid=getIdentityUid();
   if(!uid||!roomId||!fbDb)return Promise.resolve();
-  var group=(myGroupsCache||[]).find(function(g){return g.roomId===roomId;});
-  var roomName=group?group.roomName:roomId;
-  var createdBy=group?group.createdBy:"";
-  if(createdBy&&createdBy!==uid){notif("Apenas o criador pode excluir o grupo","err");return Promise.resolve();}
-  return fbDb.ref("rooms/"+roomId).once("value").then(function(snap){
-    var room=snap.val()||{};
-    var members=room.members||{};
-    var updates={};
-    Object.keys(members).forEach(function(memberUid){
-      updates["userRooms/"+memberUid+"/"+roomId]=null;
-      updates["groupPortfolios/"+roomId+"/"+memberUid]=null;
-      updates["groupHistory/"+roomId+"/"+memberUid]=null;
+
+  // Problema 8: exclusão exige internet (decisão destrutiva precisa de confirmação do servidor)
+  if(rtdbConnected !== true){
+    notif("Conecte-se à internet para excluir o grupo.","err");
+    return Promise.resolve();
+  }
+
+  return getOnlineSnapshot(fbDb.ref("rooms/"+roomId)).then(function(snap){
+    var room=snap.val();
+    if(!room){
+      // Sala já não existe: faxina idempotente do próprio usuário
+      groupListGen++; // invalida cargas em andamento
+      return cleanupOwnRoomResidues(roomId,{remoteAllowed:true,removeLegacyProfile:true}).then(function(){
+        notif("Grupo removido");
+        if(currentRoomId===roomId)return switchToSoloProfile();
+        renderGroupPanel();
+      });
+    }
+
+    var roomName=room.name||roomId;
+    if(room.createdBy && room.createdBy!==uid){
+      notif("Apenas o criador pode excluir o grupo","err");
+      return Promise.reject(new Error("not_creator"));
+    }
+
+    // Ordem segura (provisória até a Fase C no Worker):
+    // 1) apagar rooms/{roomId} primeiro — "mata" a sala para todos; regra do criador permite
+    return fbDb.ref("rooms/"+roomId).remove().then(function(){
+      // 2) invalida cargas antigas IMEDIATAMENTE (Promise antiga não ressuscita)
+      groupListGen++;
+      // 3) limpeza central: tombstone + resíduos próprios (local + remoto)
+      return cleanupOwnRoomResidues(roomId,{remoteAllowed:true,removeLegacyProfile:true});
+      // Resíduos de OUTROS membros viram órfãos inofensivos; cada app limpa o próprio
+      // ao detectar rooms ausente. Exclusão atômica total virá na Fase C (Worker).
+    }).then(function(){
+      if(currentRoomId===roomId){notif("Grupo "+roomName+" excluído");return switchToSoloProfile();}
+      notif("Grupo "+roomName+" excluído"); renderGroupPanel();
     });
-    updates["rooms/"+roomId]=null;
-    return fbDb.ref().update(updates);
-  }).then(function(){
-    var profs=getProfiles().filter(function(p){var m=getProfileMeta(p);return!(m&&m.type==="group"&&m.roomId===roomId);});
-    localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));
-    Object.keys(localStorage).forEach(function(k){
-      if(k.indexOf("hb_state_v3_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
-      if(k.indexOf("hb_goal_v1_grupo_"+roomId+"_")===0)localStorage.removeItem(k);
-    });
-    removeMyRoomLocal(roomId);
-    if(currentUser&&currentRoomId===roomId)localStorage.removeItem("hb_active_room_"+currentUser.uid);
-    myGroupsCache=(myGroupsCache||[]).filter(function(g){return g.roomId!==roomId;});
-    if(currentRoomId===roomId){notif("Grupo "+roomName+" excluído");return switchToSoloProfile();}
-    notif("Grupo "+roomName+" excluído"); renderGroupPanel();
+  }).catch(function(err){
+    if(err && err.message==="not_creator") return;
+    if(err && (err.message==="offline"||err.message==="offline_during_read")){
+      notif("Conecte-se à internet para excluir o grupo.","err");
+      renderGroupPanel();
+      return;
+    }
+    console.error("Falha ao excluir grupo:",err);
+    notif("Não foi possível excluir o grupo. Tente novamente.","err");
+    renderGroupPanel();
   });
 }
 
@@ -964,50 +996,50 @@ function rememberCurrentGroupForSoloList() {
   if (!uid || !currentRoomId) return Promise.resolve();
 
   var roomId = currentRoomId;
-  var room = currentRoomData || {};
+  if (isTombstoned(roomId)) return Promise.resolve(); // não re-registra grupo excluído
 
-  var group = {
-    roomId: roomId,
-    roomName: room.name || room.roomName || roomId,
-    initialBal: Number(room.initialBal || initialBal || 100000),
-    endDate: room.endDate || "",
-    targetPct: Number(room.targetPct || 0),
-    memberName: getIdentityName(),
-    createdAt: Number(room.createdAt || Date.now()),
-    createdBy: room.createdBy || ""
-  };
+  // Offline ou sem SDK: preserva o que existe, NÃO escreve nem recria índice
+  if (!fbDb || rtdbConnected !== true) return Promise.resolve();
 
-  upsertMyRoomLocal(group);
+  // Valida o vínculo no Firebase ANTES de reparar índice/cache
+  return getOnlineSnapshot(fbDb.ref("rooms/" + roomId)).then(function(snap) {
+    var room = snap.val();
+    if (!room) return; // sala não existe → não recria nada
+    var members = room.members || {};
+    var stillLinked = !!members[uid] || room.createdBy === uid;
+    if (!stillLinked) return; // sem vínculo → não repara
 
-  var pid = "grupo_" + roomId + "_" + getIdentityName();
+    var group = {
+      roomId: roomId,
+      roomName: room.name || roomId,
+      initialBal: Number(room.initialBal || initialBal || 100000),
+      endDate: room.endDate || "",
+      targetPct: Number(room.targetPct || 0),
+      memberName: getIdentityName(),
+      createdAt: Number(room.createdAt || Date.now()),
+      createdBy: room.createdBy || ""
+    };
 
-  setProfileMeta(pid, {
-    profileId: pid,
-    displayName: getIdentityName(),
-    type: "group",
-    roomId: roomId,
-    roomName: group.roomName,
-    initialBal: group.initialBal,
-    endDate: group.endDate,
-    targetPct: group.targetPct,
-    createdAt: group.createdAt,
-    createdBy: group.createdBy
-  });
+    upsertMyRoomLocal(group);
 
-  addProfileIfMissing(pid);
+    var pid = "grupo_" + roomId + "_" + getIdentityName();
+    setProfileMeta(pid, {
+      profileId: pid, displayName: getIdentityName(), type: "group",
+      roomId: roomId, roomName: group.roomName, initialBal: group.initialBal,
+      endDate: group.endDate, targetPct: group.targetPct,
+      createdAt: group.createdAt, createdBy: group.createdBy
+    });
+    addProfileIfMissing(pid);
 
-  if (!fbDb) return Promise.resolve();
-
-  return fbDb.ref("userRooms/" + uid + "/" + roomId).update({
-    roomName: group.roomName,
-    initialBal: group.initialBal,
-    endDate: group.endDate,
-    targetPct: group.targetPct,
-    memberName: group.memberName,
-    createdAt: group.createdAt,
-    createdBy: group.createdBy
+    return fbDb.ref("userRooms/" + uid + "/" + roomId).update({
+      roomName: group.roomName, initialBal: group.initialBal, endDate: group.endDate,
+      targetPct: group.targetPct, memberName: group.memberName,
+      createdAt: group.createdAt, createdBy: group.createdBy
+    }).catch(function(err) {
+      console.error("Não consegui reparar userRooms antes de voltar ao solo:", err);
+    });
   }).catch(function(err) {
-    console.error("Não consegui reparar userRooms antes de voltar ao solo:", err);
+    console.error("rememberCurrentGroupForSoloList: leitura falhou, preservando estado:", err);
   });
 }
 
@@ -1015,11 +1047,15 @@ function switchToSoloProfile() {
   var soloId = ensureSoloProfile();
   if (!soloId) return;
 
+  roomSwitchToken++; // B1: invalida qualquer abertura de grupo em andamento
+
   rememberCurrentGroupForSoloList().then(function() {
     currentRoomId = "";
     currentRoomData = null;
 
     localStorage.removeItem("hb_room_id");
+    // B5: remove também o active_room, senão o grupo ressuscita no próximo login
+    if (currentUser) localStorage.removeItem("hb_active_room_" + currentUser.uid);
 
     if (groupUnsubscribe) {
       groupUnsubscribe();
@@ -1080,7 +1116,7 @@ function updateAuthIdentityUI() {
         var found=(myGroupsCache||[]).find(function(g){return g.roomId===currentRoomId;});
         return found?found.roomName:currentRoomId;
       })();
-    el.innerHTML='<span style="color:var(--a)">🏆 '+roomName+'</span> <span style="color:var(--tx4);font-size:9px">· '+name+'</span>';
+    el.innerHTML='<span style="color:var(--a)">🏆 '+escapeHtml(roomName)+'</span> <span style="color:var(--tx4);font-size:9px">· '+escapeHtml(name)+'</span>';
     return;
   }
   el.textContent = "Perfil: " + name;
@@ -1356,15 +1392,28 @@ function subscribeOwnPortfolioRealtime() {
 
   _lastServerExecSeen = 0; // recalibra no primeiro snapshot do novo contexto
 
+  // B2: captura o contexto NO MOMENTO da subscription. Se o contexto mudar
+  // (troca de grupo/solo), um evento tardio deste listener é ignorado.
+  var subscribedContextKey = getCurrentContextKey();
+  var subscribedInGroup = isInGroupContext();
+
   _portfolioSubHandler = function(snap) {
+    if (getCurrentContextKey() !== subscribedContextKey) return; // evento de contexto antigo
     var data = snap.val();
     if (!data) return;
 
     var serverExec = Number(data.lastServerExec || 0);
 
-    // Primeiro snapshot: só calibra a referência, sem aplicar
+    // Primeiro snapshot: calibra a referência. Aplica o estado como autoritativo
+    // (silenciosamente, sem som/notificação) para não ficar defasado se o Worker
+    // já executou algo antes do listener anexar (G3).
     if (_lastServerExecSeen === 0) {
       _lastServerExecSeen = serverExec || 1;
+      if (serverExec > 0) {
+        if (subscribedInGroup) { applyGroupPayloadToMemory(data); syncGroupToLocalCache(getCurrentProfile()); }
+        else { applySoloPayloadToMemory(data); syncSoloToLocalCache(); }
+        render();
+      }
       return;
     }
 
@@ -1372,8 +1421,8 @@ function subscribeOwnPortfolioRealtime() {
 
     _lastServerExecSeen = serverExec;
 
-    // Aplica o estado vindo do servidor
-    if (isInGroupContext()) {
+    // Aplica o estado vindo do servidor (usa o contexto CAPTURADO, não o atual)
+    if (subscribedInGroup) {
       applyGroupPayloadToMemory(data);
       syncGroupToLocalCache(getCurrentProfile());
     } else {
@@ -1385,7 +1434,7 @@ function subscribeOwnPortfolioRealtime() {
     if (typeof playTradeSound === "function") { try { playTradeSound("limit"); } catch(e) {} }
 
     pushEquityPoint();
-    if (isInGroupContext()) pushMyStats();
+    if (subscribedInGroup) pushMyStats();
     render();
   };
 
@@ -1609,11 +1658,15 @@ function fillBusinessDayGaps(points) {
 
 // ── FIREBASE INIT ────────────────────────────────────────────
 var fbDb=null, fbAuth=null, currentUser=null;
+var rtdbConnected=false; // estado REAL da conexão (fbDb existir != estar online)
 try {
   if(typeof firebase!=="undefined"){
     if(!firebase.apps.length) firebase.initializeApp({apiKey:"AIzaSyCx1J0mvZz9G29fwc0d9wQdkJM-9DjfnLY",databaseURL:"https://trading-gp-default-rtdb.firebaseio.com",projectId:"trading-gp",authDomain:"trading-gp.firebaseapp.com"});
     fbDb=firebase.database();
     fbAuth=firebase.auth();
+    try {
+      fbDb.ref(".info/connected").on("value", function(snap){ rtdbConnected = (snap.val() === true); });
+    } catch(e){ console.log("Conexão RTDB:", e.message); }
   }
 } catch(e){console.log("FB err:",e.message);}
 
@@ -1622,10 +1675,32 @@ try {
 var roomSwitchToken=0,roomLoadToken=0;
 var myGroupsCache=[];
 var soloGroupUnsubs={};
+var groupListGen=0; // contador de geração: descarta respostas antigas de loadMyGroupsFromFirebase
+
+// Tombstones: grupos apagados nesta sessão. Bloqueiam ressurreição por Promise
+// antiga, cache local ou perfil legado. Persistido para sobreviver a reload.
+function getTombstoneKey(){ var uid=getIdentityUid(); return "hb_deleted_rooms_"+(uid||"anon"); }
+function loadTombstones(){
+  try { return JSON.parse(localStorage.getItem(getTombstoneKey())||"{}"); } catch(e){ return {}; }
+}
+function addTombstone(roomId){
+  if(!roomId) return;
+  var t=loadTombstones(); t[roomId]=Date.now();
+  localStorage.setItem(getTombstoneKey(), JSON.stringify(t));
+}
+function isTombstoned(roomId){
+  var t=loadTombstones(); return !!(t && t[roomId]);
+}
+// Quando o Firebase confirma que a sala VOLTOU a existir (ex.: recriada), limpa o tombstone
+function clearTombstone(roomId){
+  if(!roomId) return;
+  var t=loadTombstones();
+  if(t && Object.prototype.hasOwnProperty.call(t,roomId)){ delete t[roomId]; localStorage.setItem(getTombstoneKey(), JSON.stringify(t)); }
+}
 
 var currentRoomId="",currentRoomData=null,groupUnsubscribe=null;
 function genRoomId(){return Math.random().toString(36).substr(2,6).toUpperCase();}
-function createRoom(n,b,d,t){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));var id=genRoomId();return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getIdentityUid(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
+function createRoom(n,b,d,t){if(!fbDb||rtdbConnected!==true)return Promise.reject(new Error("offline"));var id=genRoomId();clearTombstone(id);return fbDb.ref("rooms/"+id).set({id:id,name:n,initialBal:b,endDate:d,targetPct:t,createdBy:getIdentityUid(),createdAt:Date.now(),members:{}}).then(function(){localStorage.setItem("hb_room_id",id);currentRoomId=id;return id;});}
 function joinRoom(id){if(!fbDb)return Promise.reject(new Error("Firebase indisponível"));return fbDb.ref("rooms/"+id).once("value").then(function(s){if(!s.exists())throw new Error("Sala não encontrada");localStorage.setItem("hb_room_id",id);currentRoomId=id;currentRoomData=s.val();return s.val();});}
 function pushMyStats(){
   var uid=getIdentityUid();
@@ -1660,6 +1735,7 @@ function saveMyRoomsLocalIndex(data) {
 
 function upsertMyRoomLocal(group) {
   if (!group || !group.roomId) return;
+  if (isTombstoned(group.roomId)) return; // nunca re-registra grupo excluído nesta sessão
 
   var data = loadMyRoomsLocalIndex();
 
@@ -1708,144 +1784,237 @@ function addProfileIfMissing(profileId) {
 
 function loadMyGroupsFromFirebase() {
   var uid = getIdentityUid();
-
   if (!uid) return Promise.resolve([]);
 
-  var groupsMap = {};
+  var myGen = ++groupListGen; // marca esta carga; respostas antigas serão descartadas
+  var tombstones = loadTombstones();
 
-  function addGroup(g) {
-    if (!g || !g.roomId) return;
-
-    groupsMap[g.roomId] = Object.assign(groupsMap[g.roomId] || {}, {
-      roomId: g.roomId,
-      roomName: g.roomName || g.name || g.roomId,
-      initialBal: Number(g.initialBal || 100000),
-      endDate: g.endDate || "",
-      targetPct: Number(g.targetPct || 0),
-      memberName: g.memberName || getIdentityName(),
-      createdAt: Number(g.createdAt || Date.now()),
-      createdBy: g.createdBy || ""
+  // ── MODO OFFLINE: sem SDK OU sem conexão real → só cache local, zero escrita/limpeza ──
+  if (!fbDb || rtdbConnected !== true) {
+    var localOnly = {};
+    var li = loadMyRoomsLocalIndex();
+    Object.keys(li).forEach(function(roomId){
+      if (tombstones[roomId]) return; // não ressuscita apagado, mas também não apaga nada
+      localOnly[roomId] = li[roomId];
     });
+    var arr = Object.values(localOnly);
+    if (myGen === groupListGen) { myGroupsCache = arr; }
+    return Promise.resolve(arr);
   }
 
-  // 1) Fallback local forte: índice próprio
-  var localRooms = loadMyRoomsLocalIndex();
+  // ── MODO ONLINE: Firebase é a fonte de verdade ──
+  // Passo 1: ler userRooms/{uid} (índice reverso oficial — não varre rooms inteiro)
+  return fbDb.ref("userRooms/" + uid).once("value").then(function(snap) {
+    var indexData = snap.val() || {};
+    var roomIds = Object.keys(indexData);
 
-  Object.keys(localRooms).forEach(function(roomId) {
-    addGroup(localRooms[roomId]);
-  });
-
-  // 2) Fallback local antigo: perfis grupo_...
-  try {
-    getProfiles().forEach(function(profileId) {
-      var meta = getProfileMeta(profileId);
-
-      if (meta && meta.type === "group" && meta.roomId) {
-        addGroup({
-          roomId: meta.roomId,
-          roomName: meta.roomName || meta.roomId,
-          initialBal: Number(meta.initialBal || 100000),
-          endDate: meta.endDate || "",
-          targetPct: Number(meta.targetPct || 0),
-          memberName: meta.displayName || getIdentityName(),
-          createdAt: Number(meta.createdAt || Date.now()),
-          createdBy: meta.createdBy || ""
+    // Migração legada única: importa perfis grupo_... só uma vez, e só os que
+    // ainda existirem no Firebase (validados no passo 2 abaixo).
+    var legacyKey = "hb_legacy_rooms_migration_done_" + uid;
+    var legacyDone = false;
+    try { legacyDone = localStorage.getItem(legacyKey) === "1"; } catch(e){}
+    var legacyCandidates = {};
+    if (!legacyDone) {
+      try {
+        getProfiles().forEach(function(profileId) {
+          var meta = getProfileMeta(profileId);
+          if (meta && meta.type === "group" && meta.roomId && !tombstones[meta.roomId]) {
+            legacyCandidates[meta.roomId] = {
+              roomId: meta.roomId,
+              roomName: meta.roomName || meta.roomId,
+              initialBal: Number(meta.initialBal || 100000),
+              endDate: meta.endDate || "",
+              targetPct: Number(meta.targetPct || 0),
+              memberName: meta.displayName || getIdentityName(),
+              createdAt: Number(meta.createdAt || Date.now()),
+              createdBy: meta.createdBy || ""
+            };
+          }
         });
-      }
-    });
-  } catch (e) {
-    console.error("Erro lendo perfis locais de grupo:", e);
-  }
+      } catch (e) { console.error("Erro lendo perfis legados:", e); }
+    }
 
-  if (!fbDb) {
-    var onlyLocal = Object.values(groupsMap);
-    myGroupsCache = onlyLocal;
-    return Promise.resolve(onlyLocal);
-  }
+    // IMPORTANTE (tombstone × reingresso legítimo):
+    // - IDs vindos de userRooms/{uid} (Firebase) SEMPRE são verificados, mesmo com
+    //   tombstone — pois podem ser um reingresso legítimo feito em outro dispositivo.
+    // - IDs vindos só de fontes LOCAIS (perfil legado) respeitam o tombstone.
+    var idsToCheck = {};
+    roomIds.forEach(function(r){ idsToCheck[r] = true; }); // do Firebase: sempre
+    Object.keys(legacyCandidates).forEach(function(r){ if(!tombstones[r]) idsToCheck[r] = true; }); // legado: só sem tombstone
+    var idList = Object.keys(idsToCheck);
 
-  // 3) Caminho oficial: userRooms/{uid}
-  var pUserRooms = fbDb.ref("userRooms/" + uid).once("value").then(function(snap) {
-    var data = snap.val() || {};
+    if (!idList.length) {
+      if (myGen === groupListGen) { myGroupsCache = []; }
+      if (!legacyDone && rtdbConnected === true) { try { localStorage.setItem(legacyKey, "1"); } catch(e){} }
+      return [];
+    }
 
-    Object.keys(data).forEach(function(roomId) {
-      var x = data[roomId] || {};
-
-      addGroup({
-        roomId: roomId,
-        roomName: x.roomName || x.name || roomId,
-        initialBal: Number(x.initialBal || 100000),
-        endDate: x.endDate || "",
-        targetPct: Number(x.targetPct || 0),
-        memberName: x.memberName || getIdentityName(),
-        createdAt: Number(x.createdAt || Date.now()),
-        createdBy: x.createdBy || ""
-      });
-    });
-  }).catch(function(err) {
-    console.error("Erro lendo userRooms:", err);
-  });
-
-  // 4) Fallback Firebase: tenta ler rooms, mas não depende disso
-  var pRooms = fbDb.ref("rooms").once("value").then(function(snap) {
-    var rooms = snap.val() || {};
-
-    Object.keys(rooms).forEach(function(roomId) {
-      var room = rooms[roomId] || {};
-      var members = room.members || {};
-
-      if (members[uid] || room.createdBy === uid) {
-        addGroup({
-          roomId: roomId,
-          roomName: room.name || roomId,
-          initialBal: Number(room.initialBal || 100000),
-          endDate: room.endDate || "",
-          targetPct: Number(room.targetPct || 0),
-          memberName: getIdentityName(),
-          createdAt: Number(room.createdAt || Date.now()),
-          createdBy: room.createdBy || ""
-        });
-      }
-    });
-  }).catch(function(err) {
-    console.error("Erro lendo rooms. Provável regra do Firebase bloqueando leitura geral:", err);
-  });
-
-  return Promise.all([pUserRooms, pRooms]).then(function() {
-    var list = Object.values(groupsMap);
-
-    list.sort(function(a, b) {
-      return Number(b.createdAt || 0) - Number(a.createdAt || 0);
-    });
-
-    myGroupsCache = list;
-
-    // Salva localmente para não sumir na próxima abertura
-    list.forEach(upsertMyRoomLocal);
-
-    // Repara userRooms quando possível
-    var repairs = list.map(function(g) {
-      return fbDb.ref("userRooms/" + uid + "/" + g.roomId).update({
-        roomName: g.roomName || g.roomId,
-        initialBal: Number(g.initialBal || 100000),
-        endDate: g.endDate || "",
-        targetPct: Number(g.targetPct || 0),
-        memberName: g.memberName || getIdentityName(),
-        createdAt: Number(g.createdAt || Date.now()),
-        createdBy: g.createdBy || ""
+    // Passo 2: para cada roomId, ler rooms/{roomId} e CONFIRMAR existência + vínculo.
+    var checks = idList.map(function(roomId) {
+      return fbDb.ref("rooms/" + roomId).once("value").then(function(rs) {
+        var room = rs.val();
+        if (!room) {
+          return { roomId: roomId, status: "absent", fromIndex: !!indexData[roomId] };
+        }
+        var members = room.members || {};
+        var amMember = !!members[uid] || room.createdBy === uid;
+        if (!amMember) {
+          return { roomId: roomId, status: "not_member", fromIndex: !!indexData[roomId] };
+        }
+        return {
+          roomId: roomId, status: "exists", fromIndex: !!indexData[roomId],
+          data: {
+            roomId: roomId,
+            roomName: room.name || (indexData[roomId] && indexData[roomId].roomName) || roomId,
+            initialBal: Number(room.initialBal || (indexData[roomId] && indexData[roomId].initialBal) || 100000),
+            endDate: room.endDate || "",
+            targetPct: Number(room.targetPct || 0),
+            memberName: (indexData[roomId] && indexData[roomId].memberName) || getIdentityName(),
+            createdAt: Number(room.createdAt || Date.now()),
+            createdBy: room.createdBy || ""
+          }
+        };
       }).catch(function(err) {
-        console.error("Falha ao reparar userRooms:", g.roomId, err);
+        console.error("Erro lendo rooms/" + roomId + " (preservando cache):", err);
+        return { roomId: roomId, status: "error", fromIndex: !!indexData[roomId] };
       });
     });
 
-    return Promise.all(repairs).then(function() {
+    return Promise.all(checks).then(function(results) {
+      if (myGen !== groupListGen) return myGroupsCache || [];
+
+      var list = [];
+      var localIndex = loadMyRoomsLocalIndex();
+
+      results.forEach(function(r) {
+        if (r.status === "exists") {
+          clearTombstone(r.roomId);      // vínculo vivo confirmado: reingresso legítimo limpa tombstone
+          list.push(r.data);
+          upsertMyRoomLocal(r.data);
+        } else if (r.status === "absent") {
+          // Limpeza destrutiva só com conexão REAL (offline/erro nunca = exclusão).
+          // cria tombstone + remove resíduos do próprio uid (local + remoto).
+          if (rtdbConnected === true) {
+            cleanupOwnRoomResidues(r.roomId, { remoteAllowed: true, removeLegacyProfile: true });
+          }
+        } else if (r.status === "not_member") {
+          // Existe mas não sou membro: removo meu índice SEM tombstone permanente
+          // (posso reentrar depois) e sem apagar nada da sala.
+          if (rtdbConnected === true) {
+            cleanupOwnRoomResidues(r.roomId, { remoteAllowed: true, keepTombstone: true, removeLegacyProfile: true });
+          }
+        } else {
+          // status "error": preserva cache local
+          if (localIndex[r.roomId] && !tombstones[r.roomId]) list.push(localIndex[r.roomId]);
+        }
+      });
+
+      // Reparo de userRooms APENAS para salas confirmadas vivas (vínculo já validado)
+      var confirmed = results.filter(function(r){ return r.status === "exists"; });
+      confirmed.forEach(function(r) {
+        fbDb.ref("userRooms/" + uid + "/" + r.roomId).update({
+          roomName: r.data.roomName,
+          initialBal: r.data.initialBal,
+          endDate: r.data.endDate,
+          targetPct: r.data.targetPct,
+          memberName: r.data.memberName,
+          createdAt: r.data.createdAt,
+          createdBy: r.data.createdBy
+        }).catch(function(err){ console.error("Falha ao reparar userRooms:", r.roomId, err); });
+      });
+
+      // Migração legada só conclui se: online E nenhuma leitura retornou erro/inconclusiva.
+      // Se houver erro, deixa para tentar de novo numa próxima carga.
+      var anyError = results.some(function(r){ return r.status === "error"; });
+      if (!legacyDone && rtdbConnected === true && !anyError) { try { localStorage.setItem(legacyKey, "1"); } catch(e){} }
+
+      list.sort(function(a, b){ return Number(b.createdAt||0) - Number(a.createdAt||0); });
+
+      if (myGen === groupListGen) { myGroupsCache = list; }
       return list;
     });
+  }).catch(function(err) {
+    console.error("Erro lendo userRooms (preservando cache local):", err);
+    var li = loadMyRoomsLocalIndex();
+    var tomb = loadTombstones();
+    var arr = Object.keys(li).filter(function(r){ return !tomb[r]; }).map(function(r){ return li[r]; });
+    if (myGen === groupListGen) { myGroupsCache = arr; }
+    return arr;
   });
 }
 
+// Remove o perfil legado grupo_... e estados locais associados a um roomId
+function purgeLegacyProfileForRoom(roomId) {
+  if (!roomId) return;
+  try {
+    var profs = getProfiles().filter(function(p){
+      var m = getProfileMeta(p);
+      return !(m && m.type === "group" && m.roomId === roomId);
+    });
+    localStorage.setItem("hb_profiles_v1", JSON.stringify(profs));
+  } catch(e){}
+  Object.keys(localStorage).forEach(function(k){
+    if (k.indexOf("hb_state_v3_grupo_" + roomId + "_") === 0) localStorage.removeItem(k);
+    if (k.indexOf("hb_goal_v1_grupo_" + roomId + "_") === 0) localStorage.removeItem(k);
+  });
+}
+
+// Leitura online-first para decisões SENSÍVEIS (limpeza, reparo, exclusão).
+// Rejeita se offline antes OU se a conexão cair durante a leitura.
+function getOnlineSnapshot(ref) {
+  if (!fbDb || rtdbConnected !== true) {
+    return Promise.reject(new Error("offline"));
+  }
+  return ref.once("value").then(function(snap) {
+    if (rtdbConnected !== true) {
+      throw new Error("offline_during_read");
+    }
+    return snap;
+  });
+}
+
+// ── LIMPEZA CENTRAL IDEMPOTENTE DE RESÍDUOS DO PRÓPRIO USUÁRIO ──
+// Reutilizada por delete/leave/load/render/switch. Nunca toca em dados de terceiros.
+// options:
+//   remoteAllowed   (bool) - se true E online, apaga nós do PRÓPRIO uid no Firebase
+//   keepTombstone   (bool) - se true, NÃO cria tombstone (ex.: not_member, que pode reentrar)
+//   removeLegacyProfile (bool) - se true, remove perfil grupo_... e estados locais
+//   removeFromCache (bool) - se true, remove de myGroupsCache
+function cleanupOwnRoomResidues(roomId, options) {
+  if (!roomId) return Promise.resolve();
+  options = options || {};
+  var uid = getIdentityUid();
+
+  // --- Limpeza LOCAL (sempre segura, mesmo offline) ---
+  removeMyRoomLocal(roomId);
+  if (options.removeLegacyProfile) purgeLegacyProfileForRoom(roomId);
+  if (!options.keepTombstone) addTombstone(roomId);
+  if (options.removeFromCache !== false) {
+    myGroupsCache = (myGroupsCache || []).filter(function(g){ return g.roomId !== roomId; });
+  }
+  if (currentUser && currentRoomId === roomId) {
+    try { localStorage.removeItem("hb_active_room_" + currentUser.uid); } catch(e){}
+  }
+  if (soloGroupUnsubs[roomId]) { try { soloGroupUnsubs[roomId](); } catch(e){} delete soloGroupUnsubs[roomId]; }
+
+  // --- Limpeza REMOTA (apenas online E autorizada; só nós do PRÓPRIO uid) ---
+  if (options.remoteAllowed && rtdbConnected === true && uid && fbDb) {
+    return Promise.all([
+      fbDb.ref("userRooms/" + uid + "/" + roomId).remove().catch(function(err){ console.error("Falha ao limpar userRooms:", roomId, err); }),
+      fbDb.ref("groupPortfolios/" + roomId + "/" + uid).remove().catch(function(err){ console.error("Falha ao limpar groupPortfolios:", roomId, err); }),
+      fbDb.ref("groupHistory/" + roomId + "/" + uid).remove().catch(function(err){ console.error("Falha ao limpar groupHistory:", roomId, err); })
+    ]).then(function(){});
+  }
+  return Promise.resolve();
+}
+
+
+
+
+
 function loadGroupSummaryFromFirebase(roomId) {
   var uid = getIdentityUid();
-  if (!uid || !fbDb || !roomId) return Promise.resolve(null);
+  if (!uid || !fbDb || !roomId) return Promise.resolve({ status: "error" });
 
   return Promise.all([
     fbDb.ref("groupPortfolios/" + roomId + "/" + uid).once("value"),
@@ -1854,89 +2023,62 @@ function loadGroupSummaryFromFirebase(roomId) {
   ]).then(function(results) {
     var portData = results[0].val() || null;
     var members = results[1].val() || {};
-    var roomData = results[2].val() || {};
+    var roomData = results[2].val();
 
-    if (!portData) return null;
+    // Sala confirmadamente não existe → sinaliza para o card se limpar
+    if (!roomData) return { status: "absent" };
 
-    var cash = Number(portData.cash || 0);
-    var positions = portData.positions || {};
+    var cash = Number((portData && portData.cash) || 0);
+    var positions = (portData && portData.positions) || {};
     var totalPositions = 0;
 
     Object.keys(positions).forEach(function(tk) {
       var p = positions[tk] || {};
       var qty = Number(p.qty || 0);
-
-      // Usa cotação atual. Se não tiver cotação, cai para preço médio.
       var marketPrice = Number(prices[tk] || 0);
       var avgPrice = Number(p.avgPrice || 0);
       var px = marketPrice > 0 ? marketPrice : avgPrice;
-
       totalPositions += qty * px;
     });
 
     var total = cash + totalPositions;
-
-    var initialBal = Number(
-      portData.initialBal ||
-      roomData.initialBal ||
-      100000
-    );
-
+    var initialBal = Number((portData && portData.initialBal) || roomData.initialBal || 100000);
     var pct = initialBal > 0 ? ((total - initialBal) / initialBal * 100) : 0;
 
-    // Monta ranking usando total/pct dos membros, mas substitui o usuário atual
-    // pelo cálculo fresco feito acima.
     var memberArr = Object.keys(members).map(function(memberUid) {
       var m = members[memberUid] || {};
-
       if (memberUid === uid || m.uid === uid) {
-        m = Object.assign({}, m, {
-          uid: uid,
-          total: total,
-          pct: pct,
-          name: m.name || getIdentityName()
-        });
+        m = Object.assign({}, m, { uid: uid, total: total, pct: pct, name: m.name || getIdentityName() });
       }
-
       return m;
     });
 
     if (!memberArr.length) {
-      memberArr = [{
-        uid: uid,
-        name: getIdentityName(),
-        total: total,
-        pct: pct
-      }];
+      memberArr = [{ uid: uid, name: getIdentityName(), total: total, pct: pct }];
     }
 
-    memberArr.sort(function(a, b) {
-      return Number(b.pct || 0) - Number(a.pct || 0);
-    });
+    memberArr.sort(function(a, b) { return Number(b.pct || 0) - Number(a.pct || 0); });
 
     var myName = getIdentityName();
-
     var myPos = memberArr.findIndex(function(x) {
       return (x.uid && x.uid === uid) || (x.name === myName);
     });
 
-    // Já aproveita para atualizar o nó members com o valor correto
-    fbDb.ref("rooms/" + roomId + "/members/" + uid).update({
-      uid: uid,
-      name: getIdentityName(),
-      total: total,
-      pct: pct,
-      updatedAt: Date.now()
-    }).catch(function(err) {
-      console.error("Falha ao atualizar resumo do membro:", err);
-    });
+    // NÃO escreve em members aqui: carregar resumo é operação SOMENTE-LEITURA.
+    // O ranking é atualizado por pushMyStats() (ao operar/entrar) e pelo Worker
+    // (a cada 5 min). Isso evita reintroduzir um membro que foi removido da sala.
 
     return {
+      status: "ok",
       total: total,
       pct: pct,
       pos: myPos >= 0 ? myPos + 1 : null,
       totalMembers: memberArr.length
     };
+  }).catch(function(err) {
+    // Erro de permissão / rede → NÃO é prova de exclusão
+    console.error("Erro ao carregar resumo do grupo " + roomId + ":", err);
+    return { status: "error" };
   });
 }
 
@@ -1948,9 +2090,47 @@ function clearSoloGroupSubscriptions() {
   soloGroupUnsubs={};
 }
 
-function subscribeGroup(cb){if(!currentRoomId||!fbDb)return;if(groupUnsubscribe)groupUnsubscribe();var ref=fbDb.ref("rooms/"+currentRoomId+"/members");ref.on("value",function(s){cb(s.val()||{});});groupUnsubscribe=function(){ref.off();};}
+function subscribeGroup(cb){
+  if(!currentRoomId||!fbDb)return;
+  if(groupUnsubscribe)groupUnsubscribe();
+  var roomId=currentRoomId;
+  var ref=fbDb.ref("rooms/"+roomId);
+  var handler=function(snap){
+    if(!snap.exists()){
+      // Sala excluída pelo criador enquanto eu estava dentro.
+      // Só reage com conexão real (não confunde queda de rede com exclusão).
+      if(rtdbConnected!==true) return;
+      if(currentRoomId!==roomId) return; // já troquei de contexto
+      groupListGen++; // B3: invalida cargas antigas para não ressuscitar o grupo
+      cleanupOwnRoomResidues(roomId,{remoteAllowed:true,removeLegacyProfile:true}).then(function(){
+        notif("Este grupo foi excluído pelo criador.","err");
+        switchToSoloProfile();
+      });
+      return;
+    }
+    var room=snap.val()||{};
+    // B6: o criador pode ter removido APENAS o meu vínculo (sala continua existindo).
+    var uid=getIdentityUid();
+    var stillLinked=!!(room.members&&room.members[uid])||room.createdBy===uid;
+    if(!stillLinked){
+      if(rtdbConnected!==true) return;
+      if(currentRoomId!==roomId) return;
+      groupListGen++;
+      // keepTombstone: posso ser readicionado depois; não bloqueia reentrada
+      cleanupOwnRoomResidues(roomId,{remoteAllowed:true,keepTombstone:true,removeLegacyProfile:true}).then(function(){
+        notif("Você foi removido deste grupo.","err");
+        switchToSoloProfile();
+      });
+      return;
+    }
+    cb(room.members||{});
+  };
+  ref.on("value",handler);
+  groupUnsubscribe=function(){ ref.off("value",handler); };
+}
 function getRoomInviteLink(){return window.location.origin+window.location.pathname+"?room="+encodeURIComponent(currentRoomId);}
 function showCreateRoom() {
+  if (rtdbConnected !== true) { notif("Conecte-se à internet para criar um grupo.", "err"); return; }
   var n = prompt("🏆 Nome do grupo:");
   if (!n || !n.trim()) return;
   n = n.trim();
@@ -2038,27 +2218,35 @@ function joinGroupAsGuest() {
   if(!uid){errEl.textContent="Faça login antes de entrar no grupo";errEl.style.display="block";return;}
   errEl.style.display="none";
   if(!currentRoomData){notif("Erro: sala não encontrada","err");return;}
+  if(rtdbConnected!==true){ errEl.textContent="Conecte-se à internet para entrar no grupo."; errEl.style.display="block"; return; }
+
   var name=getIdentityName();
-  fbDb.ref("rooms/"+currentRoomId+"/members/"+uid).set({uid:uid,name:name,joinedAt:Date.now()})
+  var roomId=currentRoomId;
+  var profileId="grupo_"+roomId+"_"+name;
+
+  // 1) grava membro → 2) aguarda → 3) grava userRooms → 4) aguarda →
+  // 5) só então limpa tombstone e cria perfil local → 6) entra
+  fbDb.ref("rooms/"+roomId+"/members/"+uid).set({uid:uid,name:name,joinedAt:Date.now()})
   .then(function(){
-    localStorage.setItem("hb_active_room_"+uid, currentRoomId);
-    fbDb.ref("userRooms/"+uid+"/"+currentRoomId).set({
-      roomName:currentRoomData.name||currentRoomId,
+    return fbDb.ref("userRooms/"+uid+"/"+roomId).set({
+      roomName:currentRoomData.name||roomId,
       initialBal:Number(currentRoomData.initialBal||100000),
       endDate:currentRoomData.endDate||"",
       targetPct:Number(currentRoomData.targetPct||0),
       memberName:name,
       createdAt:Number(currentRoomData.createdAt||Date.now()),
       createdBy:currentRoomData.createdBy||""
-    }).catch(function(e){console.error("userRooms write failed:",e);});
-    var profileId="grupo_"+currentRoomId+"_"+name;
-    setProfileMeta(profileId,{profileId:profileId,displayName:name,type:"group",roomId:currentRoomId,roomName:currentRoomData.name||currentRoomId});
-
+    });
+  })
+  .then(function(){
+    // Ambas as gravações confirmadas: agora é seguro limpar tombstone e registrar perfil
+    clearTombstone(roomId);
+    localStorage.setItem("hb_active_room_"+uid, roomId);
+    setProfileMeta(profileId,{profileId:profileId,displayName:name,type:"group",roomId:roomId,roomName:currentRoomData.name||roomId});
     addProfileIfMissing(profileId);
-
     upsertMyRoomLocal({
-      roomId: currentRoomId,
-      roomName: currentRoomData.name || currentRoomId,
+      roomId: roomId,
+      roomName: currentRoomData.name || roomId,
       initialBal: Number(currentRoomData.initialBal || 100000),
       endDate: currentRoomData.endDate || "",
       targetPct: Number(currentRoomData.targetPct || 0),
@@ -2066,22 +2254,23 @@ function joinGroupAsGuest() {
       createdAt: Number(currentRoomData.createdAt || Date.now()),
       createdBy: currentRoomData.createdBy || ""
     });
-
     var profs=getProfiles();
     if(profs.indexOf(profileId)===-1){profs.push(profileId);localStorage.setItem("hb_profiles_v1",JSON.stringify(profs));}
     localStorage.setItem("hb_profile_v1",profileId);
-    return loadGroupPortfolioFromFirebase(currentRoomId,profileId);
+    return loadGroupPortfolioFromFirebase(roomId,profileId);
   }).then(function(){
-    return loadGroupHistoryFromFirebase(currentRoomId,getCurrentProfile());
+    return loadGroupHistoryFromFirebase(roomId,getCurrentProfile());
   }).then(function(){
     ensureInitialEquityPoint(initialBal);
     $("gs").style.display="none";
     clearInviteFromUrl();
     pushMyStats();
-    notif("Bem-vindo ao grupo "+currentRoomData.name+"!");
+    notif("Bem-vindo ao grupo "+(currentRoomData.name||roomId)+"!");
     initApp();
   }).catch(function(err){
-    console.error(err);
+    console.error("Erro ao entrar no grupo:",err);
+    errEl.textContent="Não foi possível entrar no grupo. Tente novamente.";
+    errEl.style.display="block";
     notif("Erro ao entrar no grupo","err");
   });
 }
@@ -2093,9 +2282,9 @@ function showGroupJoinScreen(roomData){
   $("gs-name").textContent=roomData.name||currentRoomId;
   var rules="";
   if(roomData.initialBal)rules+="💰 Saldo inicial: <b>R$ "+Number(roomData.initialBal).toLocaleString("pt-BR")+"</b><br>";
-  if(roomData.endDate)rules+="📅 Prazo: <b>"+roomData.endDate+"</b><br>";
-  if(roomData.targetPct)rules+="🎯 Meta: <b>+"+roomData.targetPct+"%</b><br>";
-  if(roomData.createdBy)rules+="👑 Criado por: <b>"+roomData.createdBy+"</b><br>";
+  if(roomData.endDate)rules+="📅 Prazo: <b>"+escapeHtml(roomData.endDate)+"</b><br>";
+  if(roomData.targetPct)rules+="🎯 Meta: <b>+"+Number(roomData.targetPct)+"%</b><br>";
+  if(roomData.createdBy)rules+="👑 Criado por: <b>"+escapeHtml(roomData.createdBy)+"</b><br>";
   $("gs-rules").innerHTML=rules||"Grupo de trading — boa sorte!";
 }
 function shareRoomInvite(){
@@ -2122,44 +2311,70 @@ function switchToProfile(profileId) {
     setProfileMeta(profileId, meta);
   }
   if (meta && meta.type === "group" && meta.roomId) {
+    // Item 3/6: abrir grupo é operação estrutural — exige conexão real.
+    // Offline, não abrimos o grupo (evita usar cache como verdade); fica no solo.
+    if (!fbDb || rtdbConnected !== true) {
+      notif("Conecte-se à internet para abrir o grupo.","err");
+      return switchToSoloProfile();
+    }
     currentRoomId = meta.roomId;
     currentRoomData = null;
     if (currentUser) localStorage.setItem("hb_active_room_"+currentUser.uid, meta.roomId);
     if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
     var thisSwitch = ++roomSwitchToken;
-    joinRoom(meta.roomId).then(function(room) {
+    // Item 8: leitura online-first (rejeita se cair a conexão durante a leitura)
+    getOnlineSnapshot(fbDb.ref("rooms/" + meta.roomId)).then(function(snap) {
       if (thisSwitch !== roomSwitchToken) return;
+      var room = snap.val();
+      if (!room) { return Promise.reject(new Error("not_linked")); }
 
       currentRoomData = room;
       meta.roomName = room.name;
       setProfileMeta(profileId, meta);
 
-      upsertMyRoomLocal({
-        roomId: meta.roomId,
-        roomName: room.name || meta.roomName || meta.roomId,
-        initialBal: Number(room.initialBal || 100000),
-        endDate: room.endDate || "",
-        targetPct: Number(room.targetPct || 0),
-        memberName: meta.displayName || getIdentityName(),
-        createdAt: Number(room.createdAt || Date.now()),
-        createdBy: room.createdBy || ""
-      });
+      var uid = getIdentityUid();
+      var members = (room && room.members) || {};
+      var stillLinked = !!members[uid] || room.createdBy === uid;
 
-      addProfileIfMissing(profileId);
+      if (stillLinked) {
+        clearTombstone(meta.roomId); // vínculo vivo confirmado: reingresso legítimo limpa tombstone
 
-      return fbDb.ref("userRooms/" + getIdentityUid() + "/" + meta.roomId).update({
-        roomName: room.name || meta.roomName || meta.roomId,
-        initialBal: Number(room.initialBal || 100000),
-        endDate: room.endDate || "",
-        targetPct: Number(room.targetPct || 0),
-        memberName: meta.displayName || getIdentityName(),
-        createdAt: Number(room.createdAt || Date.now()),
-        createdBy: room.createdBy || ""
-      }).catch(function(err) {
-        console.error("Falha ao reparar userRooms no switchToProfile:", err);
-      }).then(function() {
-        return loadGroupPortfolioFromFirebase(meta.roomId, profileId);
-      });
+        // Item 7: revalida conexão antes de reparar índice/cache. Se caiu, aborta.
+        if (rtdbConnected !== true) { throw new Error("offline_during_read"); }
+
+        upsertMyRoomLocal({
+          roomId: meta.roomId,
+          roomName: room.name || meta.roomName || meta.roomId,
+          initialBal: Number(room.initialBal || 100000),
+          endDate: room.endDate || "",
+          targetPct: Number(room.targetPct || 0),
+          memberName: meta.displayName || getIdentityName(),
+          createdAt: Number(room.createdAt || Date.now()),
+          createdBy: room.createdBy || ""
+        });
+
+        addProfileIfMissing(profileId);
+
+        return fbDb.ref("userRooms/" + uid + "/" + meta.roomId).update({
+          roomName: room.name || meta.roomName || meta.roomId,
+          initialBal: Number(room.initialBal || 100000),
+          endDate: room.endDate || "",
+          targetPct: Number(room.targetPct || 0),
+          memberName: meta.displayName || getIdentityName(),
+          createdAt: Number(room.createdAt || Date.now()),
+          createdBy: room.createdBy || ""
+        }).catch(function(err) {
+          console.error("Falha ao reparar userRooms no switchToProfile:", err);
+        }).then(function() {
+          return loadGroupPortfolioFromFirebase(meta.roomId, profileId);
+        });
+      } else {
+        // Não sou mais membro nem criador → não abrir. Limpa resíduos (permite reentrada).
+        if (rtdbConnected === true) {
+          cleanupOwnRoomResidues(meta.roomId, { remoteAllowed: true, keepTombstone: true, removeLegacyProfile: true });
+        }
+        return Promise.reject(new Error("not_linked"));
+      }
     }).then(function() {
       if (thisSwitch !== roomSwitchToken) return;
       return loadGroupHistoryFromFirebase(meta.roomId, profileId);
@@ -2175,12 +2390,22 @@ function switchToProfile(profileId) {
       subscribeOwnPortfolioRealtime();
       notif("Perfil: " + meta.displayName);
     }).catch(function(err) {
+      if (err && (err.message === "not_linked")) {
+        notif("Você não participa mais deste grupo.","err");
+        return switchToSoloProfile();
+      }
+      if (err && (err.message === "offline" || err.message === "offline_during_read")) {
+        notif("Conexão perdida. Abra o grupo novamente quando online.","err");
+        return switchToSoloProfile();
+      }
       console.error("Erro ao carregar grupo:", err);
       notif("Erro ao carregar carteira do grupo","err");
+      return switchToSoloProfile();
     });
     return;
   }
   if (groupUnsubscribe) { groupUnsubscribe(); groupUnsubscribe=null; }
+  roomSwitchToken++; // B1: invalida abertura de grupo em andamento
   currentRoomId = ""; currentRoomData = null;
   if (currentUser) localStorage.removeItem("hb_active_room_"+currentUser.uid);
   return loadSoloFromFirebase().then(function() {
@@ -2248,6 +2473,16 @@ function getMyGroupProfiles() {
   return myGroupsCache || [];
 }
 
+// Escapa texto para inserção segura em innerHTML (anti-XSS em nomes de grupo etc.)
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function renderSoloGroupList(groups) {
   var el=$("group-solo-list");if(!el)return;
   el.innerHTML="";
@@ -2259,18 +2494,19 @@ function renderSoloGroupList(groups) {
     var isCreator=group.createdBy===getIdentityUid();
     var card=document.createElement("div");
     card.style.cssText="background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px;";
+    var admColor = isCreator ? 'var(--r)' : '#f59e0b';
     card.innerHTML=
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
         '<div>'+
-          '<div style="font-size:12px;font-weight:700;color:var(--a)">'+group.roomName+'</div>'+
-          '<div style="font-size:9px;color:var(--tx4);margin-top:2px">'+group.roomId+'</div>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--a)">'+escapeHtml(group.roomName)+'</div>'+
+          '<div style="font-size:9px;color:var(--tx4);margin-top:2px">'+escapeHtml(group.roomId)+'</div>'+
         '</div>'+
         '<div class="grp-pct" style="font-size:14px;font-weight:700;color:var(--tx3)">...</div>'+
       '</div>'+
       '<div class="grp-meta" style="font-size:10px;color:var(--tx2);margin-bottom:10px">Carregando...</div>'+
       '<div style="display:flex;gap:6px">'+
         '<button class="grp-open-btn" style="flex:1;padding:8px 10px;background:linear-gradient(135deg,#1e4a80,#2563eb);border:none;border-radius:6px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">OPERAR</button>'+
-        '<button class="grp-admin-btn" style="padding:8px 10px;background:transparent;border:1px solid '+(isCreator?'var(--r)':'#f59e0b')+';"+'+"border-radius:6px;color:"+(isCreator?'var(--r)':'#f59e0b')+';font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">'+(isCreator?'EXCLUIR':'SAIR')+'</button>'+
+        '<button class="grp-admin-btn" style="padding:8px 10px;background:transparent;border:1px solid '+admColor+';border-radius:6px;color:'+admColor+';font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">'+(isCreator?'EXCLUIR':'SAIR')+'</button>'+
       '</div>';
     (function(g,c,creator){
       c.querySelector(".grp-open-btn").onclick=function(){
@@ -2290,14 +2526,37 @@ function renderSoloGroupList(groups) {
           leaveGroupById(g.roomId).catch(function(err){console.error(err);notif("Erro ao sair do grupo","err");});
         }
       };
+      // Offline: mostra cache local sem nenhuma leitura/limpeza destrutiva
+      if(!fbDb || rtdbConnected !== true){
+        var metaOff=c.querySelector(".grp-meta");
+        if(metaOff)metaOff.textContent="Modo offline — dados locais";
+        return;
+      }
       loadGroupSummaryFromFirebase(g.roomId).then(function(s){
-        if(!s)return;
         var pctEl=c.querySelector(".grp-pct"),metaEl=c.querySelector(".grp-meta");
-        var color=s.pct>=0?"var(--g)":"var(--r)";
-        var medal=s.pos===1?"🥇":s.pos===2?"🥈":s.pos===3?"🥉":(s.pos?"#"+s.pos:"—");
-        if(pctEl){pctEl.style.color=color;pctEl.textContent=(s.pct>=0?"+":"")+s.pct.toFixed(2)+"%";}
-        if(metaEl){metaEl.textContent="R$ "+Number(s.total).toLocaleString("pt-BR",{minimumFractionDigits:2})+" · "+medal+" de "+s.totalMembers;}
-      }).catch(function(){});
+        if(!s){ if(metaEl)metaEl.textContent="Dados temporariamente indisponíveis"; return; }
+
+        if(s.status==="ok"){
+          var color=s.pct>=0?"var(--g)":"var(--r)";
+          var medal=s.pos===1?"🥇":s.pos===2?"🥈":s.pos===3?"🥉":(s.pos?"#"+s.pos:"—");
+          if(pctEl){pctEl.style.color=color;pctEl.textContent=(s.pct>=0?"+":"")+s.pct.toFixed(2)+"%";}
+          if(metaEl){metaEl.textContent="R$ "+Number(s.total).toLocaleString("pt-BR",{minimumFractionDigits:2})+" · "+medal+" de "+s.totalMembers;}
+        } else if(s.status==="absent"){
+          // Item 4: a conexão pode ter caído durante a leitura. Só limpa se ainda online.
+          if(rtdbConnected !== true){ if(metaEl)metaEl.textContent="Modo offline — dados locais"; return; }
+          // Sala confirmadamente não existe (com conexão real) → remove card e limpa resíduos próprios
+          cleanupOwnRoomResidues(g.roomId,{remoteAllowed:true,removeLegacyProfile:true});
+          if(c&&c.parentNode){ c.parentNode.removeChild(c); }
+          if(el&&!el.querySelector(".grp-meta")){ el.innerHTML='<div class="empty">Você ainda não participa de nenhum grupo.</div>'; }
+        } else {
+          // status "error": preserva o card, informa indisponibilidade
+          if(metaEl)metaEl.textContent="Dados temporariamente indisponíveis";
+        }
+      }).catch(function(err){
+        console.error("Erro ao carregar resumo do grupo:",err);
+        var metaEl=c.querySelector(".grp-meta");
+        if(metaEl)metaEl.textContent="Dados temporariamente indisponíveis";
+      });
     })(group,card,isCreator);
     el.appendChild(card);
   });
@@ -2319,7 +2578,7 @@ function renderGroupRanking(members){
     var div=document.createElement("div");
     div.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(isMe?"rgba(96,165,250,.12)":"var(--bg3)")+";border-radius:8px;border:1px solid "+(isMe?"rgba(96,165,250,.3)":"var(--bd2)")+";gap:10px";
     div.innerHTML="<div style='font-size:16px;min-width:24px'>"+medal+"</div>"+
-      "<div style='flex:1'><div style='font-size:12px;font-weight:700'>"+(m.name||"Jogador")+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div>"+
+      "<div style='flex:1'><div style='font-size:12px;font-weight:700'>"+escapeHtml(m.name||"Jogador")+(isMe?" <span style='font-size:9px;color:var(--bl)'>(você)</span>":"")+"</div>"+
       "<div style='font-size:9px;color:var(--tx4)'>R$ "+Number(m.total||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</div></div>"+
       "<div style='font-size:14px;font-weight:700;color:"+color+"'>"+(m.pct>=0?"+":"")+Number(m.pct||0).toFixed(2)+"%</div>";
     el.appendChild(div);
@@ -2336,7 +2595,9 @@ function renderGroupRanking(members){
 }
 
 function drawGroupChart(members){var canvas=document.getElementById("group-chart");if(!canvas)return;var ctx2=canvas.getContext("2d");canvas.width=canvas.offsetWidth||320;var W=canvas.width,H=160;ctx2.clearRect(0,0,W,H);var list=Object.values(members),colors=["#00d8a0","#60a5fa","#fbbf24","#ff4466","#a78bfa"],allPts=[];list.forEach(function(m){if(m.history)allPts=allPts.concat(m.history.map(function(p){return p.v;}));});if(!allPts.length)return;var minV=Math.min.apply(null,allPts)*0.999,maxV=Math.max.apply(null,allPts)*1.001,pad=8;list.forEach(function(m,ci){if(!m.history||m.history.length<2)return;ctx2.strokeStyle=colors[ci%colors.length];ctx2.lineWidth=2;ctx2.beginPath();m.history.forEach(function(p,i){var x=pad+(i/(m.history.length-1))*(W-pad*2),y=H-pad-(p.v-minV)/(maxV-minV)*(H-pad*2);if(i===0)ctx2.moveTo(x,y);else ctx2.lineTo(x,y);});ctx2.stroke();});}
-(function(){var params=new URLSearchParams(window.location.search),room=params.get("room");if(room&&!currentRoomId){joinRoom(room.toUpperCase()).catch(function(){});}else if(currentRoomId){joinRoom(currentRoomId).then(function(){renderGroupRoom();subscribeGroup(renderGroupRanking);}).catch(function(){});}})();
+/* B4: IIFE legado removido. A restauração de grupo e o convite por URL são
+   tratados exclusivamente por enterAppAfterAuth() (online-first, com validação
+   de vínculo). Abrir grupo aqui contornava essa validação. */
 
 //  Ativos:
 //  Ativos: 19 mais lquidos do Ibovespa + IBOV como referncia 
@@ -3637,8 +3898,8 @@ function renderOrders() {
 
   // IBOV is index only
   var orderCard=$("order-panel").querySelector(".card");
-  if(isIndex){ orderCard.style.opacity="0.4"; execEl.disabled=true; }
-  else { orderCard.style.opacity="1"; execEl.disabled=false; }
+  if(orderCard){ orderCard.style.opacity=isIndex?"0.4":"1"; }
+  execEl.disabled=!!isIndex;
 
   var pos=port[sel];
   if (pos&&p>0&&!isIndex) {
@@ -3699,11 +3960,15 @@ function renderPending() {
     var e=document.createElement("div"); e.className="pend-item";
     var col=o.side==="buy"?"var(--g)":"var(--r)";
     var bgc=o.side==="buy"?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)";
+    var detail=Number(o.qty)+' cotas - '+(o.scheduled?(o.market?'A MERCADO na abertura':'AGENDADA limite '+R(o.lp)):'LIMITE '+R(o.lp));
     e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
       '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(o.side==="buy"?"COMPRA":"VENDA")+'</span>'+
-      '<span style="color:var(--bl);font-weight:700;font-size:12px">'+o.tk+'</span></div>'+
-      '<div style="font-size:9px;color:var(--tx4)">'+o.qty+' cotas - '+(o.scheduled?(o.market?'A MERCADO na abertura':'AGENDADA limite '+R(o.lp)):'LIMITE '+R(o.lp))+'</div></div>'+
-      '<button class="cancel-btn" onclick="cancelPending('+o.id+')">CANCELAR</button>';
+      '<span style="color:var(--bl);font-weight:700;font-size:12px">'+escapeHtml(o.tk)+'</span></div>'+
+      '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(detail)+'</div></div>'+
+      '<button class="cancel-btn">CANCELAR</button>';
+    // Listener real (não onclick por string) — evita injeção via o.id
+    var btn=e.querySelector(".cancel-btn");
+    (function(oid){ if(btn) btn.onclick=function(){ cancelPending(oid); }; })(o.id);
     list.appendChild(e);
   });
 }
@@ -3773,8 +4038,8 @@ function renderPort() {
     var e=document.createElement("div"); e.className="ac";
     e.style.border="1px solid "+(pnl2>=0?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)");
     e.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:8px">'+
-      '<div><span style="color:var(--bl);font-weight:700;font-size:14px">'+t+'</span>'+
-      '<span style="color:var(--tx4);font-size:10px;margin-left:7px">'+pos.qty+' cotas</span></div>'+
+      '<div><span style="color:var(--bl);font-weight:700;font-size:14px">'+escapeHtml(t)+'</span>'+
+      '<span style="color:var(--tx4);font-size:10px;margin-left:7px">'+Number(pos.qty)+' cotas</span></div>'+
       '<div style="text-align:right"><div style="font-weight:700;font-size:13px">'+R(p*pos.qty)+'</div>'+
       '<div style="font-size:10px;color:'+(pnl2>=0?"var(--g)":"var(--r)")+';font-weight:700">'+(pnl2>=0?"+":"")+R(pnl2)+' ('+(pp>=0?"+":"")+pp.toFixed(2)+'%)</div></div></div>'+
       '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--tx4)">'+
@@ -3810,10 +4075,10 @@ function renderHist() {
         : (d.qty+' cotas x R$'+fr(d.rate));
       e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
         '<span class="bdg" style="background:rgba(0,200,150,.15);color:var(--g)">'+badge+'</span>'+
-        '<span style="color:var(--bl);font-weight:700;font-size:12px">'+d.ticker+'</span></div>'+
-        '<div style="font-size:9px;color:var(--tx4)">'+detail+'</div></div>'+
+        '<span style="color:var(--bl);font-weight:700;font-size:12px">'+escapeHtml(d.ticker)+'</span></div>'+
+        '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(detail)+'</div></div>'+
         '<div style="text-align:right"><div style="font-weight:700;font-size:12px;color:var(--g)">+'+R(d.value)+'</div>'+
-        '<div style="font-size:9px;color:var(--tx4)">'+d.date+'</div></div>';
+        '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(d.date)+'</div></div>';
       dl.appendChild(e);
     });
   } else ds.style.display="none";
@@ -3828,11 +4093,11 @@ function renderHist() {
     e.style.borderLeft="2px solid "+col;
     e.innerHTML='<div><div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">'+
       '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(t.tp==="C"?"COMPRA":"VENDA")+'</span>'+
-      '<span style="color:var(--bl);font-weight:700;font-size:12px">'+t.tk+'</span>'+
+      '<span style="color:var(--bl);font-weight:700;font-size:12px">'+escapeHtml(t.tk)+'</span>'+
       (t.note?'<span style="font-size:8px;color:var(--a)">&#127919;</span>':'')+
-      '</div><div style="font-size:10px;color:var(--tx4)">'+t.qty+' cotas @ '+R(t.pr)+(t.note?' - '+t.note:'')+'</div></div>'+
+      '</div><div style="font-size:10px;color:var(--tx4)">'+Number(t.qty)+' cotas @ '+R(t.pr)+(t.note?' - '+escapeHtml(t.note):'')+'</div></div>'+
       '<div style="text-align:right"><div style="font-weight:700;font-size:12px">'+R(t.tot)+'</div>'+
-      '<div style="font-size:9px;color:var(--tx4)">'+t.tm+'</div></div>';
+      '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(t.tm)+'</div></div>';
     l.appendChild(e);
   });
 }
@@ -4658,19 +4923,15 @@ function enterProfile(name) {
       setProfileMeta(name, meta);
     }
   }
+  // Perfil de grupo: SEMPRE pela rota validada (confirma vínculo online; volta ao
+  // solo se não for mais membro). Nunca abre grupo só por existir cache local.
   if (meta && meta.type === "group" && meta.roomId) {
-    currentRoomId = meta.roomId;
-    localStorage.setItem("hb_room_id", meta.roomId);
-    joinRoom(meta.roomId).then(function(room){
-      currentRoomData = room;
-    }).catch(function(){
-      currentRoomData = {name: meta.roomName, roomId: meta.roomId};
-    });
-  } else {
-    currentRoomId = "";
-    currentRoomData = null;
-    localStorage.removeItem("hb_room_id");
+    return switchToProfile(name);
   }
+  // Perfil solo:
+  currentRoomId = "";
+  currentRoomData = null;
+  localStorage.removeItem("hb_room_id");
   // Reload state for this profile
   var st2 = loadState();
   bal = st2.bal; port = st2.port; trd = st2.trd; pending = st2.pending;
@@ -4998,25 +5259,14 @@ if (token) {
     localStorage.setItem("hb_is_owner", hasInvite ? "0" : "1");
   }
   if (getCurrentProfile()) {
-    // If group profile, restore room before loading state
+    // B4: NÃO abrir grupo por cache local aqui. A restauração de grupo é feita
+    // por enterAppAfterAuth() (após login, online-first, com validação de vínculo).
+    // No boot, se o perfil atual for de grupo, começamos em estado neutro; o fluxo
+    // autenticado decide se abre o grupo ou cai no solo.
     var _bootProfile = getCurrentProfile();
     if (_bootProfile && _bootProfile.indexOf("grupo_") === 0) {
-      var _bootParts = _bootProfile.split("_");
-      var _bootMeta = getProfileMeta(_bootProfile);
-      if (!_bootMeta) {
-        _bootMeta = {profileId:_bootProfile, displayName:_bootParts.slice(2).join("_"), type:"group", roomId:_bootParts[1], roomName:_bootParts[1]};
-        setProfileMeta(_bootProfile, _bootMeta);
-      }
-      currentRoomId = _bootMeta.roomId;
-      localStorage.setItem("hb_room_id", currentRoomId);
-      // Load room data async - don't block boot
-      joinRoom(currentRoomId).then(function(room){
-        currentRoomData = room;
-        _bootMeta.roomName = room.name;
-        setProfileMeta(_bootProfile, _bootMeta);
-      }).catch(function(){
-        currentRoomData = {name: _bootMeta.roomName || _bootMeta.roomId};
-      });
+      currentRoomId = "";
+      currentRoomData = null;
     } else {
       currentRoomId = "";
       currentRoomData = null;
@@ -5105,9 +5355,16 @@ function enterAppAfterAuth() {
   var _savedRoomId=currentUser?localStorage.getItem("hb_active_room_"+currentUser.uid):null;
 
   if(_savedRoomId){
-    // User had a group active — load group context directly
+    // Restauração de grupo: valida vínculo ANTES de carregar contexto.
+    // Online-first: se offline, não decide nada destrutivo — cai no solo sem limpar.
     currentRoomId=_savedRoomId;
-    joinRoom(_savedRoomId).then(function(room){
+    var _uid=getIdentityUid();
+    getOnlineSnapshot(fbDb.ref("rooms/"+_savedRoomId)).then(function(snap){
+      var room=snap.val();
+      if(!room){ throw new Error("not_linked"); }
+      var members=(room&&room.members)||{};
+      var linked=!!members[_uid]||(room&&room.createdBy===_uid);
+      if(!linked){ throw new Error("not_linked"); }
       currentRoomData=room;
       goal={
         endDate:(room&&room.endDate)||"",
@@ -5120,10 +5377,22 @@ function enterAppAfterAuth() {
     }).then(function(){
       initApp(); updateContextActionsUI();
     }).catch(function(err){
-      console.error("Erro ao restaurar grupo:",err);
-      // Fallback: clear group context, load solo
-      currentRoomId=""; currentRoomData=null;
-      localStorage.removeItem("hb_active_room_"+currentUser.uid);
+      var offline = err && (err.message==="offline" || err.message==="offline_during_read");
+      if(err&&err.message==="not_linked"){
+        // Não participo mais: limpa resíduos próprios (online) e cai no solo
+        if(rtdbConnected===true){ cleanupOwnRoomResidues(_savedRoomId,{remoteAllowed:true,keepTombstone:true,removeLegacyProfile:true}); }
+        notif("Você não participa mais deste grupo.","err");
+        currentRoomId=""; currentRoomData=null;
+        if(currentUser)localStorage.removeItem("hb_active_room_"+currentUser.uid);
+      } else if(offline){
+        // Sem conexão: NÃO limpa nada, NÃO remove active room. Apenas abre solo por ora.
+        notif("Sem conexão — abrindo modo solo. Seu grupo volta quando reconectar.","err");
+        currentRoomId=""; currentRoomData=null;
+      } else {
+        console.error("Erro ao restaurar grupo:",err);
+        currentRoomId=""; currentRoomData=null;
+        if(currentUser)localStorage.removeItem("hb_active_room_"+currentUser.uid);
+      }
       loadSoloFromFirebase().then(function(){
         return loadSoloHistoryFromFirebase().catch(function(){equityHistory=loadEquityHistory();});
       }).then(function(){
