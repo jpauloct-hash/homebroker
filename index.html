@@ -926,11 +926,35 @@ function leaveGroupById(roomId) {
   });
 }
 
+var WORKER_BASE = "https://tgp-proxy.jpauloct.workers.dev";
+
+// Exclusão atômica via Worker (apaga sala + carteiras + históricos + userRooms
+// de TODOS os membros). Requer ID Token válido. Retorna Promise<bool sucesso>.
+function deleteRoomViaWorker(roomId) {
+  if (!currentUser || typeof currentUser.getIdToken !== "function") return Promise.resolve(false);
+  return currentUser.getIdToken(/*forceRefresh*/ false).then(function(idToken){
+    return fetch(WORKER_BASE + "/api/delete-room", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + idToken },
+      body: JSON.stringify({ roomId: roomId })
+    });
+  }).then(function(resp){
+    if (resp.ok) return true;
+    return resp.json().then(function(j){
+      console.error("delete-room Worker falhou:", resp.status, j && j.error);
+      return false;
+    }).catch(function(){ return false; });
+  }).catch(function(err){
+    console.error("delete-room Worker erro de rede:", err);
+    return false;
+  });
+}
+
 function deleteGroupById(roomId) {
   var uid=getIdentityUid();
   if(!uid||!roomId||!fbDb)return Promise.resolve();
 
-  // Problema 8: exclusão exige internet (decisão destrutiva precisa de confirmação do servidor)
+  // Exclusão exige internet (decisão destrutiva precisa de confirmação do servidor)
   if(rtdbConnected !== true){
     notif("Conecte-se à internet para excluir o grupo.","err");
     return Promise.resolve();
@@ -940,7 +964,7 @@ function deleteGroupById(roomId) {
     var room=snap.val();
     if(!room){
       // Sala já não existe: faxina idempotente do próprio usuário
-      groupListGen++; // invalida cargas em andamento
+      groupListGen++;
       return cleanupOwnRoomResidues(roomId,{remoteAllowed:true,removeLegacyProfile:true}).then(function(){
         notif("Grupo removido");
         if(currentRoomId===roomId)return switchToSoloProfile();
@@ -954,15 +978,20 @@ function deleteGroupById(roomId) {
       return Promise.reject(new Error("not_creator"));
     }
 
-    // Ordem segura (provisória até a Fase C no Worker):
-    // 1) apagar rooms/{roomId} primeiro — "mata" a sala para todos; regra do criador permite
-    return fbDb.ref("rooms/"+roomId).remove().then(function(){
-      // 2) invalida cargas antigas IMEDIATAMENTE (Promise antiga não ressuscita)
-      groupListGen++;
-      // 3) limpeza central: tombstone + resíduos próprios (local + remoto)
-      return cleanupOwnRoomResidues(roomId,{remoteAllowed:true,removeLegacyProfile:true});
-      // Resíduos de OUTROS membros viram órfãos inofensivos; cada app limpa o próprio
-      // ao detectar rooms ausente. Exclusão atômica total virá na Fase C (Worker).
+    // CAMINHO PREFERENCIAL: exclusão atômica no Worker (apaga tudo de todos os membros)
+    return deleteRoomViaWorker(roomId).then(function(workerOk){
+      groupListGen++; // invalida cargas em andamento, independentemente do caminho
+      if (workerOk) {
+        // Worker já apagou sala + carteiras + históricos + userRooms de todos.
+        // Resta só limpar o cache/tombstone LOCAL deste dispositivo.
+        return cleanupOwnRoomResidues(roomId,{remoteAllowed:false,removeLegacyProfile:true});
+      }
+      // FALLBACK (Worker indisponível): método cliente provisório.
+      // Apaga rooms primeiro; resíduos de outros membros viram órfãos
+      // limpos pelo app de cada um. (Comportamento da etapa anterior.)
+      return fbDb.ref("rooms/"+roomId).remove().then(function(){
+        return cleanupOwnRoomResidues(roomId,{remoteAllowed:true,removeLegacyProfile:true});
+      });
     }).then(function(){
       if(currentRoomId===roomId){notif("Grupo "+roomName+" excluído");return switchToSoloProfile();}
       notif("Grupo "+roomName+" excluído"); renderGroupPanel();
