@@ -1230,9 +1230,9 @@ function applySoloPayloadToMemory(data) {
   data=data||{};
   bal=Number(data.cash||0);
   port=data.positions||{};
-  trd=data.trades||[];
-  pending=data.pendingOrders||[];
-  divs=data.dividends||{};
+  trd=normalizeList(data.trades);
+  pending=normalizeList(data.pendingOrders);
+  divs=normalizeList(data.dividends);
   totalDiv=Number(data.totalDiv||0);
   initialBal=Number(data.initialBal||100000);
   firstTradeDate=data.firstTradeDate||"";
@@ -1256,7 +1256,7 @@ function loadSoloFromFirebase() {
   return ref.once("value").then(function(snap){
     var data=snap.val();
     if(!data){
-      data={cash:100000,positions:{},trades:[],pendingOrders:[],dividends:{},totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()};
+      data={cash:100000,positions:{},trades:[],pendingOrders:[],dividends:[],totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()};
       return ref.set(data).then(function(){return data;});
     }
     return data;
@@ -1351,8 +1351,8 @@ function buildGroupPayloadFromMemory() {
 }
 function applyGroupPayloadToMemory(data, expectedProfileId) {
   data=data||{};
-  bal=Number(data.cash||0); port=data.positions||{}; trd=data.trades||[];
-  pending=data.pendingOrders||[]; divs=data.dividends||{};
+  bal=Number(data.cash||0); port=data.positions||{}; trd=normalizeList(data.trades);
+  pending=normalizeList(data.pendingOrders); divs=normalizeList(data.dividends);
   totalDiv=Number(data.totalDiv||0); initialBal=Number(data.initialBal||100000);
   firstTradeDate=data.firstTradeDate||"";
   lastYieldDate=data.lastYieldDate||"";
@@ -1374,7 +1374,7 @@ function loadGroupPortfolioFromFirebase(roomId, profileId) {
     var data=snap.val();
     if(!data){
       var initBal=(currentRoomData&&currentRoomData.initialBal)||100000;
-      data={cash:initBal,positions:{},trades:[],pendingOrders:[],dividends:{},
+      data={cash:initBal,positions:{},trades:[],pendingOrders:[],dividends:[],
         totalDiv:0,initialBal:initBal,firstTradeDate:"",updatedAt:Date.now()};
       return ref.set(data).then(function(){return data;});
     }
@@ -2860,9 +2860,9 @@ function loadStateForProfile() {
     return {
       bal:            s.bal      !== undefined ? s.bal : 100000,
       port:           s.port     || {},
-      trd:            s.trd      || [],
-      pending:        s.pending  || [],
-      divs:           s.divs     || [],
+      trd:            normalizeList(s.trd),
+      pending:        normalizeList(s.pending),
+      divs:           normalizeList(s.divs),
       totalDiv:       s.totalDiv || 0,
       checkedDivDate: s.checkedDivDate || "",
       initialBal:     s.initialBal || 100000,
@@ -3217,6 +3217,16 @@ function fetchQ() {
       $("hupd").textContent = "Atualizado: " + new Date().toLocaleTimeString("pt-BR");
       cd = REFRESH;
       setSts("ok");
+
+      // App operacional e online: confirma o saldo do perfil atual para o extrato
+      // financeiro (caso o load tenha vindo do cache local sem passar pelas funções
+      // apply*). O bal aqui já é o saldo real exibido no topo.
+      if (!portfolioRemoteLoaded || portfolioRemoteLoadedProfileId !== ((typeof getCurrentProfile==="function"?getCurrentProfile():"")||"")) {
+        portfolioRemoteLoaded = true;
+        portfolioRemoteLoadedProfileId = (typeof getCurrentProfile==="function"?getCurrentProfile():"")||"";
+        confirmedCashForFinanceMarker = Number(bal || 0);
+        if (!financeMarkerSource) financeMarkerSource = "remote-confirmed";
+      }
 
       // Registra o fechamento do dia (1 ponto/dia, marcado a mercado)
       pushEquityPoint();
@@ -4279,16 +4289,23 @@ function activateFinanceExtractIfReady() {
     showFinancePlaceholder("Conecte-se à internet para iniciar o extrato financeiro.");
     return;
   }
-  if (!canCreateFinanceMarker()) {                        // dados ainda não confirmados
+  if (!canCreateFinanceMarker()) {                        // dados remotos ainda não confirmados
     showFinancePlaceholder("Carregando dados do perfil para iniciar o extrato financeiro...");
-    // tenta de novo em instantes (o load remoto pode estar a caminho)
     setTimeout(function(){
       if (getCurrentSubIsFinance && getCurrentSubIsFinance()) activateFinanceExtractIfReady();
     }, 1200);
     return;
   }
-  createFinanceMarker();                                  // agora pode: cria com saldo real
+  createFinanceMarker();                                  // agora pode: cria com saldo confirmado
   renderFinanceExtract();
+}
+
+// Normaliza listas que podem vir do Firebase/localStorage como objeto {} em vez
+// de array []. O RTDB às vezes serializa arrays esparsos/vazios como objeto.
+function normalizeList(x) {
+  if (Array.isArray(x)) return x;
+  if (x && typeof x === "object") return Object.values(x);
+  return [];
 }
 
 // Indica se a sub-aba Financeiro está aberta agora (usado pelo retry do extrato)
@@ -4298,9 +4315,15 @@ function getCurrentSubIsFinance() { return !!window._histSubFin; }
 // ordens/proventos/Firebase. Usada pelo botão "Reiniciar extrato deste perfil".
 function resetFinanceMarkerForCurrentProfile() {
   try { localStorage.removeItem(getFinanceMarkerKey()); } catch(e){}
-  // Se os dados do perfil atual já estão carregados, recria o marco com o saldo real;
-  // senão, mostra placeholder de carregamento. (activate decide isso.)
-  try { activateFinanceExtractIfReady(); } catch(e){}
+  // O saldo exibido no topo (bal) já é o saldo real do perfil atual em memória.
+  // Para o REINÍCIO manual, confirmamos com esse bal diretamente — não precisamos
+  // esperar um novo load remoto (que pode não reocorrer nesta sessão).
+  confirmedCashForFinanceMarker = Number(bal || 0);
+  portfolioRemoteLoaded = true;
+  portfolioRemoteLoadedProfileId = (typeof getCurrentProfile === "function" ? getCurrentProfile() : "") || "";
+  financeMarkerSource = "reset-confirmed";
+  try { activateFinanceExtractIfReady(); }
+  catch(e){ console.error("Erro ao reiniciar extrato financeiro:", e); showFinancePlaceholder("Erro ao montar o extrato financeiro. Veja o console."); }
 }
 
 function renderFinanceExtract() {
@@ -4322,7 +4345,7 @@ function renderFinanceExtract() {
   }
 
   // Trades: data derivada do id (timestamp) ou do campo tm; compra = saída, venda = entrada
-  (trd || []).forEach(function(t) {
+  normalizeList(trd).forEach(function(t) {
     var ts = Number(t.id) || Date.now();
     var dk = getLocalDateKey(ts);
     if (dk < marker.startKey) return; // antes do marco zero: ignora
@@ -4331,7 +4354,7 @@ function renderFinanceExtract() {
   });
 
   // Proventos (divs): todos são entrada de caixa
-  (divs || []).forEach(function(d) {
+  normalizeList(divs).forEach(function(d) {
     var dk = (d.date || "").split("T")[0] || getLocalDateKey(Number(d.id) || Date.now());
     if (dk < marker.startKey) return;
     bump(dk, +Number(d.value || 0));
@@ -4393,7 +4416,17 @@ function renderFinanceExtract() {
   }
 
   if (!rows.length) {
-    box.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--tx4)"><div style="font-size:32px;margin-bottom:8px">📄</div>Sem movimentações de caixa nos últimos 30 dias.</div>';
+    // Sem nenhuma linha (marco recém-criado hoje ou sem dias na janela): mostra a
+    // linha de HOJE com saldo = startCash, em vez de extrato vazio.
+    box.innerHTML = "";
+    var hojeKey = getLocalDateKey(Date.now());
+    var e0 = document.createElement("div");
+    e0.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--bd2)";
+    e0.innerHTML =
+      '<div style="font-size:11px;font-weight:700;color:var(--tx2);min-width:42px">' + fmtDay(hojeKey) + '</div>' +
+      '<div style="flex:1;text-align:center;font-size:10px"><span style="color:var(--tx4)">R$ 0</span> &nbsp;·&nbsp; <span style="color:var(--tx4)">R$ 0</span></div>' +
+      '<div style="text-align:right;font-weight:700;font-size:12px;color:var(--a);min-width:90px">' + R(Number(marker.startCash || 0)) + '</div>';
+    box.appendChild(e0);
   }
 
   // Aviso discreto: marco de versão anterior (sem version/source). Não apaga nada;
@@ -4415,7 +4448,7 @@ function render() {
   try { renderPending(); } catch(e) {}
   try { renderPort(); } catch(e) {}
   try { renderHist(); } catch(e) {}
-  try { renderFinanceExtract(); } catch(e) {}
+  try { renderFinanceExtract(); } catch(e) { console.error("Erro no extrato financeiro (render):", e); }
   try { renderGoalBar(); } catch(e) {}
 }
 
@@ -5498,7 +5531,7 @@ function initApp() {
     if (vFin) vFin.style.display = isOrd ? "none" : "block";
     if (bOrd) bOrd.classList.toggle("subtab-on", isOrd);
     if (bFin) bFin.classList.toggle("subtab-on", !isOrd);
-    if (!isOrd) { try { activateFinanceExtractIfReady(); } catch(e){} }
+    if (!isOrd) { try { activateFinanceExtractIfReady(); } catch(e){ console.error("Erro no extrato financeiro:", e); showFinancePlaceholder("Erro ao montar o extrato financeiro. Veja o console."); } }
   }
   if ($("sub-ordens")) $("sub-ordens").onclick = function(){ switchHistSub("ordens"); };
   if ($("sub-fin")) $("sub-fin").onclick = function(){ switchHistSub("fin"); };
@@ -5648,7 +5681,7 @@ function ensureUserBaseData(user) {
   }).then(function() {
     return fbDb.ref("soloPortfolios/"+uid).once("value");
   }).then(function(snap) {
-    if (!snap.exists()) return fbDb.ref("soloPortfolios/"+uid).set({cash:100000,positions:{},trades:[],pendingOrders:[],dividends:{},totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()});
+    if (!snap.exists()) return fbDb.ref("soloPortfolios/"+uid).set({cash:100000,positions:{},trades:[],pendingOrders:[],dividends:[],totalDiv:0,initialBal:100000,firstTradeDate:"",updatedAt:Date.now()});
   }).then(function() {
     ensureSoloProfile();
   });
