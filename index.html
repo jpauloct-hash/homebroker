@@ -3099,8 +3099,28 @@ function setSts(s) {
 function fetchQ() {
   setSts("loading");
 
-  var urlA      = BRAPI + "/quote/" + TICKERS_A.join(",") + "?fundamental=false";
-  var urlB      = BRAPI + "/quote/" + TICKERS_B.join(",") + "?fundamental=false";
+  // Modelo do app: busca exatamente os ativos que estão no TAPE (o que o usuário
+  // selecionou). IBOV e USDBRL têm endpoints próprios; os demais (até 18) vão numa
+  // única requisição (limite Pro = 20 por req). Clicar num ticker do tape o torna
+  // o ativo operável, então o tape É a lista de ativos do app.
+  var tapeAssets = (TAPE_TICKERS || []).filter(function(t) {
+    return t !== "IBOV" && t !== "USDBRL";
+  });
+  // Salvaguarda: inclui ativos que o usuário POSSUI (carteira) ou tem em ordens
+  // pendentes, mesmo que não estejam no tape — senão a carteira/ordem fica sem preço.
+  try {
+    Object.keys(port || {}).forEach(function(tk){ if (tk && tapeAssets.indexOf(tk) === -1) tapeAssets.push(tk); });
+    (pending || []).forEach(function(o){ if (o && o.tk && tapeAssets.indexOf(o.tk) === -1) tapeAssets.push(o.tk); });
+  } catch(e) {}
+  // dedup, mantém ordem
+  tapeAssets = tapeAssets.filter(function(t, i){ return tapeAssets.indexOf(t) === i; });
+  // Salvaguarda: a brapi aceita até 20 por req; o tape já é limitado a 18 + 2 fixos,
+  // mas em lotes de 20 por garantia caso a seleção cresça no futuro.
+  var assetUrls = [];
+  for (var ai = 0; ai < tapeAssets.length; ai += 20) {
+    assetUrls.push(BRAPI + "/quote/" + tapeAssets.slice(ai, ai + 20).join(",") + "?fundamental=false");
+  }
+
   var urlIbov   = BRAPI + "/quote/%5EBVSP?fundamental=false";
   var urlUsdBrl = BRAPI + "/quote/USDBRL=X?fundamental=false";
 
@@ -3114,12 +3134,13 @@ function fetchQ() {
     });
   }
 
-  Promise.allSettled([
-    fetchJson(urlA, "Lote A"),
-    fetchJson(urlB, "Lote B"),
+  // Ordem fixa: [IBOV, USDBRL, ...lotes de ativos]
+  var fetches = [
     fetchJson(urlIbov, "IBOV"),
     fetchJson(urlUsdBrl, "USDBRL")
-  ]).then(function(results) {
+  ].concat(assetUrls.map(function(u, i){ return fetchJson(u, "Tape " + (i+1)); }));
+
+  Promise.allSettled(fetches).then(function(results) {
     var okCount = 0;
 
     function applyBatch(data) {
@@ -3133,14 +3154,9 @@ function fetchQ() {
       okCount++;
     }
 
-    if (results[0].status === "fulfilled") applyBatch(results[0].value);
-    else console.error("Falha lote A:", results[0].reason);
-
-    if (results[1].status === "fulfilled") applyBatch(results[1].value);
-    else console.error("Falha lote B:", results[1].reason);
-
-    if (results[2].status === "fulfilled") {
-      var ibov = results[2].value;
+    // results[0] = IBOV, results[1] = USDBRL, results[2+] = lotes do tape
+    if (results[0].status === "fulfilled") {
+      var ibov = results[0].value;
       if (ibov && ibov.results && ibov.results.length) {
         var ib = ibov.results[0];
         if (ib.regularMarketPrice) prices["IBOV"] = ib.regularMarketPrice;
@@ -3148,10 +3164,10 @@ function fetchQ() {
         if (ib.regularMarketChangePercent !== undefined) pct["IBOV"] = ib.regularMarketChangePercent;
         okCount++;
       }
-    } else console.error("Falha IBOV:", results[2].reason);
+    } else console.error("Falha IBOV:", results[0].reason);
 
-    if (results[3].status === "fulfilled") {
-      var usd = results[3].value;
+    if (results[1].status === "fulfilled") {
+      var usd = results[1].value;
       if (usd && usd.results && usd.results.length) {
         var us = usd.results[0];
         if (us.regularMarketPrice) prices["USDBRL"] = us.regularMarketPrice;
@@ -3159,7 +3175,13 @@ function fetchQ() {
         if (us.regularMarketChangePercent !== undefined) pct["USDBRL"] = us.regularMarketChangePercent;
         okCount++;
       }
-    } else console.error("Falha USDBRL:", results[3].reason);
+    } else console.error("Falha USDBRL:", results[1].reason);
+
+    // Lotes de ativos do tape (results[2] em diante)
+    for (var ri = 2; ri < results.length; ri++) {
+      if (results[ri].status === "fulfilled") applyBatch(results[ri].value);
+      else console.error("Falha lote tape:", results[ri].reason);
+    }
 
     if (okCount > 0) {
       $("hupd").textContent = "Atualizado: " + new Date().toLocaleTimeString("pt-BR");
