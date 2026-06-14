@@ -2721,6 +2721,20 @@ var TVSYM = {
   VIVT3:"BMFBOVESPA:VIVT3", EQTL3:"BMFBOVESPA:EQTL3", DOLA11:"BMFBOVESPA:DOLA11",
   RDOR3:"BMFBOVESPA:RDOR3", UGPA3:"BMFBOVESPA:UGPA3"
 };
+
+// Resolve o símbolo do TradingView para QUALQUER ticker do app.
+// Exceções (índices/câmbio) saem do mapa TVSYM; todo ticker da B3 segue o
+// padrão BMFBOVESPA:TICKER. Assim nenhum ticker cai no default (Apple).
+function tvSymbolFor(sel) {
+  if (!sel) return "BMFBOVESPA:IBOV";
+  if (TVSYM[sel]) return TVSYM[sel];
+  if (sel === "USDBRL") return "FX_IDC:USDBRL";
+  if (sel === "IBOV") return "BMFBOVESPA:IBOV";
+  // Ticker padrão da B3 (ações, ETFs, BDRs, units): prefixo da bolsa
+  if (/^[A-Z]{4}[0-9]{1,2}$/.test(sel)) return "BMFBOVESPA:" + sel;
+  // Fallback seguro: não deixa cair no símbolo default do widget
+  return "BMFBOVESPA:" + sel;
+}
 // Brapi endpoint  busca em lotes de 10 (limite PRO por req)
 var TICKERS_A = TICKERS.slice(0, 10); // batch 1
 var TICKERS_B = TICKERS.slice(10);    // batch 2
@@ -3046,7 +3060,7 @@ function loadTV() {
   $("tvw").innerHTML = '<div id="'+uid+'" style="width:100%;height:100%"></div>';
   function doInit() {
     tvWidget = new TradingView.widget({
-      container_id:uid, autosize:true, symbol:TVSYM[sel], interval:per,
+      container_id:uid, autosize:true, symbol:tvSymbolFor(sel), interval:per,
       timezone:"America/Sao_Paulo", theme:"dark", style:"1", locale:"br",
       toolbar_bg:"#090d16", allow_symbol_change:false, save_image:false,
       overrides:{
