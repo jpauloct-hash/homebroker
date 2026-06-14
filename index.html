@@ -641,6 +641,9 @@ body.matrix #av-hoodie{
           <div style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:6px">EXTRATO FINANCEIRO — ÚLTIMOS 30 DIAS</div>
           <div style="font-size:9px;color:var(--tx4);line-height:1.5;margin-bottom:12px;padding:8px;background:var(--bg2);border-radius:7px;border:1px solid var(--bd2)">Este extrato mostra apenas entradas e saídas de <b>caixa</b>. Não inclui valorização ou desvalorização das ações em carteira.</div>
           <div id="fin-list"></div>
+          <div style="margin-top:16px;text-align:center">
+            <button id="fin-reset-btn" style="font-size:9px;color:var(--tx4);background:transparent;border:1px solid var(--bd2);border-radius:6px;padding:7px 12px;cursor:pointer;font-family:inherit;letter-spacing:.5px">Reiniciar extrato deste perfil</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1095,6 +1098,8 @@ function switchToSoloProfile() {
   if (!soloId) return;
 
   roomSwitchToken++; // B1: invalida qualquer abertura de grupo em andamento
+  // Volta ao solo: invalida flag de load até o Firebase confirmar o solo
+  portfolioRemoteLoaded = false; portfolioRemoteLoadedProfileId = ""; confirmedCashForFinanceMarker = null;
 
   rememberCurrentGroupForSoloList().then(function() {
     currentRoomId = "";
@@ -1232,6 +1237,8 @@ function applySoloPayloadToMemory(data) {
   initialBal=Number(data.initialBal||100000);
   firstTradeDate=data.firstTradeDate||"";
   lastYieldDate=data.lastYieldDate||"";
+  // marca load confirmado para o perfil SOLO (descarta se já trocou de perfil)
+  markPortfolioRemoteLoaded((typeof getSoloProfileId === "function" ? getSoloProfileId() : "") || (typeof getCurrentProfile==="function"?getCurrentProfile():""));
 }
 
 function syncSoloToLocalCache() {
@@ -1342,13 +1349,15 @@ function buildGroupPayloadFromMemory() {
     dividends:divs||{},totalDiv:totalDiv||0,initialBal:initialBal||100000,
     firstTradeDate:firstTradeDate||"",lastYieldDate:lastYieldDate||"",updatedAt:Date.now()};
 }
-function applyGroupPayloadToMemory(data) {
+function applyGroupPayloadToMemory(data, expectedProfileId) {
   data=data||{};
   bal=Number(data.cash||0); port=data.positions||{}; trd=data.trades||[];
   pending=data.pendingOrders||[]; divs=data.dividends||{};
   totalDiv=Number(data.totalDiv||0); initialBal=Number(data.initialBal||100000);
   firstTradeDate=data.firstTradeDate||"";
   lastYieldDate=data.lastYieldDate||"";
+  // marca load confirmado para o perfil de GRUPO recebido (não getCurrentProfile tardio)
+  markPortfolioRemoteLoaded(expectedProfileId || (typeof getCurrentProfile==="function"?getCurrentProfile():""));
 }
 function syncGroupToLocalCache(profileId) {
   if(!profileId)return;
@@ -1371,7 +1380,7 @@ function loadGroupPortfolioFromFirebase(roomId, profileId) {
     }
     return data;
   }).then(function(data){
-    applyGroupPayloadToMemory(data);
+    applyGroupPayloadToMemory(data, profileId);
     syncGroupToLocalCache(profileId);
     return data;
   });
@@ -1457,7 +1466,7 @@ function subscribeOwnPortfolioRealtime() {
     if (_lastServerExecSeen === 0) {
       _lastServerExecSeen = serverExec || 1;
       if (serverExec > 0) {
-        if (subscribedInGroup) { applyGroupPayloadToMemory(data); syncGroupToLocalCache(getCurrentProfile()); }
+        if (subscribedInGroup) { applyGroupPayloadToMemory(data, getCurrentProfile()); syncGroupToLocalCache(getCurrentProfile()); }
         else { applySoloPayloadToMemory(data); syncSoloToLocalCache(); }
         render();
       }
@@ -1470,7 +1479,7 @@ function subscribeOwnPortfolioRealtime() {
 
     // Aplica o estado vindo do servidor (usa o contexto CAPTURADO, não o atual)
     if (subscribedInGroup) {
-      applyGroupPayloadToMemory(data);
+      applyGroupPayloadToMemory(data, getCurrentProfile());
       syncGroupToLocalCache(getCurrentProfile());
     } else {
       applySoloPayloadToMemory(data);
@@ -1723,6 +1732,25 @@ var roomSwitchToken=0,roomLoadToken=0;
 var myGroupsCache=[];
 var soloGroupUnsubs={};
 var groupListGen=0; // contador de geração: descarta respostas antigas de loadMyGroupsFromFirebase
+
+// Flags de "load remoto confirmado" (para o marco zero do extrato financeiro).
+// Só criamos o marco quando os dados do perfil ATUAL já vieram do Firebase e
+// foram aplicados em memória — nunca com o bal default (100000) do boot.
+var portfolioRemoteLoaded = false;
+var portfolioRemoteLoadedProfileId = "";
+var confirmedCashForFinanceMarker = null;
+var financeMarkerSource = "remote-confirmed"; // origem do saldo confirmado (auditoria)
+// Marca o load remoto como confirmado SOMENTE se o perfil que terminou de carregar
+// ainda é o perfil atual. Blinda contra resposta assíncrona atrasada após troca
+// rápida de perfil (solo↔grupo): uma resposta velha não marca o perfil novo.
+function markPortfolioRemoteLoaded(expectedProfileId) {
+  var current = (typeof getCurrentProfile === "function" ? getCurrentProfile() : "") || "";
+  if (!expectedProfileId || expectedProfileId !== current) return; // resposta atrasada: descarta
+  portfolioRemoteLoaded = true;
+  portfolioRemoteLoadedProfileId = expectedProfileId;
+  confirmedCashForFinanceMarker = Number(bal || 0);
+  financeMarkerSource = "remote-confirmed";
+}
 
 // Tombstones: grupos apagados nesta sessão. Bloqueiam ressurreição por Promise
 // antiga, cache local ou perfil legado. Persistido para sobreviver a reload.
@@ -2351,6 +2379,8 @@ function shareRoomInvite(){
 }
 function switchToProfile(profileId) {
   localStorage.setItem("hb_profile_v1", profileId);
+  // Novo perfil: invalida a flag de load confirmado até o Firebase responder
+  portfolioRemoteLoaded = false; portfolioRemoteLoadedProfileId = ""; confirmedCashForFinanceMarker = null;
   var meta = getProfileMeta(profileId);
   if (!meta && profileId && profileId.indexOf("grupo_") === 0) {
     var _sp = profileId.split("_");
@@ -4199,13 +4229,30 @@ function getFinanceMarkerKey() {
   var prof = (typeof getCurrentProfile === "function" ? getCurrentProfile() : "") || "solo";
   return "hb_finance_start_" + uid + "_" + prof;
 }
-function ensureFinanceMarker() {
+// SOMENTE leitura: retorna o marco existente ou null. Nunca cria.
+function getFinanceMarker() {
   var k = getFinanceMarkerKey();
-  var raw = null;
-  try { raw = localStorage.getItem(k); } catch(e){}
-  if (raw) { try { return JSON.parse(raw); } catch(e){} }
-  // Primeira ativação: marco zero = agora, com o saldo de caixa atual
-  var marker = { startKey: getLocalDateKey(Date.now()), startCash: Number(bal || 0), startTs: Date.now() };
+  try { var raw = localStorage.getItem(k); if (raw) return JSON.parse(raw); } catch(e){}
+  return null;
+}
+// Pode criar o marco? Só se os dados remotos do PERFIL ATUAL já foram aplicados.
+function canCreateFinanceMarker() {
+  return portfolioRemoteLoaded === true
+      && portfolioRemoteLoadedProfileId === ((typeof getCurrentProfile === "function" ? getCurrentProfile() : "") || "")
+      && typeof confirmedCashForFinanceMarker === "number"
+      && isFinite(confirmedCashForFinanceMarker);
+}
+// Cria o marco com o saldo CONFIRMADO (não o bal cru). Identificado com version/source.
+function createFinanceMarker() {
+  var k = getFinanceMarkerKey();
+  var marker = {
+    startKey: getLocalDateKey(Date.now()),
+    startCash: Number(confirmedCashForFinanceMarker || 0),
+    startTs: Date.now(),
+    version: 2,
+    source: financeMarkerSource || "remote-confirmed",
+    profileId: (typeof getCurrentProfile === "function" ? getCurrentProfile() : "") || ""
+  };
   try { localStorage.setItem(k, JSON.stringify(marker)); } catch(e){}
   return marker;
 }
@@ -4217,10 +4264,54 @@ function classifyDiv(d) {
   return { tipo: "Provento", desc: d.ticker }; // antigos sem type
 }
 
+// Mostra um estado neutro/explicativo no lugar do extrato (sem criar marco)
+function showFinancePlaceholder(msg) {
+  var box = $("fin-list");
+  if (box) box.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--tx4)"><div style="font-size:32px;margin-bottom:8px">📄</div>' + escapeHtml(msg) + '</div>';
+}
+
+// Ativação EXPLÍCITA: chamada ao abrir a sub-aba Financeiro. É o único ponto que
+// pode CRIAR o marco — e só se os dados do perfil já vieram do Firebase.
+function activateFinanceExtractIfReady() {
+  var marker = getFinanceMarker();
+  if (marker) { renderFinanceExtract(); return; }       // já existe → renderiza
+  if (!fbDb || rtdbConnected !== true) {                 // offline antes do 1º load
+    showFinancePlaceholder("Conecte-se à internet para iniciar o extrato financeiro.");
+    return;
+  }
+  if (!canCreateFinanceMarker()) {                        // dados ainda não confirmados
+    showFinancePlaceholder("Carregando dados do perfil para iniciar o extrato financeiro...");
+    // tenta de novo em instantes (o load remoto pode estar a caminho)
+    setTimeout(function(){
+      if (getCurrentSubIsFinance && getCurrentSubIsFinance()) activateFinanceExtractIfReady();
+    }, 1200);
+    return;
+  }
+  createFinanceMarker();                                  // agora pode: cria com saldo real
+  renderFinanceExtract();
+}
+
+// Indica se a sub-aba Financeiro está aberta agora (usado pelo retry do extrato)
+function getCurrentSubIsFinance() { return !!window._histSubFin; }
+
+// Reinicia SOMENTE o marco do extrato do perfil atual. Não toca em saldo/carteira/
+// ordens/proventos/Firebase. Usada pelo botão "Reiniciar extrato deste perfil".
+function resetFinanceMarkerForCurrentProfile() {
+  try { localStorage.removeItem(getFinanceMarkerKey()); } catch(e){}
+  // Se os dados do perfil atual já estão carregados, recria o marco com o saldo real;
+  // senão, mostra placeholder de carregamento. (activate decide isso.)
+  try { activateFinanceExtractIfReady(); } catch(e){}
+}
+
 function renderFinanceExtract() {
   var box = $("fin-list");
   if (!box) return;
-  var marker = ensureFinanceMarker();
+  var marker = getFinanceMarker();
+  if (!marker) {
+    // render() geral nunca cria marco — só a ativação explícita cria.
+    showFinancePlaceholder("Abra o extrato para iniciar o acompanhamento financeiro.");
+    return;
+  }
 
   // 1. Coleta movimentos de caixa a partir do marco zero, agrupados por dia
   //    Entrada (+): venda, dividendo, JCP, Selic.  Saída (−): compra.
@@ -4303,6 +4394,15 @@ function renderFinanceExtract() {
 
   if (!rows.length) {
     box.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--tx4)"><div style="font-size:32px;margin-bottom:8px">📄</div>Sem movimentações de caixa nos últimos 30 dias.</div>';
+  }
+
+  // Aviso discreto: marco de versão anterior (sem version/source). Não apaga nada;
+  // só orienta o usuário a reiniciar caso o saldo inicial pareça incorreto.
+  if (marker && !marker.version) {
+    var warn = document.createElement("div");
+    warn.style.cssText = "margin-top:12px;font-size:8px;color:var(--tx4);line-height:1.5;padding:7px;background:var(--bg2);border-radius:6px;border:1px dashed var(--bd2)";
+    warn.textContent = "Este extrato foi iniciado em uma versão anterior. Se o saldo inicial parecer incorreto, use \"Reiniciar extrato deste perfil\".";
+    box.appendChild(warn);
   }
 }
 
@@ -5329,6 +5429,14 @@ function initApp() {
     bal=newBal; initialBal=newBal; port={}; trd=[]; pending=[];
     divs=[]; totalDiv=0; checkedDivDate=""; equityHistory=[];
     firstTradeDate=""; lastYieldDate="";
+    // Correção 6: reset reinicia o extrato financeiro DESTE perfil (só o atual).
+    // Apaga o marco antigo e atualiza o saldo confirmado para o novo valor, de modo
+    // que ao reabrir a aba Financeiro o marco seja recriado com o saldo do reset.
+    try { localStorage.removeItem(getFinanceMarkerKey()); } catch(e){}
+    confirmedCashForFinanceMarker = Number(newBal || 0);
+    portfolioRemoteLoaded = true;
+    portfolioRemoteLoadedProfileId = (typeof getCurrentProfile === "function" ? getCurrentProfile() : "") || "";
+    financeMarkerSource = "reset-confirmed"; // saldo veio do reset local, não do Firebase
     saveState(); saveEquityHistory();
     ensureInitialEquityPoint(newBal);
     saveCurrentContextToFirebase();
@@ -5383,16 +5491,21 @@ function initApp() {
   // Sub-abas do Histórico: Ordens / Financeiro
   function switchHistSub(which) {
     var isOrd = which === "ordens";
+    window._histSubFin = !isOrd; // estado da sub-aba (para o retry do extrato saber se ainda está aberta)
     var vOrd = $("subview-ordens"), vFin = $("subview-fin");
     var bOrd = $("sub-ordens"), bFin = $("sub-fin");
     if (vOrd) vOrd.style.display = isOrd ? "block" : "none";
     if (vFin) vFin.style.display = isOrd ? "none" : "block";
     if (bOrd) bOrd.classList.toggle("subtab-on", isOrd);
     if (bFin) bFin.classList.toggle("subtab-on", !isOrd);
-    if (!isOrd) { try { renderFinanceExtract(); } catch(e){} }
+    if (!isOrd) { try { activateFinanceExtractIfReady(); } catch(e){} }
   }
   if ($("sub-ordens")) $("sub-ordens").onclick = function(){ switchHistSub("ordens"); };
   if ($("sub-fin")) $("sub-fin").onclick = function(){ switchHistSub("fin"); };
+  if ($("fin-reset-btn")) $("fin-reset-btn").onclick = function(){
+    var ok = confirm("Isso apagará apenas o marco inicial do extrato financeiro deste perfil. O saldo real, carteira, ordens e proventos não serão alterados. Deseja continuar?");
+    if (ok) { resetFinanceMarkerForCurrentProfile(); notif("Extrato financeiro reiniciado"); }
+  };
   if ($("leave-group-btn")) {
     $("leave-group-btn").onclick = function() {
       if (!confirm("Deseja sair deste grupo?")) return;
