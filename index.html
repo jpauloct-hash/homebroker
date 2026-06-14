@@ -76,6 +76,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .tabs{display:flex;}
 .tab{flex:1;padding:11px 2px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--tx3);font-size:11px;font-weight:700;letter-spacing:.8px;transition:all .15s;}
 .tab.on{color:var(--bl);border-bottom-color:#3b82f6;}
+.subtab{background:var(--bg2);color:var(--tx3);border:1px solid var(--bd2)!important;transition:all .15s;}
+.subtab-on{background:linear-gradient(135deg,#1e4a80,#2563eb)!important;color:#fff!important;border:1px solid transparent!important;}
+body.matrix .subtab-on{background:linear-gradient(135deg,#003318,#00aa44)!important;color:#d4ffe0!important;}
 #pb{display:flex;gap:6px;padding:5px 14px 6px;align-items:center;}
 .pbb{padding:5px 12px;border:1px solid var(--bd);border-radius:6px;background:transparent;color:var(--tx3);font-size:10px;font-weight:700;transition:all .15s;}
 .pbb.on{border-color:#1e4a80;background:#0d2040;color:var(--bl);}
@@ -617,13 +620,28 @@ body.matrix #av-hoodie{
 
     <div id="history-panel" class="panel">
       <div class="sp">
-        <!-- Dividends section -->
-        <div id="div-sec" style="display:none;margin-bottom:14px">
-          <div style="font-size:9px;color:var(--g);letter-spacing:2px;margin-bottom:8px">DIVIDENDOS RECEBIDOS</div>
-          <div id="div-list"></div>
+        <!-- Sub-abas: Ordens / Financeiro -->
+        <div style="display:flex;gap:6px;margin-bottom:14px">
+          <button id="sub-ordens" class="subtab subtab-on" style="flex:1;padding:8px;border:none;border-radius:7px;font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:inherit">ORDENS</button>
+          <button id="sub-fin" class="subtab" style="flex:1;padding:8px;border:none;border-radius:7px;font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:inherit">FINANCEIRO</button>
         </div>
-        <div id="hcnt" style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:12px"></div>
-        <div id="hlist"></div>
+
+        <!-- SUB-ABA ORDENS (conteúdo original) -->
+        <div id="subview-ordens">
+          <div id="div-sec" style="display:none;margin-bottom:14px">
+            <div style="font-size:9px;color:var(--g);letter-spacing:2px;margin-bottom:8px">DIVIDENDOS RECEBIDOS</div>
+            <div id="div-list"></div>
+          </div>
+          <div id="hcnt" style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:12px"></div>
+          <div id="hlist"></div>
+        </div>
+
+        <!-- SUB-ABA FINANCEIRO (extrato de caixa) -->
+        <div id="subview-fin" style="display:none">
+          <div style="font-size:9px;color:var(--tx4);letter-spacing:2px;margin-bottom:6px">EXTRATO FINANCEIRO — ÚLTIMOS 30 DIAS</div>
+          <div style="font-size:9px;color:var(--tx4);line-height:1.5;margin-bottom:12px;padding:8px;background:var(--bg2);border-radius:7px;border:1px solid var(--bd2)">Este extrato mostra apenas entradas e saídas de <b>caixa</b>. Não inclui valorização ou desvalorização das ações em carteira.</div>
+          <div id="fin-list"></div>
+        </div>
       </div>
     </div>
 
@@ -3486,9 +3504,14 @@ function checkDividends() {
 
         bal += value;
         totalDiv += value;
+        // Captura o tipo do provento (brapi Pro: "Dividendo" | "JCP").
+        // Normaliza para "JCP" ou "Dividendo"; se ausente, deixa vazio (exibe "Provento").
+        var rawType = (d.type || d.label || "").toString().toUpperCase();
+        var provType = rawType.indexOf("JCP") >= 0 || rawType.indexOf("JUROS") >= 0 ? "JCP"
+                     : (rawType.indexOf("DIVID") >= 0 ? "Dividendo" : "");
         var divRec = {
           id: divId, ticker: ticker, qty: pos.qty,
-          rate: d.rate, value: value,
+          rate: d.rate, value: value, type: provType,
           date: today, tm: new Date().toLocaleTimeString("pt-BR")
         };
         divs.unshift(divRec);
@@ -4131,6 +4154,122 @@ function renderHist() {
   });
 }
 
+// ── EXTRATO FINANCEIRO (visão de caixa, últimos 30 dias, com marco zero) ──
+// Marco zero: na primeira vez, grava data + saldo de caixa atual como ponto de
+// partida. A partir daí, soma entradas/saídas registradas em trd[] e divs[].
+// Não recalcula nem altera o saldo real; é só uma VISÃO dos dados existentes.
+function getFinanceMarkerKey() {
+  var uid = getIdentityUid() || "anon";
+  var prof = (typeof getCurrentProfile === "function" ? getCurrentProfile() : "") || "solo";
+  return "hb_finance_start_" + uid + "_" + prof;
+}
+function ensureFinanceMarker() {
+  var k = getFinanceMarkerKey();
+  var raw = null;
+  try { raw = localStorage.getItem(k); } catch(e){}
+  if (raw) { try { return JSON.parse(raw); } catch(e){} }
+  // Primeira ativação: marco zero = agora, com o saldo de caixa atual
+  var marker = { startKey: getLocalDateKey(Date.now()), startCash: Number(bal || 0), startTs: Date.now() };
+  try { localStorage.setItem(k, JSON.stringify(marker)); } catch(e){}
+  return marker;
+}
+
+function classifyDiv(d) {
+  if (d.ticker === "SELIC") return { tipo: "Rendimento Selic", desc: "Rendimento sobre caixa" };
+  if (d.type === "JCP") return { tipo: "JCP", desc: d.ticker };
+  if (d.type === "Dividendo") return { tipo: "Dividendo", desc: d.ticker };
+  return { tipo: "Provento", desc: d.ticker }; // antigos sem type
+}
+
+function renderFinanceExtract() {
+  var box = $("fin-list");
+  if (!box) return;
+  var marker = ensureFinanceMarker();
+
+  // 1. Coleta movimentos de caixa a partir do marco zero, agrupados por dia
+  //    Entrada (+): venda, dividendo, JCP, Selic.  Saída (−): compra.
+  var byDay = {}; // dateKey -> { in, out }
+  function bump(dateKey, val) {
+    if (!byDay[dateKey]) byDay[dateKey] = { in: 0, out: 0 };
+    if (val >= 0) byDay[dateKey].in += val; else byDay[dateKey].out += -val;
+  }
+
+  // Trades: data derivada do id (timestamp) ou do campo tm; compra = saída, venda = entrada
+  (trd || []).forEach(function(t) {
+    var ts = Number(t.id) || Date.now();
+    var dk = getLocalDateKey(ts);
+    if (dk < marker.startKey) return; // antes do marco zero: ignora
+    var v = Number(t.tot || 0);
+    if (t.tp === "C") bump(dk, -v); else bump(dk, +v);
+  });
+
+  // Proventos (divs): todos são entrada de caixa
+  (divs || []).forEach(function(d) {
+    var dk = (d.date || "").split("T")[0] || getLocalDateKey(Number(d.id) || Date.now());
+    if (dk < marker.startKey) return;
+    bump(dk, +Number(d.value || 0));
+  });
+
+  // 2. Monta a linha do tempo do marco zero até hoje, preenchendo dias sem movimento
+  var todayKey = getLocalDateKey(Date.now());
+  var days = [];
+  var cursor = marker.startKey;
+  var guard = 0;
+  while (cursor <= todayKey && guard < 400) {
+    days.push(cursor);
+    cursor = nextDateKey(cursor);
+    guard++;
+  }
+  // Janela de 30 dias: mostra só os últimos 30 dias do período
+  var windowDays = days.slice(-30);
+
+  // 3. Calcula saldo acumulado PRA FRENTE desde o marco zero (mesmo para dias fora
+  //    da janela), e guarda as linhas apenas dos dias dentro da janela de 30 dias.
+  //    Assim o saldo de cada linha já reflete todo o histórico anterior.
+  var running = Number(marker.startCash || 0);
+  var rows = [];
+  for (var j = 0; j < days.length; j++) {
+    var key = days[j];
+    var mv2 = byDay[key] || { in: 0, out: 0 };
+    running += (mv2.in - mv2.out);
+    if (windowDays.indexOf(key) >= 0) {
+      rows.push({ dateKey: key, in: mv2.in, out: mv2.out, saldo: running });
+    }
+  }
+
+  // 4. Renderiza (mais recente no topo). Inclui a linha de marco zero se estiver na janela.
+  box.innerHTML = "";
+  var showMarker = windowDays.indexOf(marker.startKey) >= 0;
+
+  function fmtDay(dk) { var p = dk.split("-"); return p[2] + "/" + p[1]; }
+
+  rows.slice().reverse().forEach(function(r) {
+    var e = document.createElement("div");
+    e.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--bd2)";
+    var inTxt = r.in > 0 ? '<span style="color:var(--g)">+' + R(r.in) + '</span>' : '<span style="color:var(--tx4)">R$ 0</span>';
+    var outTxt = r.out > 0 ? '<span style="color:var(--r)">-' + R(r.out) + '</span>' : '<span style="color:var(--tx4)">R$ 0</span>';
+    e.innerHTML =
+      '<div style="font-size:11px;font-weight:700;color:var(--tx2);min-width:42px">' + fmtDay(r.dateKey) + '</div>' +
+      '<div style="flex:1;text-align:center;font-size:10px">' + inTxt + ' &nbsp;·&nbsp; ' + outTxt + '</div>' +
+      '<div style="text-align:right;font-weight:700;font-size:12px;color:var(--a);min-width:90px">' + R(r.saldo) + '</div>';
+    box.appendChild(e);
+  });
+
+  if (showMarker) {
+    var m = document.createElement("div");
+    m.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-top:2px solid var(--bd2);margin-top:4px;opacity:.75";
+    m.innerHTML =
+      '<div style="font-size:10px;font-weight:700;color:var(--tx3)">' + fmtDay(marker.startKey) + '</div>' +
+      '<div style="flex:1;text-align:center;font-size:9px;color:var(--tx4)">Início do extrato financeiro</div>' +
+      '<div style="text-align:right;font-weight:700;font-size:11px;color:var(--tx3);min-width:90px">' + R(marker.startCash) + '</div>';
+    box.appendChild(m);
+  }
+
+  if (!rows.length) {
+    box.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--tx4)"><div style="font-size:32px;margin-bottom:8px">📄</div>Sem movimentações de caixa nos últimos 30 dias.</div>';
+  }
+}
+
 function render() {
   try { renderHdr(); } catch(e) {}
   try { maybePushStats(); } catch(e) {}
@@ -4140,6 +4279,7 @@ function render() {
   try { renderPending(); } catch(e) {}
   try { renderPort(); } catch(e) {}
   try { renderHist(); } catch(e) {}
+  try { renderFinanceExtract(); } catch(e) {}
   try { renderGoalBar(); } catch(e) {}
 }
 
@@ -5203,6 +5343,20 @@ function initApp() {
   };
   $("aho-modal").onclick=function(e){ if(e.target===$("aho-modal")){$("aho-modal").style.display="none";ahoOrder=null;} };
   $("logb").onclick = function() { doAuthLogout(); };
+
+  // Sub-abas do Histórico: Ordens / Financeiro
+  function switchHistSub(which) {
+    var isOrd = which === "ordens";
+    var vOrd = $("subview-ordens"), vFin = $("subview-fin");
+    var bOrd = $("sub-ordens"), bFin = $("sub-fin");
+    if (vOrd) vOrd.style.display = isOrd ? "block" : "none";
+    if (vFin) vFin.style.display = isOrd ? "none" : "block";
+    if (bOrd) bOrd.classList.toggle("subtab-on", isOrd);
+    if (bFin) bFin.classList.toggle("subtab-on", !isOrd);
+    if (!isOrd) { try { renderFinanceExtract(); } catch(e){} }
+  }
+  if ($("sub-ordens")) $("sub-ordens").onclick = function(){ switchHistSub("ordens"); };
+  if ($("sub-fin")) $("sub-fin").onclick = function(){ switchHistSub("fin"); };
   if ($("leave-group-btn")) {
     $("leave-group-btn").onclick = function() {
       if (!confirm("Deseja sair deste grupo?")) return;
