@@ -890,7 +890,7 @@ function doAuthLogout() {
   // Encerra explicitamente o listener da carteira (Fase B) para não vazar entre sessões
   if (_portfolioSubRef && _portfolioSubHandler) {
     try { _portfolioSubRef.off("value", _portfolioSubHandler); } catch(e) {}
-    _portfolioSubRef = null; _portfolioSubHandler = null; _lastServerExecSeen = 0;
+    _portfolioSubRef = null; _portfolioSubHandler = null; _lastServerExecSeen = 0; _lastServerUpdateSeen = 0;
   }
   currentUser=null; currentRoomId=""; currentRoomData=null;
   fbAuth.signOut().then(function() { showAuthScreen(); }).catch(function(err){ console.error("Erro ao sair:",err); });
@@ -1431,6 +1431,7 @@ function saveCurrentContextToFirebase() {
 var _portfolioSubRef = null;
 var _portfolioSubHandler = null;
 var _lastServerExecSeen = 0;
+var _lastServerUpdateSeen = 0; // marcador genérico de atualização do servidor (inclui Selic)
 
 function subscribeOwnPortfolioRealtime() {
   // Desliga o listener anterior (troca de perfil/contexto)
@@ -1447,6 +1448,7 @@ function subscribeOwnPortfolioRealtime() {
   if (!ref) return;
 
   _lastServerExecSeen = 0; // recalibra no primeiro snapshot do novo contexto
+  _lastServerUpdateSeen = 0;
 
   // B2: captura o contexto NO MOMENTO da subscription. Se o contexto mudar
   // (troca de grupo/solo), um evento tardio deste listener é ignorado.
@@ -1459,13 +1461,15 @@ function subscribeOwnPortfolioRealtime() {
     if (!data) return;
 
     var serverExec = Number(data.lastServerExec || 0);
+    var serverUpdate = Number(data.lastServerUpdate || 0); // marcador genérico (execução OU rendimento)
 
-    // Primeiro snapshot: calibra a referência. Aplica o estado como autoritativo
-    // (silenciosamente, sem som/notificação) para não ficar defasado se o Worker
-    // já executou algo antes do listener anexar (G3).
-    if (_lastServerExecSeen === 0) {
+    // Primeiro snapshot: calibra as referências e aplica o estado autoritativo
+    // (silenciosamente) para não ficar defasado se o Worker já mexeu na carteira
+    // antes do listener anexar (G3).
+    if (_lastServerExecSeen === 0 && _lastServerUpdateSeen === 0) {
       _lastServerExecSeen = serverExec || 1;
-      if (serverExec > 0) {
+      _lastServerUpdateSeen = serverUpdate;
+      if (serverExec > 0 || serverUpdate > 0) {
         if (subscribedInGroup) { applyGroupPayloadToMemory(data, getCurrentProfile()); syncGroupToLocalCache(getCurrentProfile()); }
         else { applySoloPayloadToMemory(data); syncSoloToLocalCache(); }
         render();
@@ -1473,9 +1477,17 @@ function subscribeOwnPortfolioRealtime() {
       return;
     }
 
-    if (!serverExec || serverExec <= _lastServerExecSeen) return; // nada novo do servidor
+    // Detecta novidade do servidor: execução de ordens (lastServerExec) OU
+    // qualquer atualização do servidor (lastServerUpdate) — inclui rendimento Selic.
+    var execIsNew = serverExec > _lastServerExecSeen;
+    var updateIsNew = serverUpdate > _lastServerUpdateSeen;
+    if (!execIsNew && !updateIsNew) return; // nada novo
 
-    _lastServerExecSeen = serverExec;
+    var updateType = data.lastServerUpdateType || "";
+    var wasYield = updateIsNew && !execIsNew && updateType === "yield";
+    var wasYieldZero = updateIsNew && !execIsNew && updateType === "yield_zero";
+    if (serverExec > _lastServerExecSeen) _lastServerExecSeen = serverExec;
+    if (serverUpdate > _lastServerUpdateSeen) _lastServerUpdateSeen = serverUpdate;
 
     // Aplica o estado vindo do servidor (usa o contexto CAPTURADO, não o atual)
     if (subscribedInGroup) {
@@ -1486,8 +1498,15 @@ function subscribeOwnPortfolioRealtime() {
       syncSoloToLocalCache();
     }
 
-    notif("Ordem(ns) executada(s) pelo servidor");
-    if (typeof playTradeSound === "function") { try { playTradeSound("limit"); } catch(e) {} }
+    // Mensagem adequada ao tipo de atualização
+    if (wasYieldZero) {
+      // rendimento zero: atualização silenciosa (só sincroniza lastYieldDate/estado)
+    } else if (wasYield) {
+      notif("Rendimento do caixa creditado");
+    } else {
+      notif("Ordem(ns) executada(s) pelo servidor");
+      if (typeof playTradeSound === "function") { try { playTradeSound("limit"); } catch(e) {} }
+    }
 
     pushEquityPoint();
     if (subscribedInGroup) pushMyStats();
@@ -3233,7 +3252,8 @@ function fetchQ() {
 
       checkScheduledOrders();
       processRetroactiveOrders();
-      creditDailyYield();
+      // creditDailyYield() REMOVIDO: a remuneração do caixa (82,5% Selic) agora é
+      // calculada e creditada pelo Worker (servidor), 6h BRT, para não pagar em dobro.
       checkDividends();
       checkPending();
       render();
@@ -3470,68 +3490,15 @@ function countBusinessDaysBetween(fromKey, toKey) {
 }
 
 function creditDailyYield() {
-  var todayKey = getLocalDateKey(Date.now());
-
-  // Primeira execução: marca hoje como base, sem crédito retroativo
-  if (!lastYieldDate) {
-    lastYieldDate = todayKey;
-    saveState();
-    return Promise.resolve();
-  }
-
-  if (lastYieldDate >= todayKey) return Promise.resolve(); // já creditado hoje
-
-  var nDays = countBusinessDaysBetween(lastYieldDate, todayKey);
-  if (nDays <= 0) {
-    // Só fim de semana no intervalo: avança o marcador sem creditar
-    lastYieldDate = todayKey;
-    saveState();
-    return Promise.resolve();
-  }
-
-  if (!isFinite(bal) || bal <= 0) {
-    // Sem caixa para render: avança o marcador
-    lastYieldDate = todayKey;
-    saveState();
-    return Promise.resolve();
-  }
-
-  return fetchSelicRate().then(function(annualRate){
-    if (annualRate === null) return; // sem taxa, tenta de novo na próxima (não avança marcador)
-
-    // Taxa diária útil: (1 + Selic a.a.)^(1/252) - 1
-    var daily = Math.pow(1 + annualRate / 100, 1 / 252) - 1;
-    // Juros compostos pelos dias úteis acumulados
-    var amount = bal * (Math.pow(1 + daily, nDays) - 1);
-    amount = Math.round(amount * 100) / 100; // centavos
-
-    if (amount > 0) {
-      bal += amount;
-      totalDiv += amount;
-      divs.unshift({
-        id: "SELIC_" + todayKey,
-        ticker: "SELIC",
-        qty: nDays,
-        rate: annualRate,
-        value: amount,
-        date: todayKey,
-        tm: new Date().toLocaleTimeString("pt-BR"),
-        note: "Rendimento do caixa (" + nDays + " dia" + (nDays > 1 ? "s" : "") + " útil" + (nDays > 1 ? "eis" : "") + " a " + annualRate.toFixed(2).replace(".", ",") + "% a.a.)"
-      });
-      notif("Rendimento do caixa: +" + R(amount) + " (Selic " + annualRate.toFixed(2).replace(".", ",") + "% a.a.)");
-      if (typeof sfxDividend === "function") { try { sfxDividend(); } catch(e) {} }
-    }
-
-    lastYieldDate = todayKey;
-    saveState();
-
-    if (isInGroupContext()) {
-      pushEquityPoint();
-      pushMyStats();
-    }
-
-    render();
-  });
+  // NO-OP: a remuneração do caixa (82,5% Selic) agora é calculada e creditada
+  // exclusivamente pelo Worker (servidor), às 6h BRT. Mantida como no-op para não
+  // quebrar chamadas residuais e evitar pagamento em dobro.
+  return;
+}
+function _creditDailyYield_DESATIVADA() {
+  // Código antigo de remuneração local REMOVIDO. A remuneração Selic é feita
+  // exclusivamente pelo Worker. Mantida vazia para não quebrar referências.
+  return;
 }
 
 //  Dividendos 
