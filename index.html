@@ -813,7 +813,7 @@ body.matrix #av-hoodie{
 <div id="aho-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:none;align-items:center;justify-content:center;padding:24px;">
   <div style="width:100%;max-width:360px;background:#0d1421;border-radius:14px;padding:24px;border:1px solid var(--a);">
     <div style="font-size:13px;font-weight:700;color:var(--a);margin-bottom:8px">Pregao Fechado</div>
-    <div style="font-size:11px;color:var(--tx2);line-height:1.7;margin-bottom:12px">O pregao esta fechado. Deseja agendar esta ordem para a abertura do proximo pregao (10:00)?</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.7;margin-bottom:12px">O pregao esta fechado. Deseja agendar esta ordem para o proximo pregao? A execucao ocorre a partir das 10:05, respeitando o delay de 5 min da cotacao.</div>
     <div id="aho-summary" style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--tx2)"></div>
     <div style="display:flex;gap:8px">
       <button id="aho-no" style="flex:1;padding:10px;border:1px solid var(--bd2);border-radius:8px;color:var(--tx3);font-size:11px;font-weight:600;background:transparent">Cancelar</button>
@@ -3354,6 +3354,19 @@ function isPregaoOpen() {
   return mins >= 600 && mins < 1020; // 10:00-17:00
 }
 
+// Janela de EXECUÇÃO manual a mercado: 10:05–17:00 BRT (mesma do Worker).
+// O pregão "abre" visualmente às 10:00, mas a brapi tem delay de 5 min — entre
+// 10:00 e 10:04 a cotação ainda reflete o fechamento anterior. Esta trava impede
+// que o usuário execute uma ordem manual a mercado com preço congelado.
+// NÃO bloqueia agendar ordem pendente (que o Worker executa a partir de 10:05).
+function isExecutionWindowClientBRT() {
+  var brt = getBRTDate();
+  var dow = brt.getDay();
+  if (dow === 0 || dow === 6) return false;
+  var mins = brt.getHours()*60 + brt.getMinutes();
+  return mins >= 605 && mins < 1020; // 10:05–17:00
+}
+
 function nextPregaoOpen() {
   // Returns ms until next 10:00 BRT on a business day
   var brt = getBRTDate();
@@ -3405,25 +3418,11 @@ setInterval(updatePregaoBar, 1000);
 
 // Check if scheduled orders should fire at prego open
 function checkScheduledOrders() {
-  if (!isPregaoOpen()) return;
-  var brt = getBRTDate();
-  var minsNow = brt.getHours()*60 + brt.getMinutes();
-  var isLate = minsNow > 610; // depois de 10:10 BRT = perdeu a abertura
-  var toActivate=[], keep=[];
-  pending.forEach(function(o) {
-    if (o.scheduled) {
-      // Convert scheduled order to active limit order
-      var activated = JSON.parse(JSON.stringify(o));
-      delete activated.scheduled;
-      if (activated.market && isLate) activated.activatedLate = true; // executa retro ao preço de abertura
-      toActivate.push(activated);
-    } else keep.push(o);
-  });
-  if (toActivate.length) {
-    pending = keep.concat(toActivate);
-    saveState();
-    notif(toActivate.length+" ordem(s) agendada(s) ativada(s) no pregao!");
-  }
+  // OPÇÃO A: execução de ordens pendentes/agendadas centralizada no WORKER.
+  // O cliente não ativa nem executa mais ordens localmente (evita execução dupla,
+  // preço congelado às 10:00 e ranking injusto). As pendentes seguem exibidas na
+  // aba ORDENS por renderPending(); o Worker executa e o listener absorve.
+  return;
 }
 
 // Pending after-hours order (temp storage before user confirms scheduling)
@@ -3437,7 +3436,7 @@ function showAHO(orderObj) {
     '<span style="color:'+(orderObj.side==="buy"?"var(--g)":"var(--r)")+';font-weight:700">'+side+'</span> - '+
     '<span style="color:var(--bl);font-weight:700">'+orderObj.tk+'</span> - '+
     orderObj.qty+' cotas - '+type+'<br>'+
-    '<span style="color:var(--a);font-size:10px">Agendada para: '+nextPregaoDateStr()+' as 10:00</span>';
+    '<span style="color:var(--a);font-size:10px">Agendada para execução a partir das 10:05 de '+nextPregaoDateStr()+', respeitando o delay da cotação</span>';
   $("aho-modal").style.display="flex";
 }
 
@@ -3601,97 +3600,8 @@ function fetchIntraday(ticker) {
 var _retroRunning = false;
 
 function processRetroactiveOrders() {
-  if (_retroRunning) return;
-  if (!pending.length) return;
-  if (!isPregaoOpen()) return;
-
-  var todayKey = getLocalDateKey(Date.now());
-
-  var lateMarket = pending.filter(function(o){ return o.market && o.activatedLate; });
-  var limitToCheck = pending.filter(function(o){
-    return !o.scheduled && !o.market && o.lp && o.retroCheck !== todayKey;
-  });
-
-  if (!lateMarket.length && !limitToCheck.length) return;
-
-  _retroRunning = true;
-  var anyChange = false;
-
-  // Dedup de tickers para buscar o intradiário uma vez só por papel
-  var tickers = {};
-  lateMarket.forEach(function(o){ tickers[o.tk] = true; });
-  limitToCheck.forEach(function(o){ tickers[o.tk] = true; });
-
-  var fetches = Object.keys(tickers).map(function(tk){
-    return fetchIntraday(tk).then(function(candles){ return { tk: tk, candles: candles }; });
-  });
-
-  Promise.all(fetches).then(function(results){
-    var byTicker = {};
-    results.forEach(function(r){ byTicker[r.tk] = r.candles; });
-
-    // a) Market agendadas atrasadas: preço de abertura (primeiro candle do dia)
-    lateMarket.forEach(function(o){
-      var stillPending = pending.some(function(p){ return p.id === o.id; });
-      if (!stillPending) return;
-
-      var candles = byTicker[o.tk];
-      var openPrice = null;
-      if (candles && candles.length) {
-        var first = candles[0];
-        openPrice = Number(first.open || first.close || 0);
-      }
-
-      pending = pending.filter(function(p){ return p.id !== o.id; });
-
-      if (openPrice && openPrice > 0) {
-        doMarketOrder(o.tk, o.side, o.qty, true, openPrice, "Agendada @ abertura");
-      } else {
-        // Fallback: sem intradiário, executa ao preço corrente (comportamento antigo)
-        doMarketOrder(o.tk, o.side, o.qty, true);
-      }
-      anyChange = true;
-    });
-
-    // b) Limitadas: mín/máx do dia cruzou o limite enquanto o app esteve fechado
-    limitToCheck.forEach(function(o){
-      var live = pending.filter(function(p){ return p.id === o.id; })[0];
-      if (!live) return; // já executou ao vivo nesse meio-tempo
-
-      live.retroCheck = todayKey; // marca a checagem do dia (executando ou não)
-
-      var candles = byTicker[o.tk];
-      if (!candles || !candles.length) return;
-
-      var dayLow = Infinity, dayHigh = -Infinity;
-      candles.forEach(function(c){
-        var lo = Number(c.low || c.close), hi = Number(c.high || c.close);
-        if (isFinite(lo) && lo > 0 && lo < dayLow) dayLow = lo;
-        if (isFinite(hi) && hi > 0 && hi > dayHigh) dayHigh = hi;
-      });
-
-      var crossed = (live.side==="buy" && dayLow <= live.lp) ||
-                    (live.side==="sell" && dayHigh >= live.lp);
-      if (!crossed) { anyChange = true; return; } // só o retroCheck mudou; persiste
-
-      pending = pending.filter(function(p){ return p.id !== live.id; });
-      fillLimitOrder(live, live.lp, "Lim retro @ " + fr(live.lp));
-      anyChange = true;
-    });
-
-    if (anyChange) {
-      saveState();
-      if (isInGroupContext()) {
-        pushEquityPoint();
-        pushMyStats();
-      }
-      render();
-    }
-  }).catch(function(err){
-    console.error("Erro na execução retroativa:", err);
-  }).then(function(){
-    _retroRunning = false;
-  });
+  // OPÇÃO A: desativado no cliente. O Worker executa ordens agendadas/retroativas.
+  return;
 }
 
 // Executa o preenchimento de uma ordem limitada a um preço dado.
@@ -3718,46 +3628,9 @@ function fillLimitOrder(o, execPrice, noteText) {
 }
 
 function checkPending() {
-  if (!pending.length) return;
-  if (!isPregaoOpen()) return; // so executa durante pregao
-  var keep = [], changed = false;
-  for (var i=0; i<pending.length; i++) {
-    var o = pending[i];
-    if (o.scheduled) { keep.push(o); continue; } // aguarda ativacao no pregao
-
-    var p = prices[o.tk];
-    if (!p) { keep.push(o); continue; }
-
-    // Market agendada que perdeu a abertura: a execução retroativa cuida (preço de abertura)
-    if (o.market && o.activatedLate) { keep.push(o); continue; }
-
-    // Market order agendada: executa imediatamente
-    if (o.market) {
-      doMarketOrder(o.tk, o.side, o.qty, true);
-      changed = true; continue;
-    }
-
-    // Limit order: executa quando preo cruzar o limite (qualquer direo)
-    // Compra: executa quando p <= lp (mercado caiu at o alvo)
-    // Venda: executa quando p >= lp (mercado subiu at o alvo)
-    // Se mercado j passou alm do limite, executa no preo de mercado
-    var hit = (o.side==="buy" && p<=o.lp) || (o.side==="sell" && p>=o.lp);
-    if (!hit) { keep.push(o); continue; }
-
-    fillLimitOrder(o, p); // "filled" ou "cancelled": nos dois casos a ordem sai da fila
-    changed=true;
-  }
-  pending = keep;
-  if (changed) {
-    saveState();
-
-    if (isInGroupContext()) {
-      pushEquityPoint();
-      pushMyStats();
-    }
-
-    render();
-  }
+  // OPÇÃO A: desativado no cliente. O Worker executa ordens limitadas/pendentes
+  // a partir de 10:05 BRT. O cliente apenas exibe e permite cancelar.
+  return;
 }
 
 //  Equity Canvas Chart 
@@ -4157,44 +4030,55 @@ function renderPort() {
 }
 
 function renderHist() {
-  // Dividends
-  var ds=$("div-sec"),dl=$("div-list");
-  if (divs.length) {
-    ds.style.display="block"; dl.innerHTML="";
-    divs.forEach(function(d) {
-      var e=document.createElement("div"); e.className="div-item";
-      var isYield = d.ticker === "SELIC";
-      var badge = isYield ? "RENDIMENTO" : "DIVIDENDO";
-      var detail = isYield
-        ? (d.note || ("Caixa a "+fr(d.rate)+"% a.a."))
-        : (d.qty+' cotas x R$'+fr(d.rate));
-      e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
-        '<span class="bdg" style="background:rgba(0,200,150,.15);color:var(--g)">'+badge+'</span>'+
-        '<span style="color:var(--bl);font-weight:700;font-size:12px">'+escapeHtml(d.ticker)+'</span></div>'+
-        '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(detail)+'</div></div>'+
-        '<div style="text-align:right"><div style="font-weight:700;font-size:12px;color:var(--g)">+'+R(d.value)+'</div>'+
-        '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(d.date)+'</div></div>';
-      dl.appendChild(e);
-    });
-  } else ds.style.display="none";
+  var _divs = normalizeList(divs);
+  var _trd = normalizeList(trd);
 
-  // Trades
-  $("hcnt").textContent=trd.length+" OPERAC"+(trd.length===1?"AO":"OES");
-  var l=$("hlist"); l.innerHTML="";
-  if (!trd.length) { l.innerHTML='<div class="empty"><div style="font-size:36px;margin-bottom:10px">&#128203;</div>Nenhuma operacao.</div>'; return; }
-  trd.forEach(function(t) {
-    var col=t.tp==="C"?"var(--g)":"var(--r)", bgc=t.tp==="C"?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)";
-    var e=document.createElement("div"); e.className="ti";
-    e.style.borderLeft="2px solid "+col;
-    e.innerHTML='<div><div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">'+
-      '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(t.tp==="C"?"COMPRA":"VENDA")+'</span>'+
-      '<span style="color:var(--bl);font-weight:700;font-size:12px">'+escapeHtml(t.tk)+'</span>'+
-      (t.note?'<span style="font-size:8px;color:var(--a)">&#127919;</span>':'')+
-      '</div><div style="font-size:10px;color:var(--tx4)">'+Number(t.qty)+' cotas @ '+R(t.pr)+(t.note?' - '+escapeHtml(t.note):'')+'</div></div>'+
-      '<div style="text-align:right"><div style="font-weight:700;font-size:12px">'+R(t.tot)+'</div>'+
-      '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(t.tm)+'</div></div>';
-    l.appendChild(e);
-  });
+  // ── Seção de dividendos/rendimentos (isolada: erro aqui não derruba os trades) ──
+  try {
+    var ds=$("div-sec"),dl=$("div-list");
+    if (_divs.length) {
+      ds.style.display="block"; dl.innerHTML="";
+      _divs.forEach(function(d) {
+        d = d || {};
+        var e=document.createElement("div"); e.className="div-item";
+        var isYield = d.ticker === "SELIC";
+        var badge = isYield ? "RENDIMENTO" : "DIVIDENDO";
+        var hasRate = (typeof d.rate === "number" && isFinite(d.rate)) || (d.rate != null && !isNaN(Number(d.rate)));
+        var detail = isYield
+          ? (d.desc || d.note || "Rendimento do caixa")
+          : (Number(d.qty||0)+' cotas' + (hasRate ? ' x R$'+fr(d.rate) : ''));
+        e.innerHTML='<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
+          '<span class="bdg" style="background:rgba(0,200,150,.15);color:var(--g)">'+badge+'</span>'+
+          '<span style="color:var(--bl);font-weight:700;font-size:12px">'+escapeHtml(d.ticker||"—")+'</span></div>'+
+          '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(detail)+'</div></div>'+
+          '<div style="text-align:right"><div style="font-weight:700;font-size:12px;color:var(--g)">+'+R(d.value||0)+'</div>'+
+          '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(d.date||"")+'</div></div>';
+        dl.appendChild(e);
+      });
+    } else ds.style.display="none";
+  } catch(e) { console.error("renderHist dividendos:", e, divs); }
+
+  // ── Seção de trades (isolada) ──
+  try {
+    $("hcnt").textContent=_trd.length+" OPERAC"+(_trd.length===1?"AO":"OES");
+    var l=$("hlist"); l.innerHTML="";
+    if (!_trd.length) { l.innerHTML='<div class="empty"><div style="font-size:36px;margin-bottom:10px">&#128203;</div>Nenhuma operacao.</div>'; return; }
+    _trd.forEach(function(t) {
+      t = t || {};
+      var tp = t.tp || "?";
+      var col=tp==="C"?"var(--g)":"var(--r)", bgc=tp==="C"?"rgba(0,200,150,.15)":"rgba(240,64,96,.15)";
+      var e=document.createElement("div"); e.className="ti";
+      e.style.borderLeft="2px solid "+col;
+      e.innerHTML='<div><div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">'+
+        '<span class="bdg" style="background:'+bgc+';color:'+col+'">'+(tp==="C"?"COMPRA":"VENDA")+'</span>'+
+        '<span style="color:var(--bl);font-weight:700;font-size:12px">'+escapeHtml(t.tk||"—")+'</span>'+
+        (t.note?'<span style="font-size:8px;color:var(--a)">&#127919;</span>':'')+
+        '</div><div style="font-size:10px;color:var(--tx4)">'+Number(t.qty||0)+' cotas @ '+R(t.pr||0)+(t.note?' - '+escapeHtml(t.note):'')+'</div></div>'+
+        '<div style="text-align:right"><div style="font-weight:700;font-size:12px">'+R(t.tot||0)+'</div>'+
+        '<div style="font-size:9px;color:var(--tx4)">'+escapeHtml(t.tm||"")+'</div></div>';
+      l.appendChild(e);
+    });
+  } catch(e) { console.error("renderHist trades:", e, trd); }
 }
 
 // ── EXTRATO FINANCEIRO (visão de caixa, últimos 30 dias, com marco zero) ──
@@ -4414,7 +4298,7 @@ function render() {
   try { renderOrders(); } catch(e) {}
   try { renderPending(); } catch(e) {}
   try { renderPort(); } catch(e) {}
-  try { renderHist(); } catch(e) {}
+  try { renderHist(); } catch(e) { console.error("renderHist:", e); }
   try { renderFinanceExtract(); } catch(e) { console.error("Erro no extrato financeiro (render):", e); }
   try { renderGoalBar(); } catch(e) {}
 }
@@ -4489,6 +4373,12 @@ function execOrder() {
   if (!open) {
     // Offer to schedule as market order at next open
     sfxBolt(); showAHO({id:Date.now(),tk:sel,side:side,qty:qty,lp:null,scheduled:true,market:true});
+    return;
+  }
+  // Trava anti-cotação-congelada: entre 10:00 e 10:04 o pregão está "aberto" mas a
+  // brapi ainda reflete o fechamento anterior. Bloqueia execução manual (agendar continua ok).
+  if (!isExecutionWindowClientBRT()) {
+    notif("Aguarde 10:05 para executar. A cotacao tem delay de 5 minutos.","err");
     return;
   }
   doMarketOrder(sel,side,qty,false);
